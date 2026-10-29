@@ -96,7 +96,12 @@ export function TwoFactorForm() {
       <Button type="submit" disabled={isSubmitting}>
         {isSubmitting ? "Verificando..." : "Verificar"}
       </Button>
-      <Button type="button" variant="link" onClick={toggleMode}>
+      <Button
+        type="button"
+        variant="link"
+        onClick={toggleMode}
+        className="h-auto text-center whitespace-normal"
+      >
         {useBackupCode
           ? "Usar o código do aplicativo"
           : "Perdeu o celular? Use um código de recuperação"}

@@ -133,14 +133,14 @@ function VerifyStep({ enrollment }: { enrollment: Enrollment }) {
           className="rounded-md border"
         />
         <p className="text-sm text-muted-foreground">
-          Se não conseguir ler, digite esta chave no aplicativo:{" "}
-          <code
-            id="totp-secret"
-            className="font-mono break-all text-foreground"
-          >
-            {enrollment.secret}
-          </code>
+          Se não conseguir ler, digite esta chave no aplicativo:
         </p>
+        <code
+          id="totp-secret"
+          className="rounded-md border p-3 font-mono text-sm break-all"
+        >
+          {enrollment.secret}
+        </code>
       </section>
 
       <section className="grid gap-3">
