@@ -6,27 +6,27 @@ Aprovado por Guilherme em 29/10/2026. Este arquivo registra as decisões da Etap
 
 Um único aplicativo em TypeScript (Next.js) com PostgreSQL entrega site, agendamento e painel num só código e numa só implantação. A peça central é o próprio banco recusar dois agendamentos no mesmo horário.
 
-| Tema                 | Recomendação                                                       | Motivo                                                                                              |
-| -------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| Aplicação            | Next.js com TypeScript, em um projeto só (monólito modular)        | Um código e um deploy; site bem indexado no Google; a mesma validação no navegador e no servidor    |
-| Banco de dados       | PostgreSQL com Drizzle ORM e migrações SQL versionadas             | Uma constraint de exclusão impede horários sobrepostos no próprio banco                             |
-| Login do painel      | Better Auth, com 2FA e sem cadastro público                        | É a biblioteca que a equipe que hoje mantém o Auth.js indica para projetos novos                    |
-| Interface            | Tailwind CSS, shadcn/ui e FullCalendar no painel                   | Componentes acessíveis; visões de dia, semana e mês prontas                                         |
-| Confirmação          | Definida por serviço; o padrão é a clínica confirmar               | Procedimentos como PEIM podem exigir avaliação prévia                                               |
-| Dados do paciente    | Nome, WhatsApp e e-mail opcional, sem campo de texto livre         | Coleta mínima e nenhum dado de saúde no formulário público                                          |
-| Cancelar e reagendar | Link secreto enviado ao paciente, sem login                        | Menos atrito e menos dados pessoais guardados                                                       |
-| Hospedagem           | Vercel Pro e Neon, ambos em São Paulo; alternativa: VPS no Brasil  | Menos manutenção para um desenvolvedor sozinho; o código continua portátil                          |
+| Tema                 | Recomendação                                                      | Motivo                                                                                           |
+| -------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Aplicação            | Next.js com TypeScript, em um projeto só (monólito modular)       | Um código e um deploy; site bem indexado no Google; a mesma validação no navegador e no servidor |
+| Banco de dados       | PostgreSQL com Drizzle ORM e migrações SQL versionadas            | Uma constraint de exclusão impede horários sobrepostos no próprio banco                          |
+| Login do painel      | Better Auth, com 2FA e sem cadastro público                       | É a biblioteca que a equipe que hoje mantém o Auth.js indica para projetos novos                 |
+| Interface            | Tailwind CSS, shadcn/ui e FullCalendar no painel                  | Componentes acessíveis; visões de dia, semana e mês prontas                                      |
+| Confirmação          | Definida por serviço; o padrão é a clínica confirmar              | Procedimentos como PEIM podem exigir avaliação prévia                                            |
+| Dados do paciente    | Nome, WhatsApp e e-mail opcional, sem campo de texto livre        | Coleta mínima e nenhum dado de saúde no formulário público                                       |
+| Cancelar e reagendar | Link secreto enviado ao paciente, sem login                       | Menos atrito e menos dados pessoais guardados                                                    |
+| Hospedagem           | Vercel Pro e Neon, ambos em São Paulo; alternativa: VPS no Brasil | Menos manutenção para um desenvolvedor sozinho; o código continua portátil                       |
 
 ## Análise dos requisitos e escopo do MVP
 
 Os requisitos são coerentes e cabem num MVP, desde que integrações externas, pagamentos e qualquer dado clínico fiquem para etapas seguintes.
 
-| Área           | Entra no MVP                                                                                                                                                           | Fica para depois                                                                       |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Site público   | Apresentação da clínica e da profissional, serviços por categoria, contato, link do mapa, botão de WhatsApp, botão Agendar, aviso de privacidade, SEO básico           | Blog, galeria, depoimentos                                                             |
-| Agendamento    | Fluxo em cinco passos, regras configuráveis, link para cancelar ou reagendar, arquivo para adicionar ao calendário (.ics)                                                | Lembretes automáticos, lista de espera, sinal e pagamento online, recorrência          |
+| Área           | Entra no MVP                                                                                                                                                           | Fica para depois                                                                           |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Site público   | Apresentação da clínica e da profissional, serviços por categoria, contato, link do mapa, botão de WhatsApp, botão Agendar, aviso de privacidade, SEO básico           | Blog, galeria, depoimentos                                                                 |
+| Agendamento    | Fluxo em cinco passos, regras configuráveis, link para cancelar ou reagendar, arquivo para adicionar ao calendário (.ics)                                              | Lembretes automáticos, lista de espera, sinal e pagamento online, recorrência              |
 | Painel         | Agenda por dia, semana e mês; pendências; confirmar, cancelar, reagendar e concluir; serviços; expediente e bloqueios; pacientes; busca; indicadores; conteúdo do site | Relatórios gerenciais, financeiro, vários profissionais e salas, Google Calendar e Outlook |
-| Dados de saúde | Nenhum                                                                                                                                                                 | Prontuário, em etapa própria                                                           |
+| Dados de saúde | Nenhum                                                                                                                                                                 | Prontuário, em etapa própria                                                               |
 
 Itens que o pedido não cita e que foram incluídos, porque sem eles a agenda não fica confiável:
 
@@ -47,46 +47,46 @@ Interpretações adotadas:
 
 Cada item tem um padrão proposto e pode ser ajustado no painel até a publicação.
 
-| #   | Pergunta                                                                                                    | Padrão proposto                                                         | Necessário para |
-| --- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------- |
-| 1   | Quem usa o painel: só ela ou também uma secretária?                                                         | Só ela; o modelo já prevê papéis                                        | Etapa 2         |
-| 2   | Algum procedimento permite atender dois pacientes ao mesmo tempo?                                           | Não, um atendimento por vez                                             | Etapa 3         |
-| 3   | Quais serviços confirmam sozinhos e quais dependem da clínica?                                              | Todos dependem da clínica até ela mudar                                 | Etapa 3         |
-| 4   | Antecedência mínima, limite de dias à frente, prazo para cancelar online e intervalo entre os horários       | 2 horas, 60 dias, 24 horas e 30 minutos                                 | Etapa 3         |
-| 5   | Bastam nome, WhatsApp e e-mail opcional? CPF ou data de nascimento são exigidos?                            | Só os três primeiros                                                    | Etapa 3         |
-| 6   | A clínica atende menores de idade?                                                                          | Agendamento online só para maiores; menores pelo WhatsApp, com o responsável | Etapa 3    |
-| 7   | Existe e-mail profissional e domínio? A clínica quer e-mails automáticos?                                   | E-mail opcional por SMTP; WhatsApp manual como canal principal          | Etapa 3         |
-| 8   | Em qual município fica a clínica, e ela abre em feriados?                                                   | Feriados nacionais carregados como bloqueio, editáveis                  | Etapa 3         |
-| 9   | Quais exames não sanguíneos serão oferecidos? As habilitações para ozonioterapia e PEIM estão confirmadas?   | O serviço só aparece no site quando ela o ativa                         | Publicação      |
-| 10  | Expediente, duração e preço de cada serviço, textos, fotos, logotipo, cores, registro profissional, endereço e contatos | Nenhum dado inventado; campos vazios até ela preencher      | Publicação      |
-| 11  | Qual o orçamento mensal de hospedagem?                                                                      | Vercel Pro e Neon em São Paulo                                          | Publicação      |
-| 12  | A clínica é pessoa jurídica? Há assessoria jurídica para LGPD?                                              | Ver Privacidade e LGPD                                                  | Publicação      |
+| #   | Pergunta                                                                                                                | Padrão proposto                                                              | Necessário para |
+| --- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------- |
+| 1   | Quem usa o painel: só ela ou também uma secretária?                                                                     | Só ela; o modelo já prevê papéis                                             | Etapa 2         |
+| 2   | Algum procedimento permite atender dois pacientes ao mesmo tempo?                                                       | Não, um atendimento por vez                                                  | Etapa 3         |
+| 3   | Quais serviços confirmam sozinhos e quais dependem da clínica?                                                          | Todos dependem da clínica até ela mudar                                      | Etapa 3         |
+| 4   | Antecedência mínima, limite de dias à frente, prazo para cancelar online e intervalo entre os horários                  | 2 horas, 60 dias, 24 horas e 30 minutos                                      | Etapa 3         |
+| 5   | Bastam nome, WhatsApp e e-mail opcional? CPF ou data de nascimento são exigidos?                                        | Só os três primeiros                                                         | Etapa 3         |
+| 6   | A clínica atende menores de idade?                                                                                      | Agendamento online só para maiores; menores pelo WhatsApp, com o responsável | Etapa 3         |
+| 7   | Existe e-mail profissional e domínio? A clínica quer e-mails automáticos?                                               | E-mail opcional por SMTP; WhatsApp manual como canal principal               | Etapa 3         |
+| 8   | Em qual município fica a clínica, e ela abre em feriados?                                                               | Feriados nacionais carregados como bloqueio, editáveis                       | Etapa 3         |
+| 9   | Quais exames não sanguíneos serão oferecidos? As habilitações para ozonioterapia e PEIM estão confirmadas?              | O serviço só aparece no site quando ela o ativa                              | Publicação      |
+| 10  | Expediente, duração e preço de cada serviço, textos, fotos, logotipo, cores, registro profissional, endereço e contatos | Nenhum dado inventado; campos vazios até ela preencher                       | Publicação      |
+| 11  | Qual o orçamento mensal de hospedagem?                                                                                  | Vercel Pro e Neon em São Paulo                                               | Publicação      |
+| 12  | A clínica é pessoa jurídica? Há assessoria jurídica para LGPD?                                                          | Ver Privacidade e LGPD                                                       | Publicação      |
 
 ## Stack
 
-| Camada                  | Escolha                                                                  | Por quê                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
-| Linguagem               | TypeScript em modo estrito, Node.js LTS                                  | Erros aparecem antes de rodar; a mesma linguagem no navegador e no servidor                     |
+| Camada                  | Escolha                                                                  | Por quê                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Linguagem               | TypeScript em modo estrito, Node.js LTS                                  | Erros aparecem antes de rodar; a mesma linguagem no navegador e no servidor                      |
 | Framework               | Next.js (App Router) com Server Actions                                  | Site renderizado no servidor, bom para o Google, e telas interativas e back-end no mesmo projeto |
-| Banco                   | PostgreSQL 17 ou superior                                                | Relacional e maduro; constraint de exclusão com faixas de horário impede sobreposição no banco  |
-| ORM e migrações         | Drizzle ORM e drizzle-kit                                                | Consultas tipadas e próximas do SQL; migrações em arquivos SQL revisáveis no Git                |
-| Autenticação            | Better Auth: e-mail e senha, sessões no banco, 2FA, limite de tentativas | Mantido pela equipe que também mantém o Auth.js e indicado por ela para projetos novos          |
-| Validação e formulários | Zod e React Hook Form                                                    | O mesmo esquema valida no navegador e no servidor; o servidor sempre revalida                   |
-| Interface               | Tailwind CSS e shadcn/ui                                                 | Componentes acessíveis copiados para o projeto; tema por variáveis, sem kit fechado             |
-| Calendário do painel    | FullCalendar, com os plugins gratuitos de dia, semana, mês e lista       | Visões prontas e testadas; arrastar para reagendar                                              |
-| Datas                   | date-fns com @date-fns/tz, fuso America/Sao_Paulo                        | Horários gravados em UTC e exibidos no fuso da clínica, à prova de horário de verão             |
-| E-mail (opcional)       | Nodemailer via SMTP                                                      | Funciona com qualquer provedor; sem configuração, o sistema segue sem e-mail                    |
-| Antirrobô               | Cloudflare Turnstile e limite de requisições no próprio PostgreSQL       | Barra automação sem precisar de Redis                                                           |
-| Testes                  | Vitest (unidade e integração com PostgreSQL real) e Playwright           | Cobrem regras de agenda, concorrência e fluxos completos                                        |
-| Qualidade               | pnpm, ESLint, Prettier, GitHub Actions e Dependabot                      | Padronização, verificação a cada PR e atualizações de segurança                                 |
-| Ambiente local          | Docker Compose com PostgreSQL                                            | O banco de desenvolvimento sobe com um comando                                                  |
+| Banco                   | PostgreSQL 17 ou superior                                                | Relacional e maduro; constraint de exclusão com faixas de horário impede sobreposição no banco   |
+| ORM e migrações         | Drizzle ORM e drizzle-kit                                                | Consultas tipadas e próximas do SQL; migrações em arquivos SQL revisáveis no Git                 |
+| Autenticação            | Better Auth: e-mail e senha, sessões no banco, 2FA, limite de tentativas | Mantido pela equipe que também mantém o Auth.js e indicado por ela para projetos novos           |
+| Validação e formulários | Zod e React Hook Form                                                    | O mesmo esquema valida no navegador e no servidor; o servidor sempre revalida                    |
+| Interface               | Tailwind CSS e shadcn/ui                                                 | Componentes acessíveis copiados para o projeto; tema por variáveis, sem kit fechado              |
+| Calendário do painel    | FullCalendar, com os plugins gratuitos de dia, semana, mês e lista       | Visões prontas e testadas; arrastar para reagendar                                               |
+| Datas                   | date-fns com @date-fns/tz, fuso America/Sao_Paulo                        | Horários gravados em UTC e exibidos no fuso da clínica, à prova de horário de verão              |
+| E-mail (opcional)       | Nodemailer via SMTP                                                      | Funciona com qualquer provedor; sem configuração, o sistema segue sem e-mail                     |
+| Antirrobô               | Cloudflare Turnstile e limite de requisições no próprio PostgreSQL       | Barra automação sem precisar de Redis                                                            |
+| Testes                  | Vitest (unidade e integração com PostgreSQL real) e Playwright           | Cobrem regras de agenda, concorrência e fluxos completos                                         |
+| Qualidade               | pnpm, ESLint, Prettier, GitHub Actions e Dependabot                      | Padronização, verificação a cada PR e atualizações de segurança                                  |
+| Ambiente local          | Docker Compose com PostgreSQL                                            | O banco de desenvolvimento sobe com um comando                                                   |
 
 ### Hospedagem
 
-| Opção                                                                                         | A favor                                                                     | Contra                                                                                                                            |
-| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Opção                                                                                           | A favor                                                                                         | Contra                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A (recomendada): Vercel Pro com funções em São Paulo (gru1) e Neon em São Paulo (aws-sa-east-1) | Sem servidor para manter; HTTPS, deploy e prévias automáticos; banco gerenciado com restauração | Custo em dólar: US$ 20 por desenvolvedor por mês na Vercel, mais o plano do banco. O plano gratuito da Vercel é só para uso pessoal e não comercial |
-| B: VPS no Brasil com Docker Compose (app, PostgreSQL e proxy HTTPS)                            | Custo fixo menor; controle total                                            | Manutenção do sistema operacional, backups, monitoramento e segurança do servidor ficam por nossa conta                           |
+| B: VPS no Brasil com Docker Compose (app, PostgreSQL e proxy HTTPS)                             | Custo fixo menor; controle total                                                                | Manutenção do sistema operacional, backups, monitoramento e segurança do servidor ficam por nossa conta                                             |
 
 Nas duas opções o código fica portátil: Dockerfile, PostgreSQL padrão e nenhum armazenamento proprietário.
 
@@ -198,20 +198,20 @@ Concluído e Não compareceu só podem ser marcados depois do horário de iníci
 
 Onze tabelas próprias e as tabelas do Better Auth cobrem o MVP. A garantia contra conflito é uma constraint de exclusão sobre o intervalo ocupado de cada agendamento ativo.
 
-| Tabela                 | Para quê                                                | Campos principais                                                                                                                                                                                       |
-| ---------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| clinic_settings        | Dados do site e regras gerais (uma linha só)            | nome, textos, contatos, endereço, fuso, tema, antecedência mínima, limite de dias, passo dos horários, prazo de cancelamento, limite por telefone, agendamento online ligado                           |
-| service_categories     | Categorias de serviço                                   | nome, slug, ordem, ativa                                                                                                                                                                                |
-| services               | Procedimentos                                           | categoria, nome, slug, descrição, duração, preparo antes, intervalo depois, preço e forma de exibir, exige confirmação, aceita agendamento online, orientações de preparo, ativo, ordem                |
-| service_availability   | Janelas opcionais por serviço                           | serviço, dia da semana, início, fim                                                                                                                                                                     |
-| business_hours         | Expediente semanal                                      | dia da semana, início, fim (vários por dia)                                                                                                                                                             |
-| time_blocks            | Folgas, férias, feriados e bloqueios                    | início, fim, dia inteiro, tipo, título interno                                                                                                                                                          |
-| patients               | Dados mínimos do paciente                               | nome, telefone no formato internacional, e-mail opcional, data de anonimização                                                                                                                          |
-| appointments           | Agendamentos                                            | paciente, serviço, início, fim, ocupado de e até (com preparo e intervalo), status, origem, cópia do nome e da duração do serviço, cancelado por, motivo, hash do token de gerenciamento, chave de idempotência |
-| audit_logs             | Histórico de ações                                      | autor (admin, paciente ou sistema), ação, entidade, mudanças sem dados pessoais, data                                                                                                                   |
-| media                  | Logotipo e fotos do site                                | tipo, conteúdo, dimensões                                                                                                                                                                               |
-| rate_limits            | Limite de requisições do formulário público             | chave, janela, contagem                                                                                                                                                                                 |
-| Tabelas do Better Auth | Usuários do painel, sessões, contas, verificação e 2FA  | papel do usuário (admin no MVP)                                                                                                                                                                         |
+| Tabela                 | Para quê                                               | Campos principais                                                                                                                                                                                               |
+| ---------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| clinic_settings        | Dados do site e regras gerais (uma linha só)           | nome, textos, contatos, endereço, fuso, tema, antecedência mínima, limite de dias, passo dos horários, prazo de cancelamento, limite por telefone, agendamento online ligado                                    |
+| service_categories     | Categorias de serviço                                  | nome, slug, ordem, ativa                                                                                                                                                                                        |
+| services               | Procedimentos                                          | categoria, nome, slug, descrição, duração, preparo antes, intervalo depois, preço e forma de exibir, exige confirmação, aceita agendamento online, orientações de preparo, ativo, ordem                         |
+| service_availability   | Janelas opcionais por serviço                          | serviço, dia da semana, início, fim                                                                                                                                                                             |
+| business_hours         | Expediente semanal                                     | dia da semana, início, fim (vários por dia)                                                                                                                                                                     |
+| time_blocks            | Folgas, férias, feriados e bloqueios                   | início, fim, dia inteiro, tipo, título interno                                                                                                                                                                  |
+| patients               | Dados mínimos do paciente                              | nome, telefone no formato internacional, e-mail opcional, data de anonimização                                                                                                                                  |
+| appointments           | Agendamentos                                           | paciente, serviço, início, fim, ocupado de e até (com preparo e intervalo), status, origem, cópia do nome e da duração do serviço, cancelado por, motivo, hash do token de gerenciamento, chave de idempotência |
+| audit_logs             | Histórico de ações                                     | autor (admin, paciente ou sistema), ação, entidade, mudanças sem dados pessoais, data                                                                                                                           |
+| media                  | Logotipo e fotos do site                               | tipo, conteúdo, dimensões                                                                                                                                                                                       |
+| rate_limits            | Limite de requisições do formulário público            | chave, janela, contagem                                                                                                                                                                                         |
+| Tabelas do Better Auth | Usuários do painel, sessões, contas, verificação e 2FA | papel do usuário (admin no MVP)                                                                                                                                                                                 |
 
 A proteção contra conflito fica no próprio banco:
 
@@ -239,20 +239,20 @@ Outras decisões do modelo:
 
 ## Segurança
 
-| Risco ou necessidade      | Medida                                                                                                                                                                  |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Risco ou necessidade      | Medida                                                                                                                                                                      |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Acesso indevido ao painel | Sem cadastro público: contas criadas por script. Senha com hash forte, 2FA obrigatório por aplicativo autenticador, limite de tentativas, sessões com expiração e revogação |
-| Rota protegida contornada | Sessão conferida no layout do painel e em cada ação e consulta, não só no proxy (lição da CVE-2025-29927, que permitia pular o middleware)                             |
-| SQL injection             | Consultas parametrizadas do Drizzle; SQL manual só pelo template parametrizado                                                                                          |
-| XSS                       | O React escapa o conteúdo por padrão; textos editados no painel nunca viram HTML cru; cabeçalhos CSP, HSTS e bloqueio de iframe                                         |
-| CSRF                      | Server Actions só aceitam POST e conferem a origem; o Better Auth valida origens confiáveis; cookies httpOnly, Secure e SameSite                                        |
-| Abuso do formulário       | Turnstile, campo isca, limite por IP e por telefone, máximo de agendamentos ativos por telefone, pausa do agendamento online e cancelamento em lote                     |
-| Dados inválidos           | Zod em toda entrada no servidor, telefone normalizado e limites de tamanho                                                                                              |
-| Segredos                  | Só em variáveis de ambiente validadas na inicialização; `.env` fora do Git; `.env.example` documentado                                                                   |
-| Dependências vulneráveis  | Lockfile, Dependabot e atualização mensal junto das releases de segurança do Next.js                                                                                    |
-| Excesso de privilégio     | Usuário do banco da aplicação sem superusuário; acesso à produção restrito; desenvolvimento nunca usa cópia de dados reais                                              |
-| Vazamento por logs        | Logs só com IDs, nunca nome, telefone, e-mail ou token                                                                                                                  |
-| Perda de dados            | Restauração pontual do provedor e dump diário criptografado em outro provedor, guardado por 30 dias; teste de restauração a cada três meses                             |
+| Rota protegida contornada | Sessão conferida no layout do painel e em cada ação e consulta, não só no proxy (lição da CVE-2025-29927, que permitia pular o middleware)                                  |
+| SQL injection             | Consultas parametrizadas do Drizzle; SQL manual só pelo template parametrizado                                                                                              |
+| XSS                       | O React escapa o conteúdo por padrão; textos editados no painel nunca viram HTML cru; cabeçalhos CSP, HSTS e bloqueio de iframe                                             |
+| CSRF                      | Server Actions só aceitam POST e conferem a origem; o Better Auth valida origens confiáveis; cookies httpOnly, Secure e SameSite                                            |
+| Abuso do formulário       | Turnstile, campo isca, limite por IP e por telefone, máximo de agendamentos ativos por telefone, pausa do agendamento online e cancelamento em lote                         |
+| Dados inválidos           | Zod em toda entrada no servidor, telefone normalizado e limites de tamanho                                                                                                  |
+| Segredos                  | Só em variáveis de ambiente validadas na inicialização; `.env` fora do Git; `.env.example` documentado                                                                      |
+| Dependências vulneráveis  | Lockfile, Dependabot e atualização mensal junto das releases de segurança do Next.js                                                                                        |
+| Excesso de privilégio     | Usuário do banco da aplicação sem superusuário; acesso à produção restrito; desenvolvimento nunca usa cópia de dados reais                                                  |
+| Vazamento por logs        | Logs só com IDs, nunca nome, telefone, e-mail ou token                                                                                                                      |
+| Perda de dados            | Restauração pontual do provedor e dump diário criptografado em outro provedor, guardado por 30 dias; teste de restauração a cada três meses                                 |
 
 Meta de recuperação proposta: no pior caso, perder até 24 horas de dados e voltar ao ar em até 4 horas.
 
@@ -272,13 +272,13 @@ O sistema aplica privacidade desde a concepção, mas isso sozinho não o torna 
 
 ### Retenção proposta (a validar)
 
-| Dado                                 | Prazo sugerido                                  | Depois do prazo    |
-| ------------------------------------ | ----------------------------------------------- | ------------------ |
-| Solicitações canceladas ou recusadas | 6 meses                                         | Anonimizar         |
-| Paciente sem novos agendamentos      | 5 anos após o último                            | Anonimizar         |
-| Histórico de ações do painel         | 5 anos                                          | Apagar             |
-| Logs técnicos                        | 30 dias                                         | Apagar             |
-| Backups                              | 30 dias                                         | Rotação automática |
+| Dado                                 | Prazo sugerido                                   | Depois do prazo    |
+| ------------------------------------ | ------------------------------------------------ | ------------------ |
+| Solicitações canceladas ou recusadas | 6 meses                                          | Anonimizar         |
+| Paciente sem novos agendamentos      | 5 anos após o último                             | Anonimizar         |
+| Histórico de ações do painel         | 5 anos                                           | Apagar             |
+| Logs técnicos                        | 30 dias                                          | Apagar             |
+| Backups                              | 30 dias                                          | Rotação automática |
 | Registro de incidentes               | 5 anos, o mínimo da Resolução CD/ANPD nº 15/2024 | Apagar             |
 
 ### O que precisa de validação fora do código
@@ -298,44 +298,44 @@ O sistema aplica privacidade desde a concepção, mas isso sozinho não o torna 
 
 O maior risco não é técnico: é a agenda online ficar desatualizada porque pedidos chegam por WhatsApp e não entram no painel.
 
-| Risco                                                            | Tipo        | Impacto | Mitigação                                                                                                   |
-| ---------------------------------------------------------------- | ----------- | ------- | ----------------------------------------------------------------------------------------------------------- |
-| Duas reservas simultâneas no mesmo horário                       | Técnico     | Alto    | Constraint de exclusão, lock transacional e teste automatizado de concorrência                              |
-| Erro de fuso ou de horário de verão, que pode voltar a ser adotado | Técnico   | Alto    | UTC no banco, fuso por nome (America/Sao_Paulo) e testes com datas de transição                             |
-| Falha no cálculo de horários livres                              | Técnico     | Alto    | Função pura com bateria de testes de bordas, intervalos e bloqueios                                         |
-| Falha de segurança no framework                                  | Técnico     | Alto    | Atualização mensal, Dependabot, autorização junto aos dados e firewall da hospedagem                        |
-| Horários desatualizados por cache                                | Técnico     | Médio   | Disponibilidade sempre calculada na hora, sem cache                                                         |
-| Dependência de um fornecedor                                     | Técnico     | Médio   | PostgreSQL padrão, Dockerfile e nenhum recurso proprietário                                                 |
-| Pedidos por WhatsApp ou telefone fora do sistema                 | Operacional | Alto    | Agendamento manual rápido no painel, treinamento e pausa do online                                          |
-| Backup que não restaura                                          | Operacional | Alto    | Teste de restauração a cada três meses, com roteiro documentado                                             |
-| Solicitações esquecidas segurando horários                       | Operacional | Médio   | Destaque no painel e aviso por e-mail; expiração automática numa etapa futura                               |
-| Robôs ou trotes ocupando a agenda                                | Operacional | Médio   | Turnstile, limites por IP e telefone, cancelamento em lote e pausa                                          |
-| Perda de acesso ao painel (senha ou 2FA)                         | Operacional | Médio   | Códigos de recuperação, script de redefinição e um segundo administrador                                    |
-| Domínio e hospedagem em contas pessoais                          | Operacional | Médio   | Contas em nome da clínica, com 2FA e senhas num gerenciador                                                 |
-| Manutenção dependente de uma só pessoa                           | Operacional | Médio   | README, testes, stack popular e tarefas do dia a dia feitas no painel                                       |
-| Vazamento de dados que revelam procedimentos                     | Privacidade | Alto    | 2FA, acesso mínimo, criptografia em trânsito e em repouso, logs sem dados pessoais e backups criptografados |
-| Coleta excessiva ou relato de saúde no formulário                | Privacidade | Médio   | Formulário mínimo, sem campo livre                                                                          |
-| Rastreadores de terceiros no site                                | Privacidade | Médio   | Sem pixels, analytics de anúncios ou iframes de mapa                                                        |
-| Transferência internacional sem respaldo contratual              | Privacidade | Médio   | Regiões no Brasil e cláusulas-padrão da ANPD nos contratos                                                  |
-| Dados reais usados em desenvolvimento                            | Privacidade | Médio   | Proibido; dados de exemplo marcados como fictícios                                                          |
-| Conteúdo do site em desacordo com o conselho profissional        | Regulatório | Médio   | Revisão da profissional antes de publicar                                                                   |
+| Risco                                                              | Tipo        | Impacto | Mitigação                                                                                                   |
+| ------------------------------------------------------------------ | ----------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| Duas reservas simultâneas no mesmo horário                         | Técnico     | Alto    | Constraint de exclusão, lock transacional e teste automatizado de concorrência                              |
+| Erro de fuso ou de horário de verão, que pode voltar a ser adotado | Técnico     | Alto    | UTC no banco, fuso por nome (America/Sao_Paulo) e testes com datas de transição                             |
+| Falha no cálculo de horários livres                                | Técnico     | Alto    | Função pura com bateria de testes de bordas, intervalos e bloqueios                                         |
+| Falha de segurança no framework                                    | Técnico     | Alto    | Atualização mensal, Dependabot, autorização junto aos dados e firewall da hospedagem                        |
+| Horários desatualizados por cache                                  | Técnico     | Médio   | Disponibilidade sempre calculada na hora, sem cache                                                         |
+| Dependência de um fornecedor                                       | Técnico     | Médio   | PostgreSQL padrão, Dockerfile e nenhum recurso proprietário                                                 |
+| Pedidos por WhatsApp ou telefone fora do sistema                   | Operacional | Alto    | Agendamento manual rápido no painel, treinamento e pausa do online                                          |
+| Backup que não restaura                                            | Operacional | Alto    | Teste de restauração a cada três meses, com roteiro documentado                                             |
+| Solicitações esquecidas segurando horários                         | Operacional | Médio   | Destaque no painel e aviso por e-mail; expiração automática numa etapa futura                               |
+| Robôs ou trotes ocupando a agenda                                  | Operacional | Médio   | Turnstile, limites por IP e telefone, cancelamento em lote e pausa                                          |
+| Perda de acesso ao painel (senha ou 2FA)                           | Operacional | Médio   | Códigos de recuperação, script de redefinição e um segundo administrador                                    |
+| Domínio e hospedagem em contas pessoais                            | Operacional | Médio   | Contas em nome da clínica, com 2FA e senhas num gerenciador                                                 |
+| Manutenção dependente de uma só pessoa                             | Operacional | Médio   | README, testes, stack popular e tarefas do dia a dia feitas no painel                                       |
+| Vazamento de dados que revelam procedimentos                       | Privacidade | Alto    | 2FA, acesso mínimo, criptografia em trânsito e em repouso, logs sem dados pessoais e backups criptografados |
+| Coleta excessiva ou relato de saúde no formulário                  | Privacidade | Médio   | Formulário mínimo, sem campo livre                                                                          |
+| Rastreadores de terceiros no site                                  | Privacidade | Médio   | Sem pixels, analytics de anúncios ou iframes de mapa                                                        |
+| Transferência internacional sem respaldo contratual                | Privacidade | Médio   | Regiões no Brasil e cláusulas-padrão da ANPD nos contratos                                                  |
+| Dados reais usados em desenvolvimento                              | Privacidade | Médio   | Proibido; dados de exemplo marcados como fictícios                                                          |
+| Conteúdo do site em desacordo com o conselho profissional          | Regulatório | Médio   | Revisão da profissional antes de publicar                                                                   |
 
 ## Preparação para expansões futuras
 
 Nada do futuro entra agora; o modelo só evita decisões que bloqueariam essas extensões.
 
-| Funcionalidade                         | Como entra depois                                                                                                                                                         |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Lembretes e confirmações por WhatsApp  | API oficial do WhatsApp Business, uma fila de notificações e uma tarefa agendada, com opt-in do paciente. Status e link de gerenciamento já existem                        |
-| Google Calendar ou Outlook             | Primeiro um feed .ics privado só com horários, sem nomes; depois sincronização pela API                                                                                   |
-| Mais profissionais e salas             | Tabelas de profissionais e salas; a coluna do profissional entra em agendamentos, expediente, bloqueios e na constraint, com a extensão btree_gist. O usuário já tem papel |
-| Recorrência e pacotes de sessões       | Uma série liga vários agendamentos comuns, então a constraint continua valendo                                                                                            |
-| Lista de espera                        | Interessados por serviço e período, avisados quando um horário é liberado                                                                                                 |
-| Pagamento e sinal                      | Tabela de pagamentos e um status de reserva com prazo para pagar, via provedor com Pix                                                                                    |
-| Histórico e relatórios                 | Agendamentos e histórico de ações já guardam os dados; relatórios são consultas sobre eles                                                                                |
-| Gestão financeira                      | Módulo próprio, ligado aos pagamentos                                                                                                                                     |
-| Prontuário eletrônico                  | Etapa própria, com permissões separadas, criptografia de campos, registro de acessos, retenção específica e validação jurídica e regulatória antes de começar              |
-| Novos serviços e modalidades           | Cadastro pelo painel; atendimento online seria um campo novo no serviço                                                                                                   |
+| Funcionalidade                        | Como entra depois                                                                                                                                                          |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lembretes e confirmações por WhatsApp | API oficial do WhatsApp Business, uma fila de notificações e uma tarefa agendada, com opt-in do paciente. Status e link de gerenciamento já existem                        |
+| Google Calendar ou Outlook            | Primeiro um feed .ics privado só com horários, sem nomes; depois sincronização pela API                                                                                    |
+| Mais profissionais e salas            | Tabelas de profissionais e salas; a coluna do profissional entra em agendamentos, expediente, bloqueios e na constraint, com a extensão btree_gist. O usuário já tem papel |
+| Recorrência e pacotes de sessões      | Uma série liga vários agendamentos comuns, então a constraint continua valendo                                                                                             |
+| Lista de espera                       | Interessados por serviço e período, avisados quando um horário é liberado                                                                                                  |
+| Pagamento e sinal                     | Tabela de pagamentos e um status de reserva com prazo para pagar, via provedor com Pix                                                                                     |
+| Histórico e relatórios                | Agendamentos e histórico de ações já guardam os dados; relatórios são consultas sobre eles                                                                                 |
+| Gestão financeira                     | Módulo próprio, ligado aos pagamentos                                                                                                                                      |
+| Prontuário eletrônico                 | Etapa própria, com permissões separadas, criptografia de campos, registro de acessos, retenção específica e validação jurídica e regulatória antes de começar              |
+| Novos serviços e modalidades          | Cadastro pelo painel; atendimento online seria um campo novo no serviço                                                                                                    |
 
 ## Fontes
 
