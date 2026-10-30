@@ -8,14 +8,18 @@ import { FormError } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ageOn, todayInClinic } from "@/modules/patients/fields";
+import {
+  ageOn,
+  formatStoredPhone,
+  todayInClinic,
+} from "@/modules/patients/fields";
 import type {
   PatientCursor,
   PatientListItem,
 } from "@/modules/patients/patients";
 
 import { searchPatientsAction } from "./actions";
-import { formatDate, formatPhone } from "./format";
+import { formatDate } from "./format";
 
 type Props = { initialItems: PatientListItem[]; initialNext?: PatientCursor };
 
@@ -119,6 +123,11 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
               >
                 <span className="font-medium">
                   {patient.name}
+                  {patient.anonymizedAt ? (
+                    <span className="ml-2 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      Anonimizado
+                    </span>
+                  ) : null}
                   {patient.nickname ? (
                     <span className="font-normal text-muted-foreground">
                       {" "}
@@ -127,7 +136,7 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
                   ) : null}
                 </span>
                 <span className="text-sm md:text-base">
-                  {formatPhone(patient.phone)}
+                  {formatStoredPhone(patient.phone)}
                 </span>
                 <span className="text-sm text-muted-foreground md:text-base md:text-foreground">
                   {formatDate(patient.birthDate)}

@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   ageOn,
+  formatBrPhoneInput,
+  formatCpfInput,
+  formatStoredCpf,
+  formatStoredPhone,
   isMinor,
   normalizeBrPhone,
   normalizeName,
@@ -139,5 +143,69 @@ describe("patientFormSchema", () => {
     expect(patientFormSchema.safeParse({ ...valid, email: "x" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("formatCpfInput", () => {
+  it("formats progressively and keeps digits only", () => {
+    expect(formatCpfInput("")).toBe("");
+    expect(formatCpfInput("529")).toBe("529");
+    expect(formatCpfInput("5299")).toBe("529.9");
+    expect(formatCpfInput("529982")).toBe("529.982");
+    expect(formatCpfInput("5299822")).toBe("529.982.2");
+    expect(formatCpfInput("529982247")).toBe("529.982.247");
+    expect(formatCpfInput("5299822472")).toBe("529.982.247-2");
+    expect(formatCpfInput("52998224725")).toBe("529.982.247-25");
+    expect(formatCpfInput("529.982.247-25")).toBe("529.982.247-25");
+  });
+  it("caps at 11 digits", () => {
+    expect(formatCpfInput("5299822472599")).toBe("529.982.247-25");
+  });
+});
+
+describe("formatBrPhoneInput", () => {
+  it("formats progressively", () => {
+    expect(formatBrPhoneInput("")).toBe("");
+    expect(formatBrPhoneInput("4")).toBe("(4");
+    expect(formatBrPhoneInput("48")).toBe("(48");
+    expect(formatBrPhoneInput("489")).toBe("(48) 9");
+    expect(formatBrPhoneInput("4833331234")).toBe("(48) 3333-1234");
+    expect(formatBrPhoneInput("48999991234")).toBe("(48) 99999-1234");
+  });
+  it("drops a leading 55 only when more than 11 digits remain", () => {
+    expect(formatBrPhoneInput("+5548999991234")).toBe("(48) 99999-1234");
+    expect(formatBrPhoneInput("554833331234")).toBe("(48) 3333-1234");
+    expect(formatBrPhoneInput("55")).toBe("(55");
+    expect(formatBrPhoneInput("55999991234")).toBe("(55) 99999-1234");
+  });
+  it("keeps area code 55 when typing past 11 digits", () => {
+    expect(formatBrPhoneInput("(55) 99999-12345")).toBe("(55) 99999-1234");
+  });
+  it("caps at 11 digits", () => {
+    expect(formatBrPhoneInput("489999912349")).toBe("(48) 99999-1234");
+  });
+});
+
+describe("formatStoredPhone / formatStoredCpf", () => {
+  it("formats stored values", () => {
+    expect(formatStoredPhone("+5548999991234")).toBe("(48) 99999-1234");
+    expect(formatStoredPhone("+554833331234")).toBe("(48) 3333-1234");
+    expect(formatStoredPhone(null)).toBe("");
+    expect(formatStoredCpf("52998224725")).toBe("529.982.247-25");
+    expect(formatStoredCpf(null)).toBe("");
+  });
+});
+
+describe("patientFormSchema with masked input", () => {
+  it("parses masked CPF and phones into stored values", () => {
+    const result = patientFormSchema.parse({
+      ...valid,
+      cpf: "529.982.247-25",
+      phone: "(48) 99999-1234",
+      landlinePhone: "(48) 3333-1234",
+    });
+    expect(result.cpf).toBe("52998224725");
+    expect(result.phone).toBe("+5548999991234");
+    expect(result.landlinePhone).toBe("+554833331234");
   });
 });

@@ -30,7 +30,7 @@ export function PanelNav({ items }: { items: NavItem[] }) {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex h-11 items-center rounded-md px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary",
+                  "flex h-11 items-center rounded-md px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand",
                   active
                     ? "bg-highlight font-semibold text-highlight-foreground"
                     : "font-medium text-white hover:bg-white/10",

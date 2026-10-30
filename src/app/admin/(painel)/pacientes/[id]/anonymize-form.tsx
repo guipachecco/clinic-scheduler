@@ -21,7 +21,7 @@ export function AnonymizeForm({ id }: { id: string }) {
     if (typed !== CONFIRMATION) return;
     setPending(true);
     setError(null);
-    // On success the action redirects to the list.
+    // On success the action redirects to the record.
     try {
       const result = await anonymizePatientAction(id, typed);
       if (result) setError(result.message);

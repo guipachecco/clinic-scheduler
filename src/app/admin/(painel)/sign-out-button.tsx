@@ -22,7 +22,7 @@ export function SignOutButton() {
       variant="outline"
       onClick={signOut}
       disabled={isPending}
-      className="border-white/50 bg-transparent text-white shadow-none hover:bg-white/10 hover:text-white focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-primary"
+      className="border-white/50 bg-transparent text-white shadow-none hover:bg-white/10 hover:text-white focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-brand"
     >
       Sair
     </Button>

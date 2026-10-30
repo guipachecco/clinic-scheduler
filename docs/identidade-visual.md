@@ -12,7 +12,7 @@ O sistema deve parecer da clínica, não um software genérico: profissional, or
 | --------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
 | Cor principal         | Marinho `#00357A` (pressionado: `#00245A`)                                                                         | Cor da marca; transmite confiança e tem contraste alto com branco                                   |
 | Destaque              | Amarelo `#FFDE59`, sempre com texto marinho                                                                        | Segunda cor da marca. No branco ele é ilegível, por isso nunca vira texto                           |
-| Modo escuro           | Preto `#0B0B10` com ciano `#99F0FF`                                                                                | Versão escura da própria marca. Fica para uma entrega futura                                        |
+| Modo escuro           | Preto `#0B0B10` com ciano `#99F0FF`                                                                                | Versão escura da própria marca. Botão de tema no painel e nas telas de acesso                       |
 | Neutros               | Fundo `#F7F5F8`, superfície branca, borda `#E4DFE8`, texto `#1C1A22`, texto secundário `#5E5868`                   | Cinzas puxando ao lilás, tirados da luz das fotos do consultório; evitam a cara fria de hospital    |
 | Erro e exclusão       | `#B3261E`                                                                                                          | Vermelho legível sobre branco                                                                       |
 | Status do agendamento | Solicitado amarelo claro, confirmado marinho, concluído verde, não compareceu bordô, cancelado cinza riscado       | Cada um difere também em claridade e sempre tem o nome escrito. Os tokens entram junto com a agenda |
@@ -32,7 +32,6 @@ O sistema deve parecer da clínica, não um software genérico: profissional, or
 
 ## Fora desta entrega
 
-- Modo escuro.
 - Tokens de status, que entram com a agenda.
 - Fotos no site público, que dependem da autorização de imagem da paciente que aparece em duas delas.
 - Versão vetorial (SVG) dos logos. Os PNG atuais têm fundo sólido; um SVG com fundo transparente deixaria o logo nítido em qualquer cor de fundo.

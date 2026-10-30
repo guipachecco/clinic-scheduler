@@ -10,11 +10,10 @@ Escolhas feitas durante a implementação que não estavam detalhadas no [planej
 - **Motivo:** com o nonce, o navegador só executa os scripts que o próprio servidor marcou, o que barra scripts injetados. Isso importa num painel com dados de pacientes. O Cache Components pré-gera parte das páginas no build, e uma página pré-gerada não tem como carregar o nonce de cada acesso.
 - **Consequência:** nenhuma página fica em cache estático. Para o volume de uma clínica o custo é desprezível, e a agenda precisa estar sempre atualizada de qualquer forma. Religar o Cache Components exigiria trocar a CSP por uma sem nonce (`'unsafe-inline'`) ou pela opção experimental de hashes (SRI).
 
-### Verificação em duas etapas opcional
+### Verificação em duas etapas obrigatória
 
-- **Decisão:** o 2FA por aplicativo autenticador (TOTP) é opcional, a pedido da clínica (30/10/2026). Uma conta sem 2FA entra no painel só com a senha, e a tela inicial recomenda ativá-lo, com link para `/admin/configurar-2fa`. Quem ativa passa a ter o código pedido em todo login. São gerados 10 códigos de recuperação de uso único.
-- **Motivo:** a clínica preferiu não obrigar o uso do celular no login. Até a Etapa 2, o 2FA era obrigatório, porque uma senha vazada não deveria bastar para ver dados de pacientes; esse risco agora fica com quem não ativar.
-- **Risco aceito:** sem 2FA, a senha (mínimo de 12 caracteres, limite de tentativas por IP) é a única proteção do painel. Recomendação: ativar ao menos na conta da profissional.
+- **Decisão:** toda conta do painel precisa de 2FA por aplicativo autenticador (TOTP). Depois da senha, uma conta sem 2FA só consegue abrir a tela de configuração (`requireAdmin` em `src/modules/auth/session.ts`). São gerados 10 códigos de recuperação de uso único.
+- **Motivo:** o Better Auth oferece 2FA, mas não obriga. Uma senha vazada não deve bastar para ver dados de pacientes.
 - **Consequência:** desativar o 2FA pelo site está bloqueado; a remoção, para o caso de celular perdido, é feita no terminal com `pnpm admin reset-2fa <email>`. A opção "confiar neste dispositivo" não foi oferecida, então todo login pede o código. Ela pode ser ligada depois, se o uso diário pedir.
 
 ### Sessões e rotas de autenticação
@@ -65,13 +64,19 @@ Escolhas feitas durante a implementação que não estavam detalhadas no [planej
 
 As cores, as fontes e os logos aprovados da clínica estão descritos em [identidade-visual.md](identidade-visual.md). Os tokens ficam em `src/app/globals.css`, incluindo o token `highlight` (amarelo, usado só como destaque sobre o azul-marinho, nunca como texto em fundo claro), e os logos em `public/marca/`.
 
+### Tema escuro
+
+- **Decisão:** um botão no menu do painel e nas telas de acesso alterna entre o tema claro e o escuro (preto e ciano, a versão escura da marca). A escolha fica num cookie `theme`, e o layout raiz o lê para renderizar a classe `dark` no `<html>`. O padrão é o tema claro.
+- **Motivo:** com o cookie, o servidor já entrega a página no tema certo, sem piscar e sem script inline, que a CSP com nonce barraria.
+- **Consequência:** a preferência do sistema operacional não é seguida automaticamente; a pessoa escolhe uma vez no botão. Os logos com fundo sólido existem nas duas versões e o CSS mostra a do tema ativo.
+
 ## Cadastro de pacientes
 
 - **Busca fora da URL:** o termo da busca viaja no corpo de uma Server Action (POST), nunca na barra de endereço. A página continua em `/admin/pacientes`, então nome, telefone ou CPF não ficam no histórico do navegador, nos logs do servidor nem em links copiados. A busca também não é gravada em log.
 - **Páginas sem dados pessoais no título:** a ficha do paciente usa o título "Paciente", porque o título vai para o histórico do navegador.
 - **Erros genéricos:** um erro inesperado do banco pode conter valores do paciente; cada ação do servidor devolve uma mensagem genérica (por exemplo, "Não foi possível salvar. Tente novamente.") e nada é registrado em log.
 - **Campos de auditoria:** criar, editar e anonimizar gravam em `audit_logs` quem fez (`actor_user_id`), quando e qual ação. Na edição, `changes` guarda só os nomes dos campos alterados, nunca os valores.
-- **Anonimização:** o botão só habilita depois de digitar exatamente `ANONIMIZAR`, e o servidor confere de novo. Pacientes com agendamentos futuros solicitados ou confirmados não podem ser anonimizados.
+- **Anonimização:** o botão só habilita depois de digitar exatamente `ANONIMIZAR`, e o servidor confere de novo. Pacientes com agendamentos futuros solicitados ou confirmados não podem ser anonimizados. Depois de anonimizado, o paciente continua listado como "Paciente anonimizado" (com a etiqueta "Anonimizado"), e a ficha mostra o aviso de dados apagados, sem edição.
 - **Acesso:** toda página e toda ação do servidor chama `requireAdmin()` antes de qualquer consulta.
 
 ### Coleta ampliada no painel

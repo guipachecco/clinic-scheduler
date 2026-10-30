@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, or, sql, type SQL } from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { findPgError, isUniqueViolation } from "@/db/errors";
@@ -39,6 +39,7 @@ export type PatientRecord = {
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
+  anonymizedAt: Date | null;
 };
 
 export type PatientListItem = {
@@ -47,8 +48,11 @@ export type PatientListItem = {
   nickname: string | null;
   phone: string | null;
   birthDate: string | null;
+  anonymizedAt: Date | null;
 };
 
+// nameNormalized carries the sort-key value (see SORT_KEY), which for an
+// anonymized patient is the normalized label rather than a column value.
 export type PatientCursor = { nameNormalized: string; id: string };
 
 export const PAGE_SIZE = 50;
@@ -221,7 +225,8 @@ export async function updatePatient(
   }
 }
 
-// Returns null for an anonymized patient and for an id that is not a UUID.
+// Returns anonymized patients too (anonymizedAt set). Null for a missing
+// patient and for an id that is not a UUID.
 export async function getPatient(id: string): Promise<PatientRecord | null> {
   if (!UUID_PATTERN.test(id)) return null;
   const [row] = await db
@@ -241,9 +246,10 @@ export async function getPatient(id: string): Promise<PatientRecord | null> {
       notes: patients.notes,
       createdAt: patients.createdAt,
       updatedAt: patients.updatedAt,
+      anonymizedAt: patients.anonymizedAt,
     })
     .from(patients)
-    .where(and(eq(patients.id, id), isNull(patients.anonymizedAt)))
+    .where(eq(patients.id, id))
     .limit(1);
   return row ?? null;
 }
@@ -260,6 +266,10 @@ const PLAIN = "aaaaaeeeeiiiiooooouuuucnAAAAAEEEEIIIIOOOOOUUUUCN";
 // collapses inner whitespace.
 const nicknameNormalized = sql`btrim(regexp_replace(lower(translate(${patients.nickname}, ${ACCENTED}, ${PLAIN})), '\\s+', ' ', 'g'))`;
 
+// Anonymized patients have no normalized name, so they sort and match by the
+// normalized label instead.
+const SORT_KEY = sql`coalesce(${patients.nameNormalized}, ${normalizeName(ANONYMIZED_NAME)})`;
+
 // Never logs the term. Digit terms (3+ digits, ignoring . - ( ) + and spaces)
 // match CPF and phones; anything else matches name and nickname.
 export async function searchPatients(input: {
@@ -268,7 +278,7 @@ export async function searchPatients(input: {
 }): Promise<{ items: PatientListItem[]; next?: PatientCursor }> {
   const term = input.term.trim();
   const digits = term.replace(/[.\-()+\s]/g, "");
-  const conditions = [isNull(patients.anonymizedAt)];
+  const conditions: SQL[] = [];
 
   if (/^\d{3,}$/.test(digits)) {
     const pattern = `%${digits}%`;
@@ -283,7 +293,7 @@ export async function searchPatients(input: {
     const pattern = `%${escapeLike(normalizeName(term))}%`;
     conditions.push(
       or(
-        sql`${patients.nameNormalized} like ${pattern}`,
+        sql`${SORT_KEY} like ${pattern}`,
         sql`${nicknameNormalized} like ${pattern}`,
       )!,
     );
@@ -291,7 +301,7 @@ export async function searchPatients(input: {
 
   if (input.after) {
     conditions.push(
-      sql`(${patients.nameNormalized}, ${patients.id}) > (${input.after.nameNormalized}, ${input.after.id}::uuid)`,
+      sql`(${SORT_KEY}, ${patients.id}) > (${input.after.nameNormalized}, ${input.after.id}::uuid)`,
     );
   }
 
@@ -299,14 +309,15 @@ export async function searchPatients(input: {
     .select({
       id: patients.id,
       name: patients.name,
-      nameNormalized: patients.nameNormalized,
+      sortKey: sql<string>`${SORT_KEY}`,
       nickname: patients.nickname,
       phone: patients.phone,
       birthDate: patients.birthDate,
+      anonymizedAt: patients.anonymizedAt,
     })
     .from(patients)
     .where(and(...conditions))
-    .orderBy(asc(patients.nameNormalized), asc(patients.id))
+    .orderBy(asc(SORT_KEY), asc(patients.id))
     .limit(PAGE_SIZE + 1);
 
   const page = rows.slice(0, PAGE_SIZE);
@@ -319,9 +330,10 @@ export async function searchPatients(input: {
       nickname: row.nickname,
       phone: row.phone,
       birthDate: row.birthDate,
+      anonymizedAt: row.anonymizedAt,
     })),
     ...(hasMore && last
-      ? { next: { nameNormalized: last.nameNormalized ?? "", id: last.id } }
+      ? { next: { nameNormalized: last.sortKey, id: last.id } }
       : {}),
   };
 }

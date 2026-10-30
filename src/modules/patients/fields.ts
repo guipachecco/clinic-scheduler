@@ -53,6 +53,48 @@ export function normalizeBrPhone(input: string): string | null {
   return `+55${digits}`;
 }
 
+// Progressive CPF mask for typing: 000.000.000-00. Digits only, at most 11.
+export function formatCpfInput(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+// Progressive Brazilian phone mask for typing: (00) 0000-0000 or
+// (00) 00000-0000. A leading 55 is dropped only when more than 11 digits
+// remain, so pasting +55... works but typing 55 as an area code does not.
+export function formatBrPhoneInput(value: string): string {
+  let d = value.replace(/\D/g, "");
+  // A pasted number may carry the country code. A value that already starts
+  // with "(" is the masked field being typed into: its 55 is an area code.
+  const pasted = !value.trimStart().startsWith("(");
+  if (pasted && d.length > 11 && d.startsWith("55")) d = d.slice(2);
+  d = d.slice(0, 11);
+  if (d.length === 0) return "";
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  const split = d.length === 11 ? 7 : 6;
+  return `(${d.slice(0, 2)}) ${d.slice(2, split)}-${d.slice(split)}`;
+}
+
+// Stored E.164 (+55...) -> display mask. Empty string for null.
+export function formatStoredPhone(e164: string | null): string {
+  if (!e164) return "";
+  const digits = e164.replace(/\D/g, "");
+  const national =
+    digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
+  if (national.length !== 10 && national.length !== 11) return e164;
+  return formatBrPhoneInput(national);
+}
+
+// Stored CPF (11 digits) -> display mask. Empty string for null.
+export function formatStoredCpf(digits: string | null): string {
+  if (!digits) return "";
+  return formatCpfInput(digits);
+}
+
 function parseIsoDate(value: string): [number, number, number] | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (!match) return null;

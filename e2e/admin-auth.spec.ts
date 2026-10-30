@@ -68,14 +68,14 @@ test("a wrong password shows an error", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin\/entrar$/);
 });
 
-test("2FA is optional: the panel opens and recommends setting it up", async ({
+test("first access requires setting up 2FA before the panel opens", async ({
   page,
 }) => {
   await signInWithPassword(page);
-  await expect(page).toHaveURL(/\/admin$/);
-  await page
-    .getByRole("link", { name: "Ativar verificação em duas etapas" })
-    .click();
+  await expect(page).toHaveURL(/\/admin\/configurar-2fa$/);
+
+  // The panel stays closed until 2FA is active.
+  await page.goto("/admin");
   await expect(page).toHaveURL(/\/admin\/configurar-2fa$/);
 
   await page.getByLabel("Confirme sua senha").fill(TEST_ADMIN.password);
@@ -145,7 +145,7 @@ test("later sign-ins ask for the authenticator code", async ({ page }) => {
   ).toBeVisible();
 
   // The panel shell must not scroll sideways on a phone.
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/admin");
   await expect(
     page.getByRole("navigation", { name: "Menu principal" }),
@@ -153,5 +153,5 @@ test("later sign-ins ask for the authenticator code", async ({ page }) => {
   const scrollWidth = await page.evaluate(
     () => document.documentElement.scrollWidth,
   );
-  expect(scrollWidth).toBeLessThanOrEqual(390);
+  expect(scrollWidth).toBeLessThanOrEqual(360);
 });

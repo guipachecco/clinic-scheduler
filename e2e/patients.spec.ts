@@ -116,8 +116,40 @@ test.describe("pacientes", () => {
     await expect(page.getByLabel("WhatsApp")).toBeFocused();
   });
 
-  test("anonymizing needs the exact confirmation word", async () => {
+  test("CPF and WhatsApp are formatted while typing", async () => {
+    await page.goto("/admin/pacientes/novo");
+    await page.getByLabel("CPF").pressSequentially("52998224725");
+    await expect(page.getByLabel("CPF")).toHaveValue("529.982.247-25");
+    // Backspace never gets stuck on the separators.
+    await page.getByLabel("CPF").press("Backspace");
+    await page.getByLabel("CPF").press("Backspace");
+    await page.getByLabel("CPF").press("Backspace");
+    await expect(page.getByLabel("CPF")).toHaveValue("529.982.24");
+    await page.getByLabel("CPF").pressSequentially("725");
+    await expect(page.getByLabel("CPF")).toHaveValue("529.982.247-25");
+    await page.getByLabel("WhatsApp").pressSequentially("48999990001");
+    await expect(page.getByLabel("WhatsApp")).toHaveValue("(48) 99999-0001");
+    await page.getByLabel("Telefone fixo").pressSequentially("4833331234");
+    await expect(page.getByLabel("Telefone fixo")).toHaveValue(
+      "(48) 3333-1234",
+    );
+  });
+
+  test("the record shows stored values formatted", async () => {
     await page.goto(patientUrl);
+    await expect(page.getByLabel("WhatsApp")).toHaveValue(PATIENT.phone);
+  });
+
+  test("anonymizing is optional, tucked in a closed section", async () => {
+    await page.goto(patientUrl);
+    const summary = page.getByText("Anonimizar paciente (LGPD)");
+    await expect(summary).toBeVisible();
+    await expect(page.getByLabel(/Digite ANONIMIZAR/)).toBeHidden();
+  });
+
+  test("anonymizing needs the exact confirmation word and keeps the record", async () => {
+    await page.goto(patientUrl);
+    await page.getByText("Anonimizar paciente (LGPD)").click();
     const button = page.getByRole("button", { name: "Anonimizar paciente" });
     await expect(button).toBeDisabled();
     await page.getByLabel(/Digite ANONIMIZAR/).fill("anonimizar");
@@ -126,12 +158,25 @@ test.describe("pacientes", () => {
     await expect(button).toBeEnabled();
     await button.click();
 
-    await expect(page).toHaveURL(/\/admin\/pacientes$/);
+    await expect(page).toHaveURL(patientUrl);
+    await expect(
+      page.getByRole("heading", { name: "Paciente anonimizado" }),
+    ).toBeVisible();
+    await expect(page.getByRole("status")).toContainText(
+      "Dados pessoais apagados em",
+    );
+    await expect(page.getByRole("status")).toContainText(
+      "O histórico de agendamentos é mantido.",
+    );
+    await expect(page.getByLabel("Nome completo")).toHaveCount(0);
+    await expect(page.getByText("Anonimizar paciente (LGPD)")).toHaveCount(0);
+
+    await page.goto("/admin/pacientes");
+    const row = page.getByRole("link", { name: /Paciente anonimizado/ });
+    await expect(row).toBeVisible();
+    await expect(row.getByText("Anonimizado", { exact: true })).toBeVisible();
     await page.getByLabel("Buscar paciente").fill("teste um");
     await page.getByRole("button", { name: "Buscar" }).click();
     await expect(page.getByText("Nenhum paciente encontrado")).toBeVisible();
-
-    const response = await page.goto(patientUrl);
-    expect(response?.status()).toBe(404);
   });
 });

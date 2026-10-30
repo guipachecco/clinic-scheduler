@@ -17,11 +17,11 @@ export async function requireAdmin() {
   const session = await getSession();
   if (!session) redirect("/admin/entrar");
   if (session.user.role !== "admin") notFound();
+  if (!session.user.twoFactorEnabled) redirect("/admin/configurar-2fa");
   return session;
 }
 
-// Only for the 2FA setup page: signed in, 2FA not set up yet. 2FA is optional;
-// the panel home recommends it while it is off.
+// Only for the 2FA setup page: signed in with the password, 2FA not yet set up.
 export async function requireSessionPendingTwoFactor() {
   const session = await getSession();
   if (!session) redirect("/admin/entrar");

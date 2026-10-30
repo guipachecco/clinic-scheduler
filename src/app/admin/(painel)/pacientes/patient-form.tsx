@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  formatBrPhoneInput,
+  formatCpfInput,
   GENDERS,
   patientFormSchema,
   REFERRAL_SOURCES,
@@ -54,8 +56,50 @@ type TextField = {
   label: string;
   type?: string;
   inputMode?: "tel" | "numeric" | "email";
+  autoComplete?: string;
+  placeholder?: string;
+  mask?: (value: string) => string;
   hint?: string;
 };
+
+function countDigits(value: string) {
+  return value.replace(/\D/g, "").length;
+}
+
+// Re-masks the field as the user types and keeps the caret next to the same
+// digit. Backspace right after a separator ("." "-" ")" " ") removes the digit
+// before it, so the punctuation never traps the caret.
+function applyMask(
+  event: React.ChangeEvent<HTMLInputElement>,
+  mask: (value: string) => string,
+  setValue: (value: string) => void,
+) {
+  const input = event.target;
+  let raw = input.value;
+  let caret = input.selectionStart ?? raw.length;
+  const inputType = (event.nativeEvent as InputEvent).inputType;
+  // The value before this keystroke: the last masked value, or the default.
+  const previous = input.dataset.masked ?? input.defaultValue;
+  if (
+    inputType === "deleteContentBackward" &&
+    countDigits(raw) === countDigits(previous) &&
+    caret > 0
+  ) {
+    const before = raw.slice(0, caret).replace(/\d(?=\D*$)/, "");
+    raw = before + raw.slice(caret);
+    caret = before.length;
+  }
+  const digitsBeforeCaret = countDigits(raw.slice(0, caret));
+  const masked = mask(raw);
+  input.dataset.masked = masked;
+  setValue(masked);
+  let position = 0;
+  for (let seen = 0; position < masked.length; position++) {
+    if (seen === digitsBeforeCaret) break;
+    if (/\d/.test(masked[position])) seen++;
+  }
+  requestAnimationFrame(() => input.setSelectionRange(position, position));
+}
 
 function TextInput({
   field,
@@ -65,6 +109,7 @@ function TextInput({
   form: PatientFormApi;
 }) {
   const error = form.formState.errors[field.name]?.message;
+  const mask = field.mask;
   const errorId = `${field.name}-error`;
   const hintId = `${field.name}-hint`;
   const describedBy =
@@ -77,12 +122,21 @@ function TextInput({
       <Input
         id={field.name}
         type={field.type ?? "text"}
-        autoComplete="off"
+        autoComplete={field.autoComplete ?? "off"}
         inputMode={field.inputMode}
+        placeholder={field.placeholder}
         max={field.type === "date" ? todayInClinic() : undefined}
         aria-invalid={Boolean(error)}
         aria-describedby={describedBy}
-        {...form.register(field.name)}
+        {...form.register(field.name, {
+          onChange: mask
+            ? (event: React.ChangeEvent<HTMLInputElement>) => {
+                applyMask(event, mask, (value) =>
+                  form.setValue(field.name, value, { shouldDirty: true }),
+                );
+              }
+            : undefined,
+        })}
       />
       {field.hint ? (
         <p id={hintId} className="text-sm text-muted-foreground">
@@ -168,7 +222,10 @@ export function PatientForm(props: Props) {
             name: "phone",
             label: "WhatsApp",
             type: "tel",
-            inputMode: "tel",
+            inputMode: "numeric",
+            autoComplete: "tel",
+            placeholder: "(00) 00000-0000",
+            mask: formatBrPhoneInput,
             hint: "Com DDD, por exemplo (48) 99999-0000.",
           }}
         />
@@ -178,7 +235,10 @@ export function PatientForm(props: Props) {
             name: "landlinePhone",
             label: "Telefone fixo",
             type: "tel",
-            inputMode: "tel",
+            inputMode: "numeric",
+            autoComplete: "tel",
+            placeholder: "(00) 0000-0000",
+            mask: formatBrPhoneInput,
           }}
         />
         <TextInput
@@ -208,7 +268,14 @@ export function PatientForm(props: Props) {
         </div>
         <TextInput
           form={form}
-          field={{ name: "cpf", label: "CPF", inputMode: "numeric" }}
+          field={{
+            name: "cpf",
+            label: "CPF",
+            inputMode: "numeric",
+            autoComplete: "off",
+            placeholder: "000.000.000-00",
+            mask: formatCpfInput,
+          }}
         />
         <TextInput form={form} field={{ name: "rg", label: "RG" }} />
         <TextInput

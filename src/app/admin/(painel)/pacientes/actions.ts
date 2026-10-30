@@ -150,5 +150,5 @@ export async function anonymizePatientAction(
           : "Paciente não encontrado.",
     };
   }
-  redirect("/admin/pacientes");
+  redirect(`/admin/pacientes/${id}`);
 }

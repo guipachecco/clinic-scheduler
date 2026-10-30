@@ -15,9 +15,11 @@ import {
   type PatientFormValues,
 } from "@/modules/patients/fields";
 import {
+  ANONYMIZED_NAME,
   anonymizePatient,
   createPatient,
   getPatient,
+  type PatientCursor,
   searchPatients,
   updatePatient,
 } from "@/modules/patients/patients";
@@ -129,12 +131,20 @@ describe("createPatient / getPatient", () => {
     });
   });
 
-  it("returns null for a missing id, a non-UUID id and an anonymized patient", async () => {
+  it("returns null for a missing id and a non-UUID id", async () => {
     expect(await getPatient("00000000-0000-4000-8000-000000000000")).toBeNull();
     expect(await getPatient("not-a-uuid")).toBeNull();
+  });
+
+  it("returns an anonymized patient with anonymizedAt set", async () => {
     const id = await created();
+    expect((await getPatient(id))?.anonymizedAt).toBeNull();
     await anonymizePatient(id, actorId);
-    expect(await getPatient(id)).toBeNull();
+    const record = await getPatient(id);
+    expect(record?.name).toBe(ANONYMIZED_NAME);
+    expect(record?.anonymizedAt).toBeInstanceOf(Date);
+    expect(record?.cpf).toBeNull();
+    expect(record?.phone).toBeNull();
   });
 
   it("writes one patient.created audit row with no input values", async () => {
@@ -309,6 +319,7 @@ describe("searchPatients", () => {
       nickname: null,
       phone: "+5548999991234",
       birthDate: "1990-05-10",
+      anonymizedAt: null,
     });
   });
 
@@ -349,13 +360,111 @@ describe("searchPatients", () => {
     expect((await searchPatients({ term: "m_ria" })).items).toHaveLength(0);
   });
 
-  it("never returns anonymized patients", async () => {
+  it("lists anonymized patients, sorted among the other names", async () => {
+    const ana = await created({ name: "Ana", cpf: "" });
+    const pedro = await created({
+      name: "Pedro",
+      cpf: "",
+      phone: "(48) 98888-0001",
+    });
+    const zelia = await created({
+      name: "Zélia",
+      cpf: "",
+      phone: "(48) 98888-0002",
+    });
+    const anon = await created({
+      name: "Qualquer Nome",
+      cpf: "",
+      phone: "(48) 98888-0003",
+    });
+    await anonymizePatient(anon, actorId);
+    const { items } = await searchPatients({ term: "" });
+    expect(items.map((i) => i.id)).toEqual([ana, anon, pedro, zelia]);
+    const row = items.find((i) => i.id === anon);
+    expect(row).toMatchObject({
+      name: ANONYMIZED_NAME,
+      phone: null,
+      birthDate: null,
+    });
+    expect(row?.anonymizedAt).toBeInstanceOf(Date);
+  });
+
+  it("finds anonymized patients by the name search only", async () => {
     const id = await created();
     await anonymizePatient(id, actorId);
-    expect((await searchPatients({ term: "anonimizado" })).items).toHaveLength(
-      0,
+    expect(
+      (await searchPatients({ term: "anonimizado" })).items.map((i) => i.id),
+    ).toEqual([id]);
+    expect(
+      (await searchPatients({ term: "Paciente Anonimizado" })).items,
+    ).toHaveLength(1);
+    expect((await searchPatients({ term: "529982" })).items).toHaveLength(0);
+  });
+
+  it("pages across the anonymized sort key with no overlap and no gaps", async () => {
+    const anonymizedKey = "paciente anonimizado";
+    await db.insert(patients).values(
+      Array.from({ length: 60 }, (_, i) => {
+        const n = String(i).padStart(2, "0");
+        return {
+          name: `Paciente ${n}`,
+          nameNormalized: `paciente ${n}`,
+          phone: `+55489000000${n}`,
+        };
+      }),
     );
-    expect((await searchPatients({ term: "" })).items).toHaveLength(0);
+    await db.insert(patients).values(
+      Array.from({ length: 8 }, () => ({
+        name: ANONYMIZED_NAME,
+        nameNormalized: null,
+        phone: null,
+        anonymizedAt: new Date(),
+      })),
+    );
+    const expected = await db.execute<{ id: string }>(
+      sql`select id from patients order by coalesce(name_normalized, ${anonymizedKey}), id`,
+    );
+    const seen: string[] = [];
+    let after: PatientCursor | undefined;
+    let pages = 0;
+    do {
+      const page = await searchPatients({ term: "", after });
+      seen.push(...page.items.map((i) => i.id));
+      after = page.next;
+      pages += 1;
+    } while (after);
+    expect(pages).toBe(2);
+    expect(seen).toEqual(expected.rows.map((r) => r.id));
+    expect(new Set(seen).size).toBe(68);
+  });
+
+  it("continues correctly when the cursor is the anonymized sort key", async () => {
+    await db.insert(patients).values(
+      Array.from({ length: 49 }, (_, i) => {
+        const n = String(i).padStart(2, "0");
+        return {
+          name: `Aaa ${n}`,
+          nameNormalized: `aaa ${n}`,
+          phone: `+55489100000${n}`,
+        };
+      }),
+    );
+    await db.insert(patients).values(
+      Array.from({ length: 5 }, () => ({
+        name: ANONYMIZED_NAME,
+        nameNormalized: null,
+        phone: null,
+        anonymizedAt: new Date(),
+      })),
+    );
+    const first = await searchPatients({ term: "" });
+    expect(first.items).toHaveLength(50);
+    expect(first.next?.nameNormalized).toBe("paciente anonimizado");
+    const second = await searchPatients({ term: "", after: first.next });
+    expect(second.items).toHaveLength(4);
+    expect(second.next).toBeUndefined();
+    const ids = new Set([...first.items, ...second.items].map((i) => i.id));
+    expect(ids.size).toBe(54);
   });
 
   it("pages by cursor, 50 at a time, with no overlap", async () => {

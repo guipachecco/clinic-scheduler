@@ -61,3 +61,29 @@ test("headings use the Archivo heading font", async ({ page }) => {
     .evaluate((element) => getComputedStyle(element).fontFamily);
   expect(fontFamily).toContain("Archivo Variable");
 });
+
+test("the theme button switches to the dark theme and remembers it", async ({
+  page,
+}) => {
+  await page.goto("/admin/entrar");
+  const toggle = page.getByRole("button", { name: "Tema escuro" });
+  await expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+  await toggle.click();
+  await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+  await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+  // The choice survives a reload: the server renders the class from the cookie.
+  await page.reload();
+  await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+  await expect(page.locator("body")).toHaveCSS(
+    "background-color",
+    "rgb(11, 11, 16)",
+  );
+  await expect(
+    page.getByRole("img", { name: "Grais Saúde Integrativa" }),
+  ).toHaveAttribute("src", /logo-preto/);
+
+  await page.getByRole("button", { name: "Tema escuro" }).click();
+  await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);
+});

@@ -57,9 +57,10 @@ Data de nascimento e os demais campos novos ficam **opcionais no banco**: o agen
   - **Motivo:** funciona igual no celular, e a ficha ganha um lugar próprio para o histórico e, depois, o prontuário.
   - A janela flutuante foi descartada: no celular vira tela cheia de qualquer jeito e lembraria o sistema anterior.
 - **Busca no servidor, fora da URL:** por nome (sem acento e sem diferença de maiúsculas), CPF ou telefone. O termo vai num POST e nunca aparece no endereço nem no histórico do navegador. Custo: ao voltar para a lista, a busca começa vazia.
-- **Lista:** pacientes ativos (não anonimizados) em ordem alfabética, 50 por vez com "Carregar mais"; cada linha mostra nome, apelido, idade e WhatsApp.
+- **Lista:** todos os pacientes em ordem alfabética, 50 por vez com "Carregar mais"; cada linha mostra nome, apelido, idade e WhatsApp. Pacientes anonimizados continuam na lista como "Paciente anonimizado", com a etiqueta discreta "Anonimizado", e abrem a ficha normalmente.
+- **Máscaras:** CPF e WhatsApp (e telefone fixo) são formatados enquanto a pessoa digita (`000.000.000-00`, `(00) 00000-0000`) e aparecem formatados na ficha e na lista. O banco guarda só os dígitos (CPF) e o formato internacional (telefone).
 - **Duplicidade:** o banco já recusa o mesmo WhatsApp com o mesmo nome; passa a recusar também o mesmo CPF. O formulário mostra o erro no campo, com link para a ficha que já existe.
-- **Anonimizar:** botão na ficha, com confirmação digitada. Apaga todos os dados pessoais, troca o nome por "Paciente anonimizado" e mantém os agendamentos. É recusado enquanto o paciente tiver agendamento futuro solicitado ou confirmado.
+- **Anonimizar:** opcional, só a pedido do titular (LGPD). Fica numa seção recolhida ("Anonimizar paciente (LGPD)") no fim da ficha, com confirmação digitada. Apaga todos os dados pessoais, troca o nome por "Paciente anonimizado" e mantém os agendamentos. É recusado enquanto o paciente tiver agendamento futuro solicitado ou confirmado. Depois de anonimizar, a pessoa continua na ficha, que mostra o aviso "Dados pessoais apagados em dd/mm/aaaa a pedido do titular (LGPD). O histórico de agendamentos é mantido." e não tem mais formulário de edição nem a seção de anonimizar.
 - **Histórico de ações:** `patient.created`, `patient.updated` e `patient.anonymized`, com o id do paciente e, na edição, só os nomes dos campos alterados, nunca os valores.
 - **Permissão:** todas as páginas e ações chamam `requireAdmin()`. Quando houver outros papéis, esta tela ganha a regra de quem pode ver.
 - **Menu:** "Pacientes" entra no menu lateral do painel.
@@ -94,7 +95,7 @@ Decisões minhas (Claude), tomadas para responder às dúvidas de um revisor; po
 - **Interpretação da busca:**
   - Um termo só com números (ignorando pontos, traços, parênteses e espaços), com 3 dígitos ou mais, procura em CPF e telefones, por trecho.
   - Qualquer outro termo procura no nome e no apelido, por trecho, sem acento e sem diferença de maiúsculas.
-  - Anonimizados nunca aparecem.
+  - Anonimizados aparecem na busca por nome (o nome vale "Paciente anonimizado", então buscar "anonimizado" os lista), na ordem alfabética dessa etiqueta. Como não têm CPF nem telefone, a busca por números não os encontra.
   - Sem índice especial: o volume de uma clínica não pede.
 - **"Carregar mais":** a busca e a paginação são uma Server Action, com ordem por nome normalizado e desempate pelo id. O termo buscado nunca vai para log.
 - **Duplicidade:**

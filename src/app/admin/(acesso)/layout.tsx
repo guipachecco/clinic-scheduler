@@ -1,19 +1,22 @@
-import Image from "next/image";
+import { BrandImage } from "@/components/brand-image";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { getTheme } from "@/lib/theme-server";
 
-export default function AccessLayout({
+export default async function AccessLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const theme = await getTheme();
+
   return (
-    <main className="flex flex-1 flex-col items-center justify-center bg-primary px-4 py-10">
+    <main className="relative flex flex-1 flex-col items-center justify-center bg-brand px-4 py-10">
+      <ThemeToggle initialTheme={theme} className="absolute top-4 right-4" />
       <div className="flex w-full max-w-md flex-col items-center gap-2">
-        <Image
-          src="/marca/logo-marinho.png"
+        <BrandImage
+          kind="logo"
           alt="Grais Saúde Integrativa"
-          width={300}
-          height={300}
-          preload
+          size={300}
           className="-my-10 size-[300px]"
         />
         <div className="w-full">{children}</div>

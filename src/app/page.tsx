@@ -1,14 +1,12 @@
-import Image from "next/image";
+import { BrandImage } from "@/components/brand-image";
 
 export default function HomePage() {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-4 px-6 py-16">
-      <Image
-        src="/marca/logo-marinho.png"
+      <BrandImage
+        kind="logo"
         alt="Grais Saúde Integrativa"
-        width={160}
-        height={160}
-        preload
+        size={160}
         className="size-40 rounded-2xl"
       />
       <h1 className="text-3xl font-semibold tracking-tight">

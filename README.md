@@ -12,7 +12,7 @@ Sistema web de agendamentos para uma clínica de biomedicina: site institucional
 | 4     | Qualidade: testes dos fluxos, segurança e responsividade     | A fazer                                                                  |
 | 5     | Publicação: produção, domínio, backups e monitoramento       | A fazer                                                                  |
 
-O que já funciona: login do painel com verificação em duas etapas opcional, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), identidade visual da clínica aplicada (cores, logo e fontes Archivo e Figtree), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
+O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), identidade visual da clínica aplicada (cores, logo e fontes Archivo e Figtree), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
 
 ## Tecnologias
 
@@ -65,7 +65,7 @@ pnpm dev
 - Site: http://localhost:3000
 - Painel: http://localhost:3000/admin
 
-A verificação em duas etapas é opcional, mas recomendada: o painel abre só com a senha e a tela inicial oferece o botão "Ativar verificação em duas etapas". Para ativar, tenha no celular um aplicativo autenticador (Google Authenticator, Microsoft Authenticator ou outro), leia o QR code e guarde os códigos de recuperação. Depois de ativada, todo login pede o código.
+No primeiro acesso ao painel, depois da senha, o sistema pede a configuração da verificação em duas etapas. Tenha no celular um aplicativo autenticador (Google Authenticator, Microsoft Authenticator ou outro), leia o QR code e guarde os códigos de recuperação. Sem 2FA ativo, o painel não abre. Faça esse primeiro acesso logo depois de criar a conta: até lá, quem tiver a senha consegue cadastrar o próprio celular.
 
 Use sempre o mesmo endereço do `BETTER_AUTH_URL` (por exemplo, `localhost` e não `127.0.0.1`), porque o login recusa pedidos vindos de outra origem.
 
@@ -117,7 +117,7 @@ O que os testes cobrem hoje:
 
 - **Trava de horários no banco:** sobreposição recusada, encaixe exato permitido, preparo e limpeza contados como tempo ocupado, cancelados sem bloquear, remarcação para horário ocupado recusada e, entre vários pedidos simultâneos para o mesmo horário, só um gravado.
 - **Contas do painel:** criação pelo script, login pelo Better Auth, cadastro público bloqueado, troca de senha e remoção do 2FA encerrando as sessões.
-- **Navegador:** cabeçalhos de segurança e nonce da CSP em todos os scripts, painel fechado sem login, painel aberto sem 2FA com a recomendação de ativá-lo, login com o código do aplicativo e código errado recusado.
+- **Navegador:** cabeçalhos de segurança e nonce da CSP em todos os scripts, painel fechado sem login, 2FA obrigatório no primeiro acesso, login com o código do aplicativo e código errado recusado.
 - **Unidade:** validação das variáveis de ambiente, montagem da CSP, identificação de erros do banco e remoção de dados pessoais dos logs.
 
 A CI do GitHub Actions roda tudo isso em cada PR e em cada push na `main`. O Dependabot abre PRs semanais de atualização das dependências.
@@ -152,7 +152,7 @@ docs/                  planejamento e decisões técnicas
 O que a fundação já faz:
 
 - Painel sem cadastro público: contas criadas só pelo terminal.
-- Senha com hash forte (scrypt) e mínimo de 12 caracteres; 2FA opcional por aplicativo autenticador, com códigos de recuperação e bloqueio de 15 minutos após 10 códigos errados.
+- Senha com hash forte (scrypt) e mínimo de 12 caracteres; 2FA obrigatório por aplicativo autenticador, com códigos de recuperação e bloqueio de 15 minutos após 10 códigos errados.
 - Sessão encerrada 12 horas depois do login, em cookie `httpOnly`, `SameSite=Lax` e, em produção, `Secure`.
 - Em produção, no máximo 5 tentativas de login por minuto por IP, com a contagem guardada no PostgreSQL.
 - Sessão conferida no servidor em cada página e ação do painel, não só no proxy.
