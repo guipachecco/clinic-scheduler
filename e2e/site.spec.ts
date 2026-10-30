@@ -47,3 +47,17 @@ test("unknown pages show the not-found message", async ({ page }) => {
     page.getByRole("heading", { name: "Página não encontrada" }),
   ).toBeVisible();
 });
+
+test("site icon is served", async ({ request }) => {
+  const response = await request.get("/icon.png");
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toBe("image/png");
+});
+
+test("headings use the Archivo heading font", async ({ page }) => {
+  await page.goto("/");
+  const fontFamily = await page
+    .locator("h1")
+    .evaluate((element) => getComputedStyle(element).fontFamily);
+  expect(fontFamily).toContain("Archivo Variable");
+});

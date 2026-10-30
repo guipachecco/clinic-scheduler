@@ -25,6 +25,8 @@
     "admin": "tsx --env-file-if-exists=.env scripts/admin.ts"
   },
   "dependencies": {
+    "@fontsource-variable/archivo": "^5.3.0",
+    "@fontsource-variable/figtree": "^5.3.0",
     "@hookform/resolvers": "^6.0.2",
     "better-auth": "^1.7.14",
     "class-variance-authority": "^0.7.1",

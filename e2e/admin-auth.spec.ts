@@ -31,6 +31,30 @@ test("the panel requires a session", async ({ page }) => {
   expect(response?.headers()["x-robots-tag"]).toBe("noindex, nofollow");
 });
 
+test("the access screen shows the brand and loads fonts from the app itself", async ({
+  page,
+}) => {
+  const messages: string[] = [];
+  page.on("console", (message) => messages.push(message.text()));
+  const fontUrls: string[] = [];
+  page.on("response", (response) => {
+    if (/\.woff2/.test(response.url())) fontUrls.push(response.url());
+  });
+
+  await page.goto("/admin/entrar");
+  await expect(
+    page.getByRole("img", { name: "Grais Saúde Integrativa" }),
+  ).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+
+  expect(messages.filter((m) => m.includes("Content Security Policy"))).toEqual(
+    [],
+  );
+  const origin = new URL(page.url()).origin;
+  expect(fontUrls.length).toBeGreaterThan(0);
+  expect(fontUrls.some((url) => url.startsWith(origin))).toBe(true);
+});
+
 test("public sign-up is disabled", async ({ request }) => {
   const response = await request.post("/api/auth/sign-up/email", {
     data: { email: "novo@example.test", password: "x".repeat(16), name: "X" },
@@ -70,6 +94,28 @@ test("first access requires setting up 2FA before the panel opens", async ({
     page.getByRole("heading", { name: `Olá, ${TEST_ADMIN.name}` }),
   ).toBeVisible();
 
+  const nav = page.getByRole("navigation", { name: "Menu principal" });
+  await expect(nav).toBeVisible();
+  const home = nav.getByRole("link", { name: "Início" });
+  await expect(home).toHaveAttribute("aria-current", "page");
+  // Proves the bg-highlight utility is generated: highlight yellow #FFDE59.
+  await expect(home).toHaveCSS("background-color", "rgb(255, 222, 89)");
+
+  // Tab order must follow reading order: "Início" comes before "Sair".
+  const homeBeforeSignOut = await page.evaluate(() => {
+    const link = [...document.querySelectorAll("nav a")].find(
+      (a) => a.textContent?.trim() === "Início",
+    );
+    const button = [...document.querySelectorAll("button")].find(
+      (b) => b.textContent?.trim() === "Sair",
+    );
+    if (!link || !button) return false;
+    return Boolean(
+      link.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+  expect(homeBeforeSignOut).toBe(true);
+
   await page.getByRole("button", { name: "Sair" }).click();
   await expect(page).toHaveURL(/\/admin\/entrar$/);
   await page.goto("/admin");
@@ -97,4 +143,15 @@ test("later sign-ins ask for the authenticator code", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: `Olá, ${TEST_ADMIN.name}` }),
   ).toBeVisible();
+
+  // The panel shell must not scroll sideways on a phone.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/admin");
+  await expect(
+    page.getByRole("navigation", { name: "Menu principal" }),
+  ).toBeVisible();
+  const scrollWidth = await page.evaluate(
+    () => document.documentElement.scrollWidth,
+  );
+  expect(scrollWidth).toBeLessThanOrEqual(390);
 });
