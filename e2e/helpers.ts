@@ -27,7 +27,8 @@ export async function signInWithFreshTwoFactor(page: Page, account: Account) {
   await page.getByLabel("E-mail").fill(account.email);
   await page.getByLabel("Senha").fill(account.password);
   await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).toHaveURL(/\/admin\/configurar-2fa$/);
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto("/admin/configurar-2fa");
 
   await page.getByLabel("Confirme sua senha").fill(account.password);
   await page.getByRole("button", { name: "Continuar" }).click();

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import {
   Card,
@@ -27,11 +28,18 @@ export default async function TwoFactorSetupPage() {
         <CardDescription>
           O painel guarda dados de pacientes. Além da senha, cada acesso vai
           pedir um código gerado no seu celular por um aplicativo autenticador,
-          como Google Authenticator ou Microsoft Authenticator.
+          como Google Authenticator ou Microsoft Authenticator. É opcional, mas
+          recomendado.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="grid gap-4">
         <TwoFactorSetup />
+        <Link
+          href="/admin"
+          className="justify-self-center text-sm font-medium underline-offset-4 hover:underline"
+        >
+          Agora não, voltar ao painel
+        </Link>
       </CardContent>
     </Card>
   );

@@ -10,10 +10,11 @@ Escolhas feitas durante a implementação que não estavam detalhadas no [planej
 - **Motivo:** com o nonce, o navegador só executa os scripts que o próprio servidor marcou, o que barra scripts injetados. Isso importa num painel com dados de pacientes. O Cache Components pré-gera parte das páginas no build, e uma página pré-gerada não tem como carregar o nonce de cada acesso.
 - **Consequência:** nenhuma página fica em cache estático. Para o volume de uma clínica o custo é desprezível, e a agenda precisa estar sempre atualizada de qualquer forma. Religar o Cache Components exigiria trocar a CSP por uma sem nonce (`'unsafe-inline'`) ou pela opção experimental de hashes (SRI).
 
-### Verificação em duas etapas obrigatória
+### Verificação em duas etapas opcional
 
-- **Decisão:** toda conta do painel precisa de 2FA por aplicativo autenticador (TOTP). Depois da senha, uma conta sem 2FA só consegue abrir a tela de configuração (`requireAdmin` em `src/modules/auth/session.ts`). São gerados 10 códigos de recuperação de uso único.
-- **Motivo:** o Better Auth oferece 2FA, mas não obriga. Uma senha vazada não deve bastar para ver dados de pacientes.
+- **Decisão:** o 2FA por aplicativo autenticador (TOTP) é opcional, a pedido da clínica (30/10/2026). Uma conta sem 2FA entra no painel só com a senha, e a tela inicial recomenda ativá-lo, com link para `/admin/configurar-2fa`. Quem ativa passa a ter o código pedido em todo login. São gerados 10 códigos de recuperação de uso único.
+- **Motivo:** a clínica preferiu não obrigar o uso do celular no login. Até a Etapa 2, o 2FA era obrigatório, porque uma senha vazada não deveria bastar para ver dados de pacientes; esse risco agora fica com quem não ativar.
+- **Risco aceito:** sem 2FA, a senha (mínimo de 12 caracteres, limite de tentativas por IP) é a única proteção do painel. Recomendação: ativar ao menos na conta da profissional.
 - **Consequência:** desativar o 2FA pelo site está bloqueado; a remoção, para o caso de celular perdido, é feita no terminal com `pnpm admin reset-2fa <email>`. A opção "confiar neste dispositivo" não foi oferecida, então todo login pede o código. Ela pode ser ligada depois, se o uso diário pedir.
 
 ### Sessões e rotas de autenticação

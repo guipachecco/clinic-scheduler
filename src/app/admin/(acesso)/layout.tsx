@@ -11,10 +11,10 @@ export default function AccessLayout({
         <Image
           src="/marca/logo-marinho.png"
           alt="Grais Saúde Integrativa"
-          width={200}
-          height={200}
+          width={300}
+          height={300}
           preload
-          className="-my-6 size-[200px]"
+          className="-my-10 size-[300px]"
         />
         <div className="w-full">{children}</div>
       </div>

@@ -68,14 +68,14 @@ test("a wrong password shows an error", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin\/entrar$/);
 });
 
-test("first access requires setting up 2FA before the panel opens", async ({
+test("2FA is optional: the panel opens and recommends setting it up", async ({
   page,
 }) => {
   await signInWithPassword(page);
-  await expect(page).toHaveURL(/\/admin\/configurar-2fa$/);
-
-  // The panel stays closed until 2FA is active.
-  await page.goto("/admin");
+  await expect(page).toHaveURL(/\/admin$/);
+  await page
+    .getByRole("link", { name: "Ativar verificação em duas etapas" })
+    .click();
   await expect(page).toHaveURL(/\/admin\/configurar-2fa$/);
 
   await page.getByLabel("Confirme sua senha").fill(TEST_ADMIN.password);
