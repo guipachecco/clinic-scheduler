@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   customType,
+  date,
   index,
   integer,
   jsonb,
@@ -64,6 +65,29 @@ export const auditActorType = pgEnum("audit_actor_type", [
   "admin",
   "patient",
   "system",
+]);
+
+export const patientGender = pgEnum("patient_gender", [
+  "male",
+  "female",
+  "other",
+  "undisclosed",
+]);
+
+export const patientReferralSource = pgEnum("patient_referral_source", [
+  "google",
+  "instagram",
+  "facebook",
+  "referral",
+  "school",
+  "outdoor",
+  "flyer",
+  "sign",
+  "insurance",
+  "radio",
+  "tv",
+  "magazine",
+  "other",
 ]);
 
 export const mediaKind = pgEnum("media_kind", ["logo", "photo"]);
@@ -289,9 +313,10 @@ export const timeBlocks = pgTable(
   ],
 );
 
-// Minimal patient data: name, phone in E.164 and an optional email. A patient
-// is identified by phone + normalized name. Anonymization clears the personal
-// fields and replaces the name with a fixed label.
+// Patient registry: name, phone in E.164 and optional contact, document and
+// marketing data. A patient is identified by phone + normalized name (the CPF,
+// when present, is also unique). Anonymization clears every personal field and
+// replaces the name with a fixed label.
 export const patients = pgTable(
   "patients",
   {
@@ -300,23 +325,51 @@ export const patients = pgTable(
     nameNormalized: text("name_normalized"),
     phone: text("phone"),
     email: text("email"),
+    nickname: text("nickname"),
+    cpf: text("cpf"),
+    rg: text("rg"),
+    landlinePhone: text("landline_phone"),
+    birthDate: date("birth_date", { mode: "string" }),
+    gender: patientGender("gender"),
+    referralSource: patientReferralSource("referral_source"),
+    referredBy: text("referred_by"),
+    notes: text("notes"),
     anonymizedAt: timestamp("anonymized_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     uniqueIndex("patients_phone_name_idx").on(t.phone, t.nameNormalized),
+    uniqueIndex("patients_cpf_idx")
+      .on(t.cpf)
+      .where(sql`${t.cpf} is not null`),
     check(
       "patients_identity_check",
       sql`${t.anonymizedAt} is not null or (${t.phone} is not null and ${t.nameNormalized} is not null)`,
     ),
     check(
       "patients_anonymized_check",
-      sql`${t.anonymizedAt} is null or (${t.phone} is null and ${t.email} is null and ${t.nameNormalized} is null)`,
+      sql`${t.anonymizedAt} is null or (${t.phone} is null and ${t.email} is null and ${t.nameNormalized} is null and ${t.nickname} is null and ${t.cpf} is null and ${t.rg} is null and ${t.landlinePhone} is null and ${t.birthDate} is null and ${t.gender} is null and ${t.referralSource} is null and ${t.referredBy} is null and ${t.notes} is null)`,
     ),
     check(
       "patients_phone_check",
       sql`${t.phone} is null or ${t.phone} ~ '^\\+[1-9][0-9]{7,14}$'`,
+    ),
+    check(
+      "patients_landline_check",
+      sql`${t.landlinePhone} is null or ${t.landlinePhone} ~ '^\\+[1-9][0-9]{7,14}$'`,
+    ),
+    check(
+      "patients_cpf_check",
+      sql`${t.cpf} is null or ${t.cpf} ~ '^[0-9]{11}$'`,
+    ),
+    check(
+      "patients_referred_by_check",
+      sql`${t.referredBy} is null or ${t.referralSource} = 'referral'`,
+    ),
+    check(
+      "patients_lengths_check",
+      sql`char_length(${t.nickname}) <= 40 and char_length(${t.rg}) <= 20 and char_length(${t.referredBy}) <= 120 and char_length(${t.notes}) <= 1000`,
     ),
   ],
 );

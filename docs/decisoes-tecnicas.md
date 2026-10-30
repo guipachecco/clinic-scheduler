@@ -46,7 +46,7 @@ Escolhas feitas durante a implementação que não estavam detalhadas no [planej
 - `clinic_settings` tem uma linha só, criada pela migração, com o conteúdo do site vazio e o agendamento online desligado até a clínica configurar. As regras começam com os padrões do planejamento: 2 horas de antecedência, 60 dias à frente, 24 horas para cancelar e horários de 30 em 30 minutos. O limite de 2 agendamentos ativos por telefone foi definido agora e pode ser ajustado.
 - Serviços nascem inativos e só aparecem no site quando a clínica os ativa.
 - Restrições `CHECK` garantem faixas válidas: duração de 5 a 720 minutos, preparo e limpeza até 240 minutos, telefone no formato internacional e imagens de até 2 MB em JPEG, PNG ou WebP.
-- A anonimização de um paciente apaga telefone, e-mail e nome normalizado e troca o nome por um rótulo; uma restrição impede anonimizar pela metade.
+- A anonimização de um paciente apaga todos os campos pessoais e troca o nome pelo rótulo "Paciente anonimizado"; uma restrição impede anonimizar pela metade.
 
 ### Testes com PostgreSQL de verdade
 
@@ -63,3 +63,23 @@ Escolhas feitas durante a implementação que não estavam detalhadas no [planej
 ### Identidade visual
 
 As cores, as fontes e os logos aprovados da clínica estão descritos em [identidade-visual.md](identidade-visual.md). Os tokens ficam em `src/app/globals.css`, incluindo o token `highlight` (amarelo, usado só como destaque sobre o azul-marinho, nunca como texto em fundo claro), e os logos em `public/marca/`.
+
+## Cadastro de pacientes
+
+- **Busca fora da URL:** o termo da busca viaja no corpo de uma Server Action (POST), nunca na barra de endereço. A página continua em `/admin/pacientes`, então nome, telefone ou CPF não ficam no histórico do navegador, nos logs do servidor nem em links copiados. A busca também não é gravada em log.
+- **Páginas sem dados pessoais no título:** a ficha do paciente usa o título "Paciente", porque o título vai para o histórico do navegador.
+- **Erros genéricos:** um erro inesperado do banco pode conter valores do paciente; cada ação do servidor devolve uma mensagem genérica (por exemplo, "Não foi possível salvar. Tente novamente.") e nada é registrado em log.
+- **Campos de auditoria:** criar, editar e anonimizar gravam em `audit_logs` quem fez (`actor_user_id`), quando e qual ação. Na edição, `changes` guarda só os nomes dos campos alterados, nunca os valores.
+- **Anonimização:** o botão só habilita depois de digitar exatamente `ANONIMIZAR`, e o servidor confere de novo. Pacientes com agendamentos futuros solicitados ou confirmados não podem ser anonimizados.
+- **Acesso:** toda página e toda ação do servidor chama `requireAdmin()` antes de qualquer consulta.
+
+### Coleta ampliada no painel
+
+- **Decisão:** a pedido da clínica, o cadastro do painel ampliou a coleta mínima do planejamento: além de nome, WhatsApp e e-mail, guarda CPF, RG, nascimento, gênero, como conheceu, indicado por e observações administrativas. O formulário público de agendamento continua com a coleta mínima.
+- **Motivo:** a recepção precisa identificar o paciente e registrar a origem dos contatos no dia a dia.
+- **Consequência:** o risco de dado sensível aumenta, principalmente no campo de observações. As mitigações são: o aviso no campo de observações, nenhum dado pessoal em URLs ou logs, a anonimização completa e registros de auditoria só com nomes de campos.
+
+### Para a agenda
+
+- Agendar ou remarcar deve travar a linha do paciente (`SELECT … FOR SHARE` ou `FOR UPDATE`) e recusar quando `anonymized_at` não for nulo. O `FOR UPDATE` da anonimização só atrasa a verificação da chave estrangeira; ele não a rejeita.
+- `appointments.cancellation_reason` é texto livre e a anonimização não o limpa. A agenda deve mantê-lo sem dados pessoais ou limpá-lo ao anonimizar.

@@ -4,3 +4,11 @@ export const TEST_ADMIN = {
   name: "Administradora de Teste",
   password: "senha-de-teste-e2e-bem-longa",
 };
+
+// Second account, used by the patient suite so it does not depend on the order
+// of the other specs. It sets up its own 2FA (see e2e/helpers.ts).
+export const TEST_ADMIN_PATIENTS = {
+  email: "pacientes@example.test",
+  name: "Administradora de Pacientes",
+  password: "senha-de-teste-pacientes-bem-longa",
+};

@@ -34,7 +34,12 @@ export default async function PanelLayout({
           </div>
         </div>
         <div className="col-span-2 row-start-2 w-full min-w-0 md:col-span-1 md:row-start-auto md:min-h-0 md:w-auto md:overflow-y-auto">
-          <PanelNav items={[{ href: "/admin", label: "Início" }]} />
+          <PanelNav
+            items={[
+              { href: "/admin", label: "Início" },
+              { href: "/admin/pacientes", label: "Pacientes" },
+            ]}
+          />
         </div>
         <div className="col-start-2 row-start-1 ml-auto flex min-w-0 items-center gap-3 md:mt-auto md:ml-0 md:flex-col md:items-stretch">
           <span className="truncate text-sm text-white/80">

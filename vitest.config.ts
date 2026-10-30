@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 
 // Database for the integration tests. It is dropped and recreated on every
@@ -7,7 +9,16 @@ const TEST_DATABASE_URL =
   "postgres://clinic:clinic@localhost:5432/clinic_scheduler_test";
 
 export default defineConfig({
-  resolve: { tsconfigPaths: true },
+  resolve: {
+    tsconfigPaths: true,
+    // "server-only" throws outside Next.js's server bundle. Tests run on the
+    // server, so they use an empty stand-in.
+    alias: {
+      "server-only": fileURLToPath(
+        new URL("./tests/server-only-stub.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     // Values for automated tests only. Real secrets never go in the repository.
     env: {

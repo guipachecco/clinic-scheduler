@@ -22,6 +22,13 @@
       "when": 1793291859706,
       "tag": "0002_clinic_settings_row",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793329253039,
+      "tag": "0003_patient_registry",
+      "breakpoints": true
     }
   ]
 }

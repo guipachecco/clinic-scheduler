@@ -1,7 +1,7 @@
 import { E2E_DATABASE_URL, E2E_SERVER_ENV } from "../playwright.config";
 import { resetDatabase } from "../tests/helpers/test-database";
 
-import { TEST_ADMIN } from "./test-account";
+import { TEST_ADMIN, TEST_ADMIN_PATIENTS } from "./test-account";
 
 export default async function globalSetup() {
   await resetDatabase(E2E_DATABASE_URL);
@@ -12,6 +12,7 @@ export default async function globalSetup() {
   const { pool } = await import("../src/db/client");
   try {
     await createAdmin(TEST_ADMIN);
+    await createAdmin(TEST_ADMIN_PATIENTS);
   } finally {
     await pool.end();
   }

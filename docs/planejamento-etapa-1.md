@@ -262,7 +262,7 @@ O sistema aplica privacidade desde a concepção, mas isso sozinho não o torna 
 
 ### O que o sistema faz
 
-- Coleta mínima: nome, WhatsApp e e-mail opcional. Sem CPF, data de nascimento ou campo de texto livre, que costuma atrair relatos de saúde.
+- Coleta mínima: nome, WhatsApp e e-mail opcional. Sem CPF, data de nascimento ou campo de texto livre, que costuma atrair relatos de saúde. (Nota: o cadastro do painel ampliou essa coleta; ver [decisões técnicas](decisoes-tecnicas.md#coleta-ampliada-no-painel).)
 - Trata o vínculo entre paciente e procedimento como possivelmente sensível. Numa clínica, ele pode revelar dado referente à saúde (art. 5º, II), então recebe a mesma proteção.
 - Mantém dados de pacientes fora de URLs, logs, avisos à clínica e páginas públicas. O link do paciente usa um token opaco, e a busca por nome no painel não vai para a URL.
 - Pede ciência do aviso de privacidade no formulário. Ciência não é consentimento; a base legal será definida com a assessoria.
