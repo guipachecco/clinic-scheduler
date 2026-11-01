@@ -89,3 +89,12 @@ As cores, as fontes e os logos aprovados da clínica estão descritos em [identi
 
 - Agendar ou remarcar deve travar a linha do paciente (`SELECT … FOR SHARE` ou `FOR UPDATE`) e recusar quando `anonymized_at` não for nulo. O `FOR UPDATE` da anonimização só atrasa a verificação da chave estrangeira; ele não a rejeita.
 - `appointments.cancellation_reason` é texto livre e a anonimização não o limpa. A agenda deve mantê-lo sem dados pessoais ou limpá-lo ao anonimizar.
+
+## Serviços
+
+- **Endereço estável ao renomear:** o `slug` de serviços e categorias é gerado do nome na criação e nunca muda depois. Renomear altera só o texto exibido, então links e referências futuras (site público, agendamentos) continuam válidos.
+- **Nada é apagado:** não há botão de excluir serviço nem categoria. Para tirar algo de uso, desmarque "Ativo". Assim os agendamentos antigos continuam apontando para o serviço que foi marcado.
+- **Serviço flexível:** "Avaliação / encaixe" (categoria "Outros") é criado pela migração e serve para encaixes que não cabem em nenhum serviço do catálogo. Quando a agenda chegar (entrega 3 de [docs/agenda.md](agenda.md)), a duração e um rótulo curto serão definidos na hora do agendamento; a tela do serviço já mostra esse aviso. O painel nunca edita a marca `is_flexible`.
+- **Preço em centavos:** o valor é guardado como inteiro (`price_cents`) e a "forma de exibir" (fixo, a partir de, sob consulta, oculto) decide o que aparece. Preço fixo e "a partir de" exigem valor.
+- **Auditoria e erros:** criar e editar gravam em `audit_logs` só o nome dos campos alterados. Erros inesperados viram a mensagem genérica "Não foi possível salvar. Tente novamente.".
+- **Acesso:** toda página e toda ação do servidor chama `requireAdmin()` antes de qualquer consulta.

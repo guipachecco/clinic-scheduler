@@ -12,3 +12,10 @@ export const TEST_ADMIN_PATIENTS = {
   name: "Administradora de Pacientes",
   password: "senha-de-teste-pacientes-bem-longa",
 };
+
+// Third account, used by the services suite.
+export const TEST_ADMIN_SERVICES = {
+  email: "servicos@example.test",
+  name: "Administradora de Serviços",
+  password: "senha-de-teste-servicos-bem-longa",
+};

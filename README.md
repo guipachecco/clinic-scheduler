@@ -8,11 +8,11 @@ Sistema web de agendamentos para uma clínica de biomedicina: site institucional
 | ----- | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | 1     | Planejamento: requisitos, stack, arquitetura, banco e riscos | Concluída ([docs/planejamento-etapa-1.md](docs/planejamento-etapa-1.md)) |
 | 2     | Fundação: projeto, banco, autenticação, testes e CI          | Em revisão ([decisões técnicas](docs/decisoes-tecnicas.md))              |
-| 3     | MVP: site, serviços, agendamento e painel                    | A fazer                                                                  |
+| 3     | MVP: site, serviços, agendamento e painel                    | Em andamento ([agenda](docs/agenda.md))                                  |
 | 4     | Qualidade: testes dos fluxos, segurança e responsividade     | A fazer                                                                  |
 | 5     | Publicação: produção, domínio, backups e monitoramento       | A fazer                                                                  |
 
-O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), identidade visual da clínica aplicada (cores, logo e fontes Archivo e Figtree), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
+O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), identidade visual da clínica aplicada (cores, logo e fontes Archivo e Figtree), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
 
 ## Tecnologias
 

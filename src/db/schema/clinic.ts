@@ -202,6 +202,10 @@ export const serviceCategories = pgTable(
   ],
 );
 
+// Slugs of the rows seeded by migration 0005_flexible_service_seed.
+export const FLEXIBLE_SERVICE_SLUG = "avaliacao-encaixe";
+export const OTHER_CATEGORY_SLUG = "outros";
+
 // Services are deactivated, never deleted, once they have appointments.
 export const services = pgTable(
   "services",
@@ -223,6 +227,7 @@ export const services = pgTable(
       .notNull()
       .default(true),
     preparationInstructions: text("preparation_instructions"),
+    isFlexible: boolean("is_flexible").notNull().default(false),
     isActive: boolean("is_active").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: createdAt(),

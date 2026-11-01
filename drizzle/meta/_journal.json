@@ -29,6 +29,20 @@
       "when": 1793329253039,
       "tag": "0003_patient_registry",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793353394319,
+      "tag": "0004_service_flexible",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793353399544,
+      "tag": "0005_flexible_service_seed",
+      "breakpoints": true
     }
   ]
 }
