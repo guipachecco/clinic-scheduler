@@ -1,0 +1,340 @@
+/* FullCalendar overrides for the admin agenda. Everything is scoped under
+   .agenda-calendar and uses only the identity and status tokens from
+   globals.css, so the dark theme follows. FullCalendar injects its own base
+   styles at runtime; these rules are more specific and load after them. Its
+   own toolbar is off: the page draws the header and the controls. */
+
+.agenda-calendar {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: var(--card);
+  --fc-neutral-bg-color: var(--muted);
+  --fc-neutral-text-color: var(--muted-foreground);
+  --fc-list-event-hover-bg-color: var(--accent);
+  --fc-today-bg-color: color-mix(in srgb, var(--highlight) 10%, transparent);
+  --fc-highlight-color: color-mix(in srgb, var(--highlight) 30%, transparent);
+  --fc-now-indicator-color: var(--primary);
+  --fc-small-font-size: 0.8125rem;
+
+  --fc-event-bg-color: var(--status-confirmed);
+  --fc-event-border-color: var(--status-confirmed);
+  --fc-event-text-color: var(--status-confirmed-foreground);
+
+  /* Light lines between the half hours. */
+  --agenda-line: color-mix(in srgb, var(--border) 65%, transparent);
+
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--card);
+  color: var(--foreground);
+}
+
+/* The card draws the outer edge: no table border around the grid. */
+
+.agenda-calendar .fc-theme-standard .fc-scrollgrid,
+.agenda-calendar .fc-theme-standard .fc-list {
+  border: 0;
+}
+
+.agenda-calendar .fc .fc-scrollgrid-section > td,
+.agenda-calendar .fc .fc-scrollgrid-section > th {
+  border: 0;
+}
+
+/* Day headers: small uppercase weekday above the day number. */
+
+.agenda-calendar .fc-theme-standard .fc-col-header-cell,
+.agenda-calendar .fc-theme-standard .fc-col-header .fc-timegrid-axis {
+  border-width: 0 0 1px;
+  vertical-align: middle;
+}
+
+.agenda-calendar .fc .fc-col-header-cell-cushion {
+  display: block;
+  padding: 0.5rem 0.25rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.agenda-calendar .agenda-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.agenda-calendar .agenda-day-weekday {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+}
+
+.agenda-calendar .agenda-day-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.125rem;
+  height: 1.875rem;
+  border-radius: 0.5rem;
+  font-family: var(--font-heading);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.agenda-calendar .fc-day-today .agenda-day-weekday {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.agenda-calendar .fc-day-today .agenda-day-number {
+  background: var(--highlight);
+  color: var(--highlight-foreground);
+  font-weight: 800;
+}
+
+/* Time grid: hour labels on the left, thin row lines, light columns. */
+
+.agenda-calendar.agenda-calendar-roomy .fc .fc-timegrid-slot {
+  height: 2.25rem;
+}
+
+.agenda-calendar .fc-theme-standard .fc-timegrid-slot-lane {
+  border-width: 1px 0 0;
+  border-style: solid;
+  border-color: var(--agenda-line);
+}
+
+.agenda-calendar .fc-theme-standard .fc-timegrid-slot-label {
+  border: 0;
+  vertical-align: top;
+}
+
+.agenda-calendar .fc-theme-standard .fc-timegrid-slots tr:first-child td {
+  border-top: 0;
+}
+
+.agenda-calendar .fc .fc-timegrid-slot-label-cushion {
+  padding: 0.125rem 0.625rem 0 0.75rem;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+}
+
+.agenda-calendar .fc-theme-standard .fc-timegrid-col {
+  border-width: 0 0 0 1px;
+}
+
+.agenda-calendar .fc-theme-standard .fc-timegrid-col.fc-timegrid-axis {
+  border: 0;
+}
+
+/* Month grid: inner lines only. */
+
+.agenda-calendar .fc-theme-standard .fc-daygrid-day {
+  border-width: 0 0 1px 1px;
+}
+
+.agenda-calendar .fc-theme-standard .fc-daygrid-day:first-child {
+  border-left: 0;
+}
+
+.agenda-calendar .fc-theme-standard .fc-daygrid-body tr:last-child > td {
+  border-bottom: 0;
+}
+
+.agenda-calendar .fc .fc-daygrid-day-number {
+  padding: 0.375rem 0.5rem;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+
+.agenda-calendar .fc .fc-day-today .fc-daygrid-day-number {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+/* Lunch and closed hours: a very light hatch instead of a grey fill. */
+
+.agenda-calendar .fc .fc-non-business {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--muted-foreground) 8%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+/* Events: filled rounded blocks, the name in bold over the service. */
+
+.agenda-calendar .fc .fc-timegrid-event,
+.agenda-calendar .fc .fc-daygrid-block-event {
+  border: 0;
+  border-radius: var(--radius);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+}
+
+.agenda-calendar .fc .fc-timegrid-event {
+  margin: 1px 2px;
+}
+
+.agenda-calendar .fc .fc-timegrid-event .fc-event-main {
+  padding: 0.375rem 0.5rem;
+}
+
+.agenda-calendar .fc .fc-daygrid-block-event {
+  border-radius: calc(var(--radius) - 4px);
+}
+
+.agenda-calendar .fc .fc-daygrid-block-event .fc-event-main {
+  padding: 0.125rem 0.375rem;
+}
+
+.agenda-calendar .agenda-event {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.agenda-calendar .agenda-event > * {
+  flex-shrink: 0;
+}
+
+/* Short appointments: name and service on one line. */
+
+.agenda-calendar .fc .fc-timegrid-event-short .fc-event-main {
+  padding-block: 0.125rem;
+}
+
+.agenda-calendar .fc-timegrid-event-short .agenda-event,
+.agenda-calendar .fc-daygrid-event .agenda-event {
+  flex-direction: row;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.agenda-calendar .fc-timegrid-event-short .agenda-event-service,
+.agenda-calendar .fc-daygrid-event .agenda-event-service {
+  flex-shrink: 1;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+
+.agenda-calendar .agenda-event-name {
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--agenda-event-name-color, inherit);
+}
+
+.agenda-calendar .agenda-event-service {
+  overflow: hidden;
+  color: color-mix(in srgb, currentColor 85%, var(--fc-event-bg-color));
+}
+
+/* Status colors. FullCalendar reads these variables on the event element. */
+
+.agenda-calendar .fc-status-requested {
+  --fc-event-bg-color: var(--status-requested);
+  --fc-event-border-color: var(--status-requested-border);
+  --fc-event-text-color: var(--status-requested-foreground);
+  --agenda-event-name-color: var(--foreground);
+}
+
+.agenda-calendar .fc .fc-status-requested.fc-timegrid-event,
+.agenda-calendar .fc .fc-status-requested.fc-daygrid-block-event {
+  outline: 2px dashed var(--status-requested-border);
+  outline-offset: -2px;
+}
+
+.agenda-calendar .fc-status-confirmed {
+  --fc-event-bg-color: var(--status-confirmed);
+  --fc-event-border-color: var(--status-confirmed);
+  --fc-event-text-color: var(--status-confirmed-foreground);
+}
+
+.agenda-calendar .fc-status-completed {
+  --fc-event-bg-color: var(--status-completed);
+  --fc-event-border-color: var(--status-completed-foreground);
+  --fc-event-text-color: var(--status-completed-foreground);
+  --agenda-event-name-color: var(--foreground);
+}
+
+.agenda-calendar .fc-status-no_show {
+  --fc-event-bg-color: var(--status-no-show);
+  --fc-event-border-color: var(--status-no-show-foreground);
+  --fc-event-text-color: var(--status-no-show-foreground);
+  --agenda-event-name-color: var(--foreground);
+}
+
+.agenda-calendar .fc-status-cancelled {
+  --fc-event-bg-color: var(--status-cancelled);
+  --fc-event-border-color: var(--status-cancelled-foreground);
+  --fc-event-text-color: var(--status-cancelled-foreground);
+}
+
+.agenda-calendar .fc-status-cancelled .agenda-event-name,
+.agenda-calendar .fc-status-cancelled .fc-list-event-title {
+  text-decoration: line-through;
+}
+
+/* Blocks: a denser hatch with a readable title. */
+
+.agenda-calendar .fc .fc-bg-event.fc-block {
+  --fc-bg-event-opacity: 1;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--muted) 0 8px,
+    var(--card) 8px 16px
+  );
+  color: var(--foreground);
+}
+
+.agenda-calendar .fc .fc-timegrid-bg-harness .fc-bg-event.fc-block {
+  margin: 2px 4px;
+  border-radius: var(--radius);
+}
+
+.agenda-calendar .agenda-block {
+  display: flex;
+  flex-direction: column;
+  padding: 0.375rem 0.5rem;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  color: var(--muted-foreground);
+}
+
+.agenda-calendar .agenda-block strong {
+  color: var(--foreground);
+}
+
+/* List view. */
+
+.agenda-calendar .fc .fc-list-day-cushion {
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+}
+
+.agenda-calendar .fc .fc-list-day-cushion a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.agenda-calendar .fc .fc-list-event td {
+  padding: 0.625rem 1rem;
+}
+
+.agenda-calendar .fc .fc-list-event-time {
+  font-variant-numeric: tabular-nums;
+}
+
+.agenda-calendar .fc .fc-list-empty {
+  background: var(--card);
+  color: var(--muted-foreground);
+}

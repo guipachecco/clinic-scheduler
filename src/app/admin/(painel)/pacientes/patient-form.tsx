@@ -44,7 +44,8 @@ const EMPTY: PatientFormInput = {
 const SAVE_ERROR = "Não foi possível salvar. Tente novamente.";
 
 type Props =
-  { mode: "create" } | { mode: "edit"; id: string; defaults: PatientFormInput };
+  | { mode: "create"; voltar?: "agenda"; inicio?: string }
+  | { mode: "edit"; id: string; defaults: PatientFormInput };
 
 type PatientFormApi = UseFormReturn<
   PatientFormInput,
@@ -194,7 +195,13 @@ export function PatientForm(props: Props) {
     // reject here and be mistaken for a failure), so navigation is ours.
     if (result.ok) {
       if (props.mode === "create") {
-        router.push(`/admin/pacientes/${result.id}` as Route);
+        if (props.voltar === "agenda") {
+          const query = new URLSearchParams({ paciente: result.id });
+          if (props.inicio) query.set("inicio", props.inicio);
+          router.push(`/admin/agenda/novo?${query}` as Route);
+        } else {
+          router.push(`/admin/pacientes/${result.id}` as Route);
+        }
       } else {
         router.refresh();
         setSaved(true);

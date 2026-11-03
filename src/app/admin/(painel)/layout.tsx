@@ -1,6 +1,7 @@
 import { BrandImage } from "@/components/brand-image";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getTheme } from "@/lib/theme-server";
+import { countRequestedFrom } from "@/modules/appointments/appointments";
 import { requireAdmin } from "@/modules/auth/session";
 
 import { PanelNav } from "./panel-nav";
@@ -12,7 +13,11 @@ export default async function PanelLayout({
   children: React.ReactNode;
 }) {
   const session = await requireAdmin();
-  const theme = await getTheme();
+  const [theme, pendingRequests] = await Promise.all([
+    getTheme(),
+    countRequestedFrom(new Date()),
+  ]);
+  const initial = session.user.name.trim().charAt(0).toUpperCase();
 
   return (
     <div className="flex flex-1 flex-col md:flex-row">
@@ -31,24 +36,40 @@ export default async function PanelLayout({
         <div className="col-span-2 row-start-2 w-full min-w-0 md:col-span-1 md:row-start-auto md:min-h-0 md:w-auto md:overflow-y-auto">
           <PanelNav
             items={[
-              { href: "/admin", label: "Início" },
-              { href: "/admin/pacientes", label: "Pacientes" },
-              { href: "/admin/servicos", label: "Serviços" },
-              { href: "/admin/expediente", label: "Expediente" },
+              { href: "/admin", label: "Início", icon: "home" },
+              {
+                href: "/admin/agenda",
+                label: "Agenda",
+                icon: "calendar",
+                badge: pendingRequests,
+                badgeLabel: "aguardando confirmação",
+              },
+              { href: "/admin/pacientes", label: "Pacientes", icon: "person" },
+              { href: "/admin/servicos", label: "Serviços", icon: "services" },
+              { href: "/admin/expediente", label: "Expediente", icon: "clock" },
             ]}
           />
         </div>
         <div className="col-start-2 row-start-1 ml-auto flex min-w-0 items-center gap-3 md:mt-auto md:ml-0 md:flex-col md:items-stretch">
-          <span className="hidden truncate text-sm text-white/80 md:block">
-            {session.user.name}
-          </span>
+          <div className="hidden min-w-0 items-center gap-2.5 rounded-xl bg-brand-muted p-3 md:flex">
+            <span
+              aria-hidden="true"
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-accent font-bold text-brand-accent-foreground"
+            >
+              {initial}
+            </span>
+            <span className="min-w-0 text-sm leading-tight font-semibold break-words">
+              {session.user.name}
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <ThemeToggle initialTheme={theme} />
             <SignOutButton />
           </div>
         </div>
       </aside>
-      <main className="mx-auto w-full max-w-5xl min-w-0 flex-1 bg-background px-4 py-8 md:px-8">
+      {/* A page marked data-layout="wide" (the agenda) gets more room. */}
+      <main className="mx-auto w-full max-w-5xl min-w-0 flex-1 bg-background px-4 py-8 has-[[data-layout=wide]]:max-w-[96rem] md:px-8">
         {children}
       </main>
     </div>

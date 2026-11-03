@@ -15,8 +15,9 @@ export default async function PanelHomePage() {
       </h1>
       <p className="text-muted-foreground">
         O acesso ao painel está protegido por senha e verificação em duas
-        etapas. Pacientes e serviços já podem ser cadastrados pelo menu; agenda
-        e conteúdo do site chegam nas próximas etapas.
+        etapas. Pela agenda você vê e remarca os atendimentos; pacientes,
+        serviços e expediente ficam no menu. O conteúdo do site chega na próxima
+        etapa.
       </p>
     </div>
   );

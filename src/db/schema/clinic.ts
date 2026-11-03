@@ -379,6 +379,13 @@ export const patients = pgTable(
   ],
 );
 
+export const CANCELLATION_REASONS = [
+  "patient_request",
+  "rescheduled",
+  "clinic_unavailable",
+  "other",
+] as const;
+
 // occupied_from/occupied_until include the preparation and cleanup buffers.
 // The appointments_no_overlap exclusion constraint (custom migration) rejects
 // two active appointments whose occupied ranges overlap.
@@ -394,6 +401,8 @@ export const appointments = pgTable(
       .references(() => services.id, { onDelete: "restrict" }),
     serviceName: text("service_name").notNull(),
     serviceDurationMinutes: integer("service_duration_minutes").notNull(),
+    // Free-text name for flexible services. Never health information.
+    customLabel: text("custom_label"),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
     occupiedFrom: timestamp("occupied_from", { withTimezone: true }).notNull(),
@@ -424,6 +433,14 @@ export const appointments = pgTable(
     check(
       "appointments_cancellation_check",
       sql`(${t.status} = 'cancelled') = (${t.cancelledAt} is not null and ${t.cancelledBy} is not null)`,
+    ),
+    check(
+      "appointments_custom_label_check",
+      sql`${t.customLabel} is null or char_length(${t.customLabel}) between 1 and 60`,
+    ),
+    check(
+      "appointments_cancellation_reason_check",
+      sql`${t.cancellationReason} is null or ${t.cancellationReason} in ('patient_request','rescheduled','clinic_unavailable','other')`,
     ),
   ],
 );

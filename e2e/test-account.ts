@@ -26,3 +26,10 @@ export const TEST_ADMIN_SCHEDULE = {
   name: "Administradora de Expediente",
   password: "senha-de-teste-expediente-bem-longa",
 };
+
+// Fifth account, used by the agenda suite.
+export const TEST_ADMIN_AGENDA = {
+  email: "agenda@example.test",
+  name: "Administradora de Agenda",
+  password: "senha-de-teste-agenda-bem-longa",
+};

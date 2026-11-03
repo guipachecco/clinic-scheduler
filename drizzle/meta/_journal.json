@@ -43,6 +43,13 @@
       "when": 1793353399544,
       "tag": "0005_flexible_service_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793717622944,
+      "tag": "0006_appointment_label_and_reason",
+      "breakpoints": true
     }
   ]
 }

@@ -18,6 +18,7 @@ import { formatDate } from "../format";
 import { PatientForm } from "../patient-form";
 
 import { AnonymizeForm } from "./anonymize-form";
+import { AppointmentHistory } from "./appointment-history";
 
 // No patient data in the title: it would reach the browser history.
 export const metadata: Metadata = { title: "Paciente" };
@@ -51,6 +52,7 @@ export default async function PatientPage({
           Dados pessoais apagados em {anonymizedOn} a pedido do titular (LGPD).
           O histórico de agendamentos é mantido.
         </p>
+        <AppointmentHistory patientId={patient.id} canSchedule={false} />
         <Button asChild variant="outline" className="w-fit">
           <Link href="/admin/pacientes">Voltar à lista</Link>
         </Button>
@@ -111,6 +113,8 @@ export default async function PatientPage({
         </h2>
         <PatientForm mode="edit" id={patient.id} defaults={defaults} />
       </section>
+
+      <AppointmentHistory patientId={patient.id} canSchedule />
 
       <details className="rounded-2xl border p-4 md:p-6">
         <summary className="flex h-11 cursor-pointer items-center rounded-md text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">

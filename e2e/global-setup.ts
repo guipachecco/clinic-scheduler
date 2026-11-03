@@ -3,6 +3,7 @@ import { resetDatabase } from "../tests/helpers/test-database";
 
 import {
   TEST_ADMIN,
+  TEST_ADMIN_AGENDA,
   TEST_ADMIN_PATIENTS,
   TEST_ADMIN_SCHEDULE,
   TEST_ADMIN_SERVICES,
@@ -20,6 +21,7 @@ export default async function globalSetup() {
     await createAdmin(TEST_ADMIN_PATIENTS);
     await createAdmin(TEST_ADMIN_SERVICES);
     await createAdmin(TEST_ADMIN_SCHEDULE);
+    await createAdmin(TEST_ADMIN_AGENDA);
   } finally {
     await pool.end();
   }

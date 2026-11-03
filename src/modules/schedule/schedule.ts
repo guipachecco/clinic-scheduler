@@ -8,6 +8,7 @@ import {
   appointments,
   auditLogs,
   businessHours,
+  clinicSettings,
   timeBlocks,
 } from "@/db/schema";
 
@@ -291,15 +292,16 @@ export async function addNationalHolidays(
 }
 
 // For the availability engine: blocks that intersect the range, plus the
-// weekly business hours.
+// weekly business hours. Pass `executor` to read inside a transaction.
 export async function findBlocksAndHours(
   range: {
     from: Date;
     to: Date;
   },
   now: Date = new Date(),
+  executor: Pick<Tx, "select"> = db,
 ): Promise<{ blocks: TimeBlockItem[]; hours: DayHours[] }> {
-  const rows = await db
+  const rows = await executor
     .select(blockColumns)
     .from(timeBlocks)
     .where(
@@ -308,6 +310,18 @@ export async function findBlocksAndHours(
     .orderBy(asc(timeBlocks.startsAt), asc(timeBlocks.id));
   return {
     blocks: rows.map((row) => ({ ...row, deletable: row.startsAt > now })),
-    hours: await readWeek(),
+    hours: await readWeek(executor),
   };
+}
+
+const DEFAULT_SLOT_STEP_MINUTES = 30;
+
+// The agenda grid step (clinic_settings.slot_step_minutes). The settings row
+// is created by a migration; the default covers a database without it.
+export async function getSlotStepMinutes(): Promise<number> {
+  const [row] = await db
+    .select({ slotStepMinutes: clinicSettings.slotStepMinutes })
+    .from(clinicSettings)
+    .limit(1);
+  return row?.slotStepMinutes ?? DEFAULT_SLOT_STEP_MINUTES;
 }
