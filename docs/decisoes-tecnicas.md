@@ -98,3 +98,14 @@ As cores, as fontes e os logos aprovados da clínica estão descritos em [identi
 - **Preço em centavos:** o valor é guardado como inteiro (`price_cents`) e a "forma de exibir" (fixo, a partir de, sob consulta, oculto) decide o que aparece. Preço fixo e "a partir de" exigem valor.
 - **Auditoria e erros:** criar e editar gravam em `audit_logs` só o nome dos campos alterados. Erros inesperados viram a mensagem genérica "Não foi possível salvar. Tente novamente.".
 - **Acesso:** toda página e toda ação do servidor chama `requireAdmin()` antes de qualquer consulta.
+
+## Expediente e bloqueios
+
+- **Fuso horário da clínica:** `America/Sao_Paulo`, definido por uma constante no código (`CLINIC_TIME_ZONE`). A coluna `clinic_settings.timezone` existe com o mesmo valor padrão, mas ainda não é lida; quando a clínica precisar de outro fuso, a constante passa a vir dela. Todo instante é guardado em UTC (`timestamptz`) e o expediente é guardado como hora local (`time`).
+- **Biblioteca de fuso:** Luxon, para converter hora local em UTC e o contrário sem somar 24 horas fixas, já que o fuso pode ter dias de 23 ou 25 horas.
+- **Bloqueio de dia inteiro:** vai da meia-noite local do primeiro dia até a meia-noite local do dia seguinte ao último dia (o último dia entra inteiro).
+- **Feriados nacionais:** o botão cria, para o ano escolhido, os 10 feriados nacionais (9 de data fixa e a Sexta-feira Santa, Páscoa menos 2 dias) como bloqueios de dia inteiro do tipo "Feriado". Um feriado é pulado quando já existe um bloqueio do tipo "Feriado" começando naquela data local, então clicar duas vezes não duplica nada. Feriados estaduais, municipais e pontos facultativos são cadastrados à mão como bloqueios.
+- **Conflitos só avisam:** criar um bloqueio sobre atendimentos `requested` ou `confirmed` funciona e lista os horários afetados (dd/MM HH:mm, sem nome de paciente). Nada é cancelado ou remarcado automaticamente; a dona da clínica decide.
+- **Até 6 intervalos por dia:** limite do formulário e do servidor, para manter a tela legível. Os intervalos do mesmo dia não podem se sobrepor.
+- **Exclusão:** só bloqueios que ainda não começaram podem ser excluídos; os passados e em andamento ficam como histórico. Títulos de bloqueio não vão para `audit_logs`, e o campo avisa para não registrar dados de pacientes.
+- **Acesso:** toda página e toda ação do servidor chama `requireAdmin()` antes de qualquer consulta.

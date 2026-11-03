@@ -64,22 +64,22 @@ Cada item tem um padrão proposto e pode ser ajustado no painel até a publicaç
 
 ## Stack
 
-| Camada                  | Escolha                                                                  | Por quê                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Linguagem               | TypeScript em modo estrito, Node.js LTS                                  | Erros aparecem antes de rodar; a mesma linguagem no navegador e no servidor                      |
-| Framework               | Next.js (App Router) com Server Actions                                  | Site renderizado no servidor, bom para o Google, e telas interativas e back-end no mesmo projeto |
-| Banco                   | PostgreSQL 17 ou superior                                                | Relacional e maduro; constraint de exclusão com faixas de horário impede sobreposição no banco   |
-| ORM e migrações         | Drizzle ORM e drizzle-kit                                                | Consultas tipadas e próximas do SQL; migrações em arquivos SQL revisáveis no Git                 |
-| Autenticação            | Better Auth: e-mail e senha, sessões no banco, 2FA, limite de tentativas | Mantido pela equipe que também mantém o Auth.js e indicado por ela para projetos novos           |
-| Validação e formulários | Zod e React Hook Form                                                    | O mesmo esquema valida no navegador e no servidor; o servidor sempre revalida                    |
-| Interface               | Tailwind CSS e shadcn/ui                                                 | Componentes acessíveis copiados para o projeto; tema por variáveis, sem kit fechado              |
-| Calendário do painel    | FullCalendar, com os plugins gratuitos de dia, semana, mês e lista       | Visões prontas e testadas; arrastar para reagendar                                               |
-| Datas                   | date-fns com @date-fns/tz, fuso America/Sao_Paulo                        | Horários gravados em UTC e exibidos no fuso da clínica, à prova de horário de verão              |
-| E-mail (opcional)       | Nodemailer via SMTP                                                      | Funciona com qualquer provedor; sem configuração, o sistema segue sem e-mail                     |
-| Antirrobô               | Cloudflare Turnstile e limite de requisições no próprio PostgreSQL       | Barra automação sem precisar de Redis                                                            |
-| Testes                  | Vitest (unidade e integração com PostgreSQL real) e Playwright           | Cobrem regras de agenda, concorrência e fluxos completos                                         |
-| Qualidade               | pnpm, ESLint, Prettier, GitHub Actions e Dependabot                      | Padronização, verificação a cada PR e atualizações de segurança                                  |
-| Ambiente local          | Docker Compose com PostgreSQL                                            | O banco de desenvolvimento sobe com um comando                                                   |
+| Camada                  | Escolha                                                                   | Por quê                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Linguagem               | TypeScript em modo estrito, Node.js LTS                                   | Erros aparecem antes de rodar; a mesma linguagem no navegador e no servidor                      |
+| Framework               | Next.js (App Router) com Server Actions                                   | Site renderizado no servidor, bom para o Google, e telas interativas e back-end no mesmo projeto |
+| Banco                   | PostgreSQL 17 ou superior                                                 | Relacional e maduro; constraint de exclusão com faixas de horário impede sobreposição no banco   |
+| ORM e migrações         | Drizzle ORM e drizzle-kit                                                 | Consultas tipadas e próximas do SQL; migrações em arquivos SQL revisáveis no Git                 |
+| Autenticação            | Better Auth: e-mail e senha, sessões no banco, 2FA, limite de tentativas  | Mantido pela equipe que também mantém o Auth.js e indicado por ela para projetos novos           |
+| Validação e formulários | Zod e React Hook Form                                                     | O mesmo esquema valida no navegador e no servidor; o servidor sempre revalida                    |
+| Interface               | Tailwind CSS e shadcn/ui                                                  | Componentes acessíveis copiados para o projeto; tema por variáveis, sem kit fechado              |
+| Calendário do painel    | FullCalendar, com os plugins gratuitos de dia, semana, mês e lista        | Visões prontas e testadas; arrastar para reagendar                                               |
+| Datas                   | Luxon, fuso America/Sao_Paulo (antes previsto: date-fns com @date-fns/tz) | Horários gravados em UTC e exibidos no fuso da clínica, à prova de horário de verão              |
+| E-mail (opcional)       | Nodemailer via SMTP                                                       | Funciona com qualquer provedor; sem configuração, o sistema segue sem e-mail                     |
+| Antirrobô               | Cloudflare Turnstile e limite de requisições no próprio PostgreSQL        | Barra automação sem precisar de Redis                                                            |
+| Testes                  | Vitest (unidade e integração com PostgreSQL real) e Playwright            | Cobrem regras de agenda, concorrência e fluxos completos                                         |
+| Qualidade               | pnpm, ESLint, Prettier, GitHub Actions e Dependabot                       | Padronização, verificação a cada PR e atualizações de segurança                                  |
+| Ambiente local          | Docker Compose com PostgreSQL                                             | O banco de desenvolvimento sobe com um comando                                                   |
 
 ### Hospedagem
 

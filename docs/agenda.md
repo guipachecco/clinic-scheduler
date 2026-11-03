@@ -81,10 +81,10 @@ A profissional precisa enxergar e organizar os atendimentos da clínica num só 
   - os intervalos de um mesmo dia não podem se sobrepor;
   - um dia sem intervalo conta como fechado.
 - **Bloqueios:**
-  - **Lista:** `/admin/bloqueios` mostra os bloqueios a partir de hoje. Cada um tem tipo (folga, férias, feriado, outro), dia inteiro ou intervalo de horas e um título interno (até 80 caracteres, sem dados de paciente).
+  - **Lista:** `/admin/expediente/bloqueios` mostra os bloqueios a partir de hoje. Cada um tem tipo (folga, férias, feriado, outro), dia inteiro ou intervalo de horas e um título interno (até 80 caracteres, sem dados de paciente).
   - **Criar e excluir:** é possível criar bloqueios e excluir os futuros.
   - **Conflitos:** quando o bloqueio novo cobre atendimentos já marcados, a tela lista esses horários e avisa. Nada é cancelado automaticamente.
-- **Feriados nacionais:** o botão "Adicionar feriados nacionais de AAAA" cria os bloqueios do ano, calculados no código, sem consulta externa:
+- **Feriados nacionais:** o botão "Adicionar feriados nacionais", com a escolha do ano (o atual ou o seguinte), cria os bloqueios do ano, calculados no código, sem consulta externa:
   - 1º/1;
   - Sexta-feira Santa;
   - 21/4;

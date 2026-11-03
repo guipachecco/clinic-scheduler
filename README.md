@@ -12,11 +12,11 @@ Sistema web de agendamentos para uma clínica de biomedicina: site institucional
 | 4     | Qualidade: testes dos fluxos, segurança e responsividade     | A fazer                                                                  |
 | 5     | Publicação: produção, domínio, backups e monitoramento       | A fazer                                                                  |
 
-O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), identidade visual da clínica aplicada (cores, logo e fontes Archivo e Figtree), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
+O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), expediente semanal e bloqueios de agenda no painel (horários de atendimento por dia da semana, folgas, férias e feriados, com a lista de feriados nacionais pronta para adicionar), identidade visual da clínica aplicada (cores, logo e fontes Archivo e Figtree), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
 
 ## Tecnologias
 
-Next.js 16 (App Router) com TypeScript estrito, PostgreSQL 17 com Drizzle ORM, Better Auth (login e 2FA), Tailwind CSS e shadcn/ui (com as fontes Archivo e Figtree empacotadas pelo próprio app), Zod e React Hook Form, Vitest e Playwright, pnpm, ESLint, Prettier, GitHub Actions e Dependabot. Os motivos de cada escolha estão no [planejamento](docs/planejamento-etapa-1.md#stack).
+Next.js 16 (App Router) com TypeScript estrito, PostgreSQL 17 com Drizzle ORM, Better Auth (login e 2FA), Tailwind CSS e shadcn/ui (com as fontes Archivo e Figtree empacotadas pelo próprio app), Zod e React Hook Form, Luxon (datas no fuso da clínica), Vitest e Playwright, pnpm, ESLint, Prettier, GitHub Actions e Dependabot. Os motivos de cada escolha estão no [planejamento](docs/planejamento-etapa-1.md#stack).
 
 ## Pré-requisitos
 

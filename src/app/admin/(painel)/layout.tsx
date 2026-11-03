@@ -34,6 +34,7 @@ export default async function PanelLayout({
               { href: "/admin", label: "Início" },
               { href: "/admin/pacientes", label: "Pacientes" },
               { href: "/admin/servicos", label: "Serviços" },
+              { href: "/admin/expediente", label: "Expediente" },
             ]}
           />
         </div>

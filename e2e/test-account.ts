@@ -19,3 +19,10 @@ export const TEST_ADMIN_SERVICES = {
   name: "Administradora de Serviços",
   password: "senha-de-teste-servicos-bem-longa",
 };
+
+// Fourth account, used by the schedule suite (business hours and blocks).
+export const TEST_ADMIN_SCHEDULE = {
+  email: "expediente@example.test",
+  name: "Administradora de Expediente",
+  password: "senha-de-teste-expediente-bem-longa",
+};
