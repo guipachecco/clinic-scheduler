@@ -76,7 +76,7 @@ As cores, as fontes e os logos aprovados da clínica estão descritos em [identi
 - **Páginas sem dados pessoais no título:** a ficha do paciente usa o título "Paciente", porque o título vai para o histórico do navegador.
 - **Erros genéricos:** um erro inesperado do banco pode conter valores do paciente; cada ação do servidor devolve uma mensagem genérica (por exemplo, "Não foi possível salvar. Tente novamente.") e nada é registrado em log.
 - **Campos de auditoria:** criar, editar e anonimizar gravam em `audit_logs` quem fez (`actor_user_id`), quando e qual ação. Na edição, `changes` guarda só os nomes dos campos alterados, nunca os valores.
-- **Anonimização:** o botão só habilita depois de digitar exatamente `ANONIMIZAR`, e o servidor confere de novo. Pacientes com agendamentos futuros solicitados ou confirmados não podem ser anonimizados. Depois de anonimizado, o paciente continua listado como "Paciente anonimizado" (com a etiqueta "Anonimizado"), e a ficha mostra o aviso de dados apagados, sem edição.
+- **Anonimização:** o botão só habilita depois de digitar exatamente `ANONIMIZAR`, e o servidor confere de novo. Pacientes com agendamentos futuros solicitados ou confirmados não podem ser anonimizados. Depois de anonimizado, o paciente sai da lista por padrão, para não confundir a dona da clínica, e volta pela caixa "Mostrar anonimizados" como "Paciente anonimizado" (com a etiqueta "Anonimizado"); a ficha mostra o aviso de dados apagados, sem edição.
 - **Acesso:** toda página e toda ação do servidor chama `requireAdmin()` antes de qualquer consulta.
 
 ### Coleta ampliada no painel

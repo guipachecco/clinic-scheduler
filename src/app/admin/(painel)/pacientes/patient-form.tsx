@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Route } from "next";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
 
@@ -152,6 +153,8 @@ export function PatientForm(props: Props) {
   const defaults = props.mode === "edit" ? props.defaults : EMPTY;
   const [formError, setFormError] = useState<string | null>(null);
   const [existingId, setExistingId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const router = useRouter();
   const form = useForm<PatientFormInput, unknown, PatientFormValues>({
     resolver: zodResolver(patientFormSchema),
     defaultValues: defaults,
@@ -174,6 +177,7 @@ export function PatientForm(props: Props) {
   async function onSubmit() {
     setFormError(null);
     setExistingId(null);
+    setSaved(false);
     // Raw text goes to the server, which parses it again with the same schema.
     const input = getValues();
     let result;
@@ -186,8 +190,17 @@ export function PatientForm(props: Props) {
       setFormError(SAVE_ERROR);
       return;
     }
-    // On success the action redirects, so a returned value is always a failure.
-    if (!result) return;
+    // The action returns success instead of redirecting (a redirect would
+    // reject here and be mistaken for a failure), so navigation is ours.
+    if (result.ok) {
+      if (props.mode === "create") {
+        router.push(`/admin/pacientes/${result.id}` as Route);
+      } else {
+        router.refresh();
+        setSaved(true);
+      }
+      return;
+    }
     const entries = Object.entries(result.fieldErrors);
     entries.forEach(([name, message], index) => {
       // Focus goes to the first field with a server error.
@@ -344,6 +357,11 @@ export function PatientForm(props: Props) {
         </div>
       ) : null}
       <FormError message={formError} />
+      {saved ? (
+        <p role="status" className="text-sm font-medium text-primary">
+          Alterações salvas.
+        </p>
+      ) : null}
       <div className="flex flex-col gap-3 sm:flex-row">
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? "Salvando..." : idle}

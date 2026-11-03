@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import * as z from "zod";
 
 import { requireAdmin } from "@/modules/auth/session";
@@ -26,18 +25,22 @@ const GENERIC_ERROR = "Não foi possível salvar. Tente novamente.";
 
 type FieldKeys = keyof ServiceFormInput | keyof CategoryFormInput;
 
-export type SaveResult = {
+export type SaveFailure = {
   ok: false;
   fieldErrors: Partial<Record<FieldKeys, string>>;
   formError?: string;
 };
 
-export type CategoryResult = { ok: true } | SaveResult;
+// Success is returned (never a redirect) so the client can tell it apart from
+// a failure and navigate itself.
+export type SaveResult = { ok: true } | SaveFailure;
+
+export type CategoryResult = SaveResult;
 
 const idSchema = z.uuid();
 
-function collectErrors(error: z.ZodError): SaveResult["fieldErrors"] {
-  const fieldErrors: SaveResult["fieldErrors"] = {};
+function collectErrors(error: z.ZodError): SaveFailure["fieldErrors"] {
+  const fieldErrors: SaveFailure["fieldErrors"] = {};
   for (const issue of error.issues) {
     const key = issue.path[0] as FieldKeys | undefined;
     if (key && !(key in fieldErrors)) fieldErrors[key] = issue.message;
@@ -45,7 +48,7 @@ function collectErrors(error: z.ZodError): SaveResult["fieldErrors"] {
   return fieldErrors;
 }
 
-const failure = (formError: string): SaveResult => ({
+const failure = (formError: string): SaveFailure => ({
   ok: false,
   fieldErrors: {},
   formError,
@@ -67,7 +70,7 @@ export async function createServiceAction(
     return failure(GENERIC_ERROR);
   }
   if (!result.ok) return result;
-  redirect("/admin/servicos");
+  return { ok: true };
 }
 
 export async function updateServiceAction(
@@ -91,7 +94,7 @@ export async function updateServiceAction(
     const empty = Object.keys(result.fieldErrors).length === 0;
     return empty ? failure("Serviço não encontrado.") : result;
   }
-  redirect("/admin/servicos");
+  return { ok: true };
 }
 
 export async function createCategoryAction(

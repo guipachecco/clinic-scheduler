@@ -1,6 +1,5 @@
 "use server";
 
-import { redirect } from "next/navigation";
 import * as z from "zod";
 
 import { requireAdmin } from "@/modules/auth/session";
@@ -23,12 +22,18 @@ import {
 
 const GENERIC_ERROR = "Não foi possível salvar. Tente novamente.";
 
-export type SaveResult = {
-  ok: false;
-  fieldErrors: Partial<Record<keyof PatientFormInput, string>>;
-  existingPatientId?: string;
-  formError?: string;
-};
+// Success is returned (never a redirect) so the client can tell it apart from
+// a failure and navigate itself.
+export type SaveResult =
+  | { ok: true; id: string }
+  | {
+      ok: false;
+      fieldErrors: Partial<Record<keyof PatientFormInput, string>>;
+      existingPatientId?: string;
+      formError?: string;
+    };
+
+type SaveFailure = Extract<SaveResult, { ok: false }>;
 
 export type SearchResult = {
   items: PatientListItem[];
@@ -36,10 +41,11 @@ export type SearchResult = {
   error?: string;
 };
 
-export type AnonymizeResult = { ok: false; message: string };
+export type AnonymizeResult = { ok: true } | { ok: false; message: string };
 
 const searchSchema = z.object({
   term: z.string().max(100),
+  includeAnonymized: z.boolean().optional(),
   after: z
     .object({
       nameNormalized: z.string().max(200),
@@ -54,10 +60,10 @@ function parseForm(
   input: unknown,
 ):
   | { ok: true; values: z.output<typeof patientFormSchema> }
-  | { ok: false; result: SaveResult } {
+  | { ok: false; result: SaveFailure } {
   const parsed = patientFormSchema.safeParse(input);
   if (parsed.success) return { ok: true, values: parsed.data };
-  const fieldErrors: SaveResult["fieldErrors"] = {};
+  const fieldErrors: SaveFailure["fieldErrors"] = {};
   for (const issue of parsed.error.issues) {
     const key = issue.path[0] as keyof PatientFormInput | undefined;
     if (key && !(key in fieldErrors)) fieldErrors[key] = issue.message;
@@ -68,6 +74,7 @@ function parseForm(
 export async function searchPatientsAction(input: {
   term: string;
   after?: PatientCursor;
+  includeAnonymized?: boolean;
 }): Promise<SearchResult> {
   await requireAdmin();
   const parsed = searchSchema.safeParse(input);
@@ -95,7 +102,7 @@ export async function createPatientAction(
     return { ok: false, fieldErrors: {}, formError: GENERIC_ERROR };
   }
   if (!result.ok) return result;
-  redirect(`/admin/pacientes/${result.id}`);
+  return { ok: true, id: result.id };
 }
 
 export async function updatePatientAction(
@@ -121,7 +128,7 @@ export async function updatePatientAction(
       ? { ...result, formError: "Paciente não encontrado." }
       : result;
   }
-  redirect(`/admin/pacientes/${result.id}`);
+  return { ok: true, id: result.id };
 }
 
 export async function anonymizePatientAction(
@@ -150,5 +157,5 @@ export async function anonymizePatientAction(
           : "Paciente não encontrado.",
     };
   }
-  redirect(`/admin/pacientes/${id}`);
+  return { ok: true };
 }

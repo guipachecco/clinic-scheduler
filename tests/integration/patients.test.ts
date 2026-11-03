@@ -378,7 +378,10 @@ describe("searchPatients", () => {
       phone: "(48) 98888-0003",
     });
     await anonymizePatient(anon, actorId);
-    const { items } = await searchPatients({ term: "" });
+    const { items } = await searchPatients({
+      term: "",
+      includeAnonymized: true,
+    });
     expect(items.map((i) => i.id)).toEqual([ana, anon, pedro, zelia]);
     const row = items.find((i) => i.id === anon);
     expect(row).toMatchObject({
@@ -393,12 +396,33 @@ describe("searchPatients", () => {
     const id = await created();
     await anonymizePatient(id, actorId);
     expect(
-      (await searchPatients({ term: "anonimizado" })).items.map((i) => i.id),
+      (
+        await searchPatients({ term: "anonimizado", includeAnonymized: true })
+      ).items.map((i) => i.id),
     ).toEqual([id]);
     expect(
-      (await searchPatients({ term: "Paciente Anonimizado" })).items,
+      (
+        await searchPatients({
+          term: "Paciente Anonimizado",
+          includeAnonymized: true,
+        })
+      ).items,
     ).toHaveLength(1);
     expect((await searchPatients({ term: "529982" })).items).toHaveLength(0);
+  });
+
+  it("hides anonymized patients unless asked for", async () => {
+    const id = await created();
+    await anonymizePatient(id, actorId);
+    expect((await searchPatients({ term: "" })).items).toHaveLength(0);
+    expect((await searchPatients({ term: "anonimizado" })).items).toHaveLength(
+      0,
+    );
+    expect(
+      (await searchPatients({ term: "", includeAnonymized: true })).items.map(
+        (i) => i.id,
+      ),
+    ).toEqual([id]);
   });
 
   it("pages across the anonymized sort key with no overlap and no gaps", async () => {
@@ -428,7 +452,11 @@ describe("searchPatients", () => {
     let after: PatientCursor | undefined;
     let pages = 0;
     do {
-      const page = await searchPatients({ term: "", after });
+      const page = await searchPatients({
+        term: "",
+        after,
+        includeAnonymized: true,
+      });
       seen.push(...page.items.map((i) => i.id));
       after = page.next;
       pages += 1;
@@ -457,10 +485,14 @@ describe("searchPatients", () => {
         anonymizedAt: new Date(),
       })),
     );
-    const first = await searchPatients({ term: "" });
+    const first = await searchPatients({ term: "", includeAnonymized: true });
     expect(first.items).toHaveLength(50);
     expect(first.next?.nameNormalized).toBe("paciente anonimizado");
-    const second = await searchPatients({ term: "", after: first.next });
+    const second = await searchPatients({
+      term: "",
+      after: first.next,
+      includeAnonymized: true,
+    });
     expect(second.items).toHaveLength(4);
     expect(second.next).toBeUndefined();
     const ids = new Set([...first.items, ...second.items].map((i) => i.id));

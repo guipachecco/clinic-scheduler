@@ -1,6 +1,16 @@
 import "server-only";
 
-import { and, asc, eq, gt, inArray, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import { db } from "@/db/client";
 import { findPgError, isUniqueViolation } from "@/db/errors";
@@ -275,10 +285,14 @@ const SORT_KEY = sql`coalesce(${patients.nameNormalized}, ${normalizeName(ANONYM
 export async function searchPatients(input: {
   term: string;
   after?: PatientCursor;
+  includeAnonymized?: boolean;
 }): Promise<{ items: PatientListItem[]; next?: PatientCursor }> {
   const term = input.term.trim();
   const digits = term.replace(/[.\-()+\s]/g, "");
   const conditions: SQL[] = [];
+
+  // Anonymized patients are hidden unless explicitly asked for.
+  if (!input.includeAnonymized) conditions.push(isNull(patients.anonymizedAt));
 
   if (/^\d{3,}$/.test(digits)) {
     const pattern = `%${digits}%`;

@@ -94,6 +94,8 @@ test.describe("pacientes", () => {
     await page.getByLabel("Apelido").fill("Pacu");
     await page.getByRole("button", { name: "Salvar alterações" }).click();
     await expect(page.getByText("Apelido: Pacu")).toBeVisible();
+    await expect(page.getByText("Alterações salvas.")).toBeVisible();
+    await expect(page.getByText("Não foi possível salvar")).not.toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Apelido")).toHaveValue("Pacu");
   });
@@ -172,6 +174,11 @@ test.describe("pacientes", () => {
     await expect(page.getByText("Anonimizar paciente (LGPD)")).toHaveCount(0);
 
     await page.goto("/admin/pacientes");
+    await expect(page.getByLabel("Mostrar anonimizados")).not.toBeChecked();
+    await expect(
+      page.getByRole("link", { name: /Paciente anonimizado/ }),
+    ).toHaveCount(0);
+    await page.getByLabel("Mostrar anonimizados").check();
     const row = page.getByRole("link", { name: /Paciente anonimizado/ });
     await expect(row).toBeVisible();
     await expect(row.getByText("Anonimizado", { exact: true })).toBeVisible();

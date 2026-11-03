@@ -72,6 +72,7 @@ test.describe("servicos", () => {
     await page.getByLabel("Preço (R$)").fill("180,00");
     await page.getByRole("button", { name: "Cadastrar serviço" }).click();
     await expect(page).toHaveURL(/\/admin\/servicos$/);
+    await expect(page.getByText("Não foi possível salvar")).not.toBeVisible();
     const row = serviceRow(SERVICE);
     await expect(row).toBeVisible();
     await expect(row.getByText("60 min")).toBeVisible();
@@ -84,6 +85,7 @@ test.describe("servicos", () => {
     await page.getByLabel("Ativo", { exact: true }).uncheck();
     await page.getByRole("button", { name: "Salvar alterações" }).click();
     await expect(page).toHaveURL(/\/admin\/servicos$/);
+    await expect(page.getByText("Não foi possível salvar")).not.toBeVisible();
     await expect(serviceRow(SERVICE).getByText("Inativo")).toBeVisible();
   });
 

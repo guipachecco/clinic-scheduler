@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 
@@ -117,6 +118,7 @@ function Checkbox({
 export function ServiceForm(props: Props) {
   const defaults = props.mode === "edit" ? props.defaults : EMPTY;
   const [formError, setFormError] = useState<string | null>(null);
+  const router = useRouter();
   const form = useForm<ServiceFormInput, unknown, ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
     defaultValues: defaults,
@@ -143,8 +145,12 @@ export function ServiceForm(props: Props) {
       setFormError(SAVE_ERROR);
       return;
     }
-    // On success the action redirects, so a returned value is always a failure.
-    if (!result) return;
+    // The action returns success instead of redirecting (a redirect would
+    // reject here and be mistaken for a failure), so navigation is ours.
+    if (result.ok) {
+      router.push("/admin/servicos");
+      return;
+    }
     const entries = Object.entries(result.fieldErrors);
     entries.forEach(([name, message], index) => {
       setError(

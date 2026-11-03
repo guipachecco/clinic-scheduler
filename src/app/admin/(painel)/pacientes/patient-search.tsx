@@ -31,10 +31,15 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
   const [searchedTerm, setSearchedTerm] = useState("");
   const [items, setItems] = useState(initialItems);
   const [next, setNext] = useState(initialNext);
+  const [includeAnonymized, setIncludeAnonymized] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function run(input: { term: string; after?: PatientCursor }) {
+  async function run(input: {
+    term: string;
+    after?: PatientCursor;
+    includeAnonymized: boolean;
+  }) {
     setPending(true);
     setError(null);
     let result;
@@ -56,7 +61,7 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
   async function onSearch(event: React.FormEvent) {
     event.preventDefault();
     const trimmed = term.trim();
-    const result = await run({ term: trimmed });
+    const result = await run({ term: trimmed, includeAnonymized });
     if (!result) return;
     setSearchedTerm(trimmed);
     setItems(result.items);
@@ -65,9 +70,26 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
 
   async function onLoadMore() {
     if (!next) return;
-    const result = await run({ term: searchedTerm, after: next });
+    const result = await run({
+      term: searchedTerm,
+      after: next,
+      includeAnonymized,
+    });
     if (!result) return;
     setItems((current) => [...current, ...result.items]);
+    setNext(result.next);
+  }
+
+  async function onToggleAnonymized(checked: boolean) {
+    setIncludeAnonymized(checked);
+    const trimmed = term.trim();
+    const result = await run({ term: trimmed, includeAnonymized: checked });
+    if (!result) {
+      setIncludeAnonymized(!checked);
+      return;
+    }
+    setSearchedTerm(trimmed);
+    setItems(result.items);
     setNext(result.next);
   }
 
@@ -95,6 +117,21 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
           {pending ? "Buscando..." : "Buscar"}
         </Button>
       </form>
+
+      <label
+        htmlFor="include-anonymized"
+        className="flex h-11 items-center gap-3 text-sm font-medium"
+      >
+        <input
+          id="include-anonymized"
+          type="checkbox"
+          className="size-5 accent-primary"
+          checked={includeAnonymized}
+          disabled={pending}
+          onChange={(event) => onToggleAnonymized(event.target.checked)}
+        />
+        Mostrar anonimizados
+      </label>
 
       <FormError message={error} />
 

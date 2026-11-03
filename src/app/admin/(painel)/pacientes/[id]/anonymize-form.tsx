@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { FormError } from "@/components/form-message";
@@ -12,6 +13,7 @@ import { anonymizePatientAction } from "../actions";
 const CONFIRMATION = "ANONIMIZAR";
 
 export function AnonymizeForm({ id }: { id: string }) {
+  const router = useRouter();
   const [typed, setTyped] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,10 +23,11 @@ export function AnonymizeForm({ id }: { id: string }) {
     if (typed !== CONFIRMATION) return;
     setPending(true);
     setError(null);
-    // On success the action redirects to the record.
     try {
       const result = await anonymizePatientAction(id, typed);
-      if (result) setError(result.message);
+      // The record page renders the anonymized state after the refresh.
+      if (result.ok) router.refresh();
+      else setError(result.message);
     } catch {
       setError("Não foi possível anonimizar. Tente novamente.");
     } finally {
