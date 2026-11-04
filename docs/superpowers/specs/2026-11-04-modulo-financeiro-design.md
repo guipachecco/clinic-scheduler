@@ -1,6 +1,6 @@
 # Módulo financeiro: orçamento, pacotes e baixa de pagamento
 
-Desenho de 04/11/2026. Ainda não foi aprovado. Complementa o [planejamento da Etapa 1](../../planejamento-etapa-1.md), que já previa o financeiro como "módulo próprio, ligado aos pagamentos" e os pacotes como "uma série que liga vários agendamentos comuns".
+Desenho aprovado por Guilherme em 04/11/2026. Complementa o [planejamento da Etapa 1](../../planejamento-etapa-1.md), que já previa o financeiro como "módulo próprio, ligado aos pagamentos" e os pacotes como "uma série que liga vários agendamentos comuns".
 
 ## Intenção
 
