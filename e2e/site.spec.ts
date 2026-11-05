@@ -1,7 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-import { PALETTES } from "../src/modules/branding/palettes";
-
 test("home page loads in Portuguese with the security headers", async ({
   page,
 }) => {
@@ -56,12 +54,12 @@ test("site icon is served", async ({ request }) => {
   expect(response.headers()["content-type"]).toBe("image/png");
 });
 
-test("headings use the Archivo heading font", async ({ page }) => {
+test("headings use the Bricolage Grotesque heading font", async ({ page }) => {
   await page.goto("/");
   const fontFamily = await page
     .locator("h1")
     .evaluate((element) => getComputedStyle(element).fontFamily);
-  expect(fontFamily).toContain("Archivo Variable");
+  expect(fontFamily).toContain("Bricolage Grotesque Variable");
 });
 
 test("the theme button switches to the dark theme and remembers it", async ({
@@ -82,14 +80,14 @@ test("the theme button switches to the dark theme and remembers it", async ({
     "background-color",
     "rgb(11, 11, 16)",
   );
-  await expect(page.getByText("Painel", { exact: true })).toBeVisible();
-  // The dark palette cascades from the neutral one on the sign-in page.
+  await expect(page.locator('img[alt="Zemana"]:visible')).toHaveCount(1);
+  // The dark Zemana purple on the sign-in page.
   const brand = await page.evaluate(() =>
     getComputedStyle(document.documentElement)
       .getPropertyValue("--brand")
       .trim(),
   );
-  expect(brand).toBe(PALETTES.painel!.dark.brand);
+  expect(brand).toBe("#14033a");
 
   await page.getByRole("button", { name: "Tema escuro" }).click();
   await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);

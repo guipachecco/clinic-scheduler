@@ -42,7 +42,7 @@ test("the access screen shows the brand and loads fonts from the app itself", as
   });
 
   await page.goto("/admin/entrar");
-  await expect(page.getByText("Painel", { exact: true })).toBeVisible();
+  await expect(page.locator('img[alt="Zemana"]:visible')).toHaveCount(1);
   await page.evaluate(() => document.fonts.ready);
 
   expect(messages.filter((m) => m.includes("Content Security Policy"))).toEqual(
@@ -96,8 +96,8 @@ test("first access requires setting up 2FA before the panel opens", async ({
   await expect(nav).toBeVisible();
   const home = nav.getByRole("link", { name: "Início" });
   await expect(home).toHaveAttribute("aria-current", "page");
-  // Proves the bg-highlight utility is generated: highlight yellow #FFDE59.
-  await expect(home).toHaveCSS("background-color", "rgb(255, 222, 89)");
+  // Proves the bg-highlight utility is generated: highlight yellow #F5C700.
+  await expect(home).toHaveCSS("background-color", "rgb(245, 199, 0)");
 
   // Tab order must follow reading order: "Início" comes before "Sair".
   const homeBeforeSignOut = await page.evaluate(() => {

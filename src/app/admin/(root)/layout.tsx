@@ -1,14 +1,9 @@
-import type { Metadata } from "next";
-
-import { PaletteStyle } from "@/components/palette-style";
+import { BrandImage } from "@/components/brand-image";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getTheme } from "@/lib/theme-server";
 import { requireRoot } from "@/modules/auth/session";
-import { NEUTRAL_PALETTE_ID, PALETTES } from "@/modules/branding/palettes";
 
 import { SignOutButton } from "../(painel)/sign-out-button";
-
-export const metadata: Metadata = { icons: { icon: "/painel-icone.svg" } };
 
 // Pages outside any clinic, only for root (the clinic list).
 export default async function RootAreaLayout({
@@ -21,11 +16,13 @@ export default async function RootAreaLayout({
 
   return (
     <div className="flex flex-1 flex-col">
-      <PaletteStyle palette={PALETTES[NEUTRAL_PALETTE_ID]} />
       <header className="flex items-center justify-between gap-3 bg-brand px-4 py-3 text-brand-foreground md:px-8">
-        <p className="font-heading text-lg font-bold tracking-wide">
-          Administração geral
-        </p>
+        <div className="flex min-w-0 items-center gap-4">
+          <BrandImage kind="horizontal" size={140} onBrand />
+          <p className="hidden font-heading text-lg font-bold tracking-wide sm:block">
+            Administração geral
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <ThemeToggle initialTheme={theme} />
           <SignOutButton />

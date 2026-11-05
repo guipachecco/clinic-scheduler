@@ -26,4 +26,5 @@ A clínica nasce com a categoria "Outros" e o serviço flexível "Avaliação / 
 
 ## O que ainda é igual para todas
 
+- **Marca:** a Zemana, em todas as telas (menu lateral, login, ícone). O painel só mostra o nome da clínica aberta; não há tela de Aparência nem cores por clínica (ver [identidade visual](identidade-visual.md)).
 - **Fuso horário:** todas usam `America/Sao_Paulo` (constante em `src/modules/schedule/time.ts`). A coluna `clinics.timezone` existe, mas ainda não é lida.

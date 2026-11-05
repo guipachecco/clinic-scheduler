@@ -6,7 +6,7 @@ import { E2E_DATABASE_URL } from "../playwright.config";
 import { signInWithFreshTwoFactor } from "./helpers";
 import { TEST_ROOT_BRANDING } from "./test-account";
 
-// Each clinic's panel wears its own identity; the sign-in screen is neutral.
+// Every screen wears the Zemana brand, whichever clinic is open.
 test.describe.configure({ mode: "serial" });
 
 const CLINICS = [
@@ -28,9 +28,6 @@ function brandToken(target: Page) {
 function iconHref(target: Page) {
   return target.locator('link[rel="icon"]').first().getAttribute("href");
 }
-
-let karinaIcon: string | null = null;
-let sirleiIcon: string | null = null;
 
 async function openClinic(name: string) {
   await page.goto("/admin/clinicas");
@@ -97,111 +94,48 @@ test.describe("branding", () => {
     }
   });
 
-  test("the sign-in screen is neutral", async ({ browser }) => {
+  test("the sign-in screen is Zemana", async ({ browser }) => {
     const anonymous = await browser.newContext();
     const signIn = await anonymous.newPage();
     await signIn.goto("/admin/entrar");
-    await expect(
-      signIn.locator('img[alt="Grais Saúde Integrativa"]'),
-    ).toHaveCount(0);
-    expect(await brandToken(signIn)).toBe("#3e4c63");
+    const logo = signIn.locator('img[alt="Zemana"]:visible');
+    await expect(logo).toHaveCount(1);
+    // The sign-in page is a purple surface, so it uses the dark-background logo.
+    expect(await logo.getAttribute("src")).toContain("fundo-escuro");
+    expect(await brandToken(signIn)).toBe("#2a0081");
+    await signIn.getByRole("button", { name: "Tema escuro" }).click();
+    await expect(signIn.locator("html")).toHaveClass(/dark/);
+    const darkLogo = signIn.locator('img[alt="Zemana"]:visible');
+    await expect(darkLogo).toHaveCount(1);
+    expect(await darkLogo.getAttribute("src")).toContain("fundo-escuro");
     await anonymous.close();
   });
 
-  test("Karina's panel is pink with her initial", async () => {
-    await openClinic("Karina Manicure");
-    expect(await brandToken(page)).toBe("#b2295b");
-    const sidebar = page.locator("aside");
-    await expect(sidebar).toContainText("Karina");
-    await expect(sidebar).toContainText("Manicure");
-    const icon = await page.request.get("/admin/icone");
-    expect(icon.ok()).toBe(true);
-    expect(await icon.text()).toContain(">K<");
-    karinaIcon = await iconHref(page);
-    expect(karinaIcon).toContain("/admin/icone?v=");
+  test("every clinic panel is Zemana", async () => {
+    for (const clinic of [
+      { filter: "/grais", text: "Grais" },
+      { filter: "Karina Manicure", text: "Karina" },
+    ]) {
+      await openClinic(clinic.filter);
+      expect(await brandToken(page)).toBe("#2a0081");
+      const sidebar = page.locator("aside");
+      await expect(sidebar).toContainText(clinic.text);
+      await expect(sidebar.locator('img[alt="Zemana"]:visible')).toHaveCount(1);
+      await expect(
+        page.locator('img[src*="logo-marinho"], img[src*="simbolo-marinho"]'),
+      ).toHaveCount(0);
+    }
   });
 
-  test("Sirlei's panel has a different icon URL", async () => {
-    await openClinic("Sirlei Massoterapia");
-    sirleiIcon = await iconHref(page);
-    expect(sirleiIcon).toContain("/admin/icone?v=");
-    expect(sirleiIcon).not.toBe(karinaIcon);
+  test("the tab icon is the Zemana symbol", async () => {
+    expect(await iconHref(page)).not.toContain("/admin/icone");
+    await expect(page.getByRole("link", { name: "Aparência" })).toHaveCount(0);
   });
 
-  test("an unknown sale shows the not-found page in Karina's palette", async () => {
-    await openClinic("Karina Manicure");
-    await page.goto(
-      "/admin/financeiro/vendas/00000000-0000-4000-8000-000000000000",
-    );
+  test("old Aparência links are not found", async () => {
+    await page.goto("/admin/aparencia");
     await expect(page.getByText("Página não encontrada")).toBeVisible();
-    expect(await brandToken(page)).toBe("#b2295b");
-  });
-
-  test("switching to Grais restores its brand", async () => {
-    await page.getByRole("link", { name: "Trocar de clínica" }).click();
-    await page
-      .getByRole("listitem")
-      .filter({ hasText: "/grais" })
-      .getByRole("button", { name: "Abrir painel" })
-      .click();
-    await expect(page).toHaveURL(/\/admin$/);
-    expect(await brandToken(page)).toBe("#00357a");
-    await expect(
-      page.locator('aside img[alt=""]:visible').first(),
-    ).toBeVisible();
-  });
-
-  test("the owner switches Karina to Marinho e coral", async () => {
-    await openClinic("Karina Manicure");
-    await page.goto("/admin/aparencia");
-    const card = page.getByRole("button", { name: /Marinho e coral/ });
-    await card.click();
-    await expect(card).toHaveAttribute("aria-pressed", "true");
-    await page.reload();
-    expect(await brandToken(page)).toBe("#22315a");
-    expect(await iconHref(page)).not.toBe(karinaIcon);
-    await expect(
-      page.getByRole("button", { name: /Marinho e coral/ }),
-    ).toHaveAttribute("aria-pressed", "true");
-  });
-
-  test("changes the area label", async () => {
-    await page.goto("/admin/aparencia");
-    await page.getByLabel("Área", { exact: true }).fill("Unhas e cuidados");
-    await page.getByRole("button", { name: "Salvar nome e área" }).click();
-    await expect(page.locator("aside")).toContainText("Unhas e cuidados");
-  });
-
-  test("uploads and removes the photo", async () => {
-    await page.goto("/admin/aparencia");
-    const png = Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
-      "base64",
-    );
-    await page.getByLabel("Escolher foto").setInputFiles({
-      name: "foto.png",
-      mimeType: "image/png",
-      buffer: png,
-    });
-    await expect(page.locator('aside img[src^="/admin/foto/"]')).toBeVisible();
-    await page.getByRole("button", { name: "Remover foto" }).click();
-    await expect(page.locator('aside img[src^="/admin/foto/"]')).toHaveCount(0);
-    await expect(
-      page.locator("aside span[aria-hidden]").filter({ hasText: /^R$/ }),
-    ).toBeVisible();
-  });
-
-  test("Grais shows Marca própria", async () => {
-    await page.goto("/admin/clinicas");
-    await page
-      .getByRole("listitem")
-      .filter({ hasText: "/grais" })
-      .getByRole("button", { name: "Abrir painel" })
-      .click();
-    await expect(page).toHaveURL(/\/admin$/);
-    await page.goto("/admin/aparencia");
-    await expect(page.getByText("Marca própria")).toBeVisible();
-    await expect(page.getByLabel("Área", { exact: true })).toHaveCount(0);
+    expect(await brandToken(page)).toBe("#2a0081");
   });
 
   test("no sideways scroll at 360 px", async () => {
