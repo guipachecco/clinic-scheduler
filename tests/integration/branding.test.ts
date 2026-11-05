@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { db, endPools } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { clinics, users } from "@/db/schema";
 import {
   getClinicBranding,

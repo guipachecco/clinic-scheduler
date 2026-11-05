@@ -3,7 +3,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { db, endPools, inClinic, panelDb, withClinic } from "@/db/client";
+import { inClinic, panelDb, withClinic } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { findPgError } from "@/db/errors";
 import { runMigrations } from "@/db/migrate";
 import { DB_ROLE_NAMES } from "@/db/roles";
@@ -194,6 +195,73 @@ describe("database roles", () => {
     } finally {
       await db.execute(sql`revoke pg_read_all_data from app_client`);
     }
+  });
+
+  it("checks the roles before giving them a login password", async () => {
+    const changed = new URL(ROLE_URLS.app_client);
+    changed.password = "senha-que-nao-deve-valer";
+    await db.execute(sql`alter role app_client bypassrls`);
+    try {
+      const error = await runMigrations(process.env.DATABASE_URL!, {
+        ...ROLE_URLS,
+        app_client: changed.toString(),
+      }).catch((caught: unknown) => caught);
+      expect(String(error)).toMatch(/privilégios a mais.*app_client/);
+      expect(String(error)).not.toContain("senha-que-nao-deve-valer");
+      expect(String(error)).not.toContain("postgres://");
+    } finally {
+      await db.execute(sql`alter role app_client nobypassrls`);
+    }
+    // The password was never changed: the old one still works, the new does not.
+    const oldLogin = new Pool({ connectionString: ROLE_URLS.app_client });
+    const newLogin = new Pool({ connectionString: changed.toString() });
+    try {
+      await expect(oldLogin.query("select 1")).resolves.toBeDefined();
+      expect(await pgErrorCode(newLogin.query("select 1"))).toBe("28P01");
+    } finally {
+      await Promise.all([oldLogin.end(), newLogin.end()]);
+    }
+  });
+
+  it("refuses an app role that owns a table, a schema or the database", async () => {
+    const run = () => runMigrations(process.env.DATABASE_URL!, ROLE_URLS);
+
+    await db.execute(sql`create table role_owned_probe (id int)`);
+    try {
+      await db.execute(sql`alter table role_owned_probe owner to app_panel`);
+      await expect(run()).rejects.toThrowError(/dono.*: app_panel$/);
+    } finally {
+      await db.execute(sql`drop table role_owned_probe`);
+    }
+
+    await db.execute(
+      sql`create schema role_owned_schema authorization app_auth`,
+    );
+    try {
+      await expect(run()).rejects.toThrowError(/dono.*: app_auth$/);
+    } finally {
+      await db.execute(sql`drop schema role_owned_schema`);
+    }
+
+    const databaseName = decodeURIComponent(
+      new URL(process.env.DATABASE_URL!).pathname.slice(1),
+    );
+    const owner = await db.execute<{ owner: string }>(
+      sql`select current_user as owner`,
+    );
+    await db.execute(
+      sql`alter database ${sql.identifier(databaseName)} owner to app_platform`,
+    );
+    try {
+      await expect(run()).rejects.toThrowError(/dono.*: app_platform$/);
+    } finally {
+      await db.execute(
+        sql`alter database ${sql.identifier(databaseName)} owner to ${sql.identifier(owner.rows[0]!.owner)}`,
+      );
+    }
+
+    // Back to normal, the migration passes again.
+    await expect(run()).resolves.toBeUndefined();
   });
 
   it("every clinic table has RLS and a panel policy", async () => {

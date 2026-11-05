@@ -6,12 +6,9 @@ import { env } from "@/lib/env";
 
 import * as schema from "./schema";
 
-// Owner connection: migrations and test fixtures only.
-export const pool = new Pool({ connectionString: env.DATABASE_URL });
-export const db = drizzle({ client: pool, schema });
-
 // One pool per PostgreSQL role (see migration 0011). Row-level security keeps
-// app_panel inside the clinic set for each transaction (inClinic).
+// app_panel inside the clinic set for each transaction (inClinic). The owner
+// connection lives apart, in ./owner, for migrations, scripts and tests only.
 const authPool = new Pool({ connectionString: env.DATABASE_URL_AUTH });
 const panelPool = new Pool({ connectionString: env.DATABASE_URL_PANEL });
 const clientPool = new Pool({ connectionString: env.DATABASE_URL_CLIENT });
@@ -22,7 +19,7 @@ export const panelDb = drizzle({ client: panelPool, schema });
 export const clientDb = drizzle({ client: clientPool, schema });
 export const platformDb = drizzle({ client: platformPool, schema });
 
-export type Database = typeof db;
+export type Database = typeof panelDb;
 export type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 // Runs fn in a transaction that sees only the rows of clinicId. The setting is
@@ -84,6 +81,6 @@ export async function currentDbUser(clinicId: string): Promise<string> {
 
 export async function endPools() {
   await Promise.all(
-    [pool, authPool, panelPool, clientPool, platformPool].map((p) => p.end()),
+    [authPool, panelPool, clientPool, platformPool].map((p) => p.end()),
   );
 }

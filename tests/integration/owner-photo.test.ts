@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { db, endPools } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { auditLogs, clinics, media, users } from "@/db/schema";
 import {
   getClinicMedia,

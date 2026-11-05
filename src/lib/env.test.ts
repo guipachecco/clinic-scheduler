@@ -4,7 +4,6 @@ import { parseServerEnv } from "./env";
 
 const valid = {
   NODE_ENV: "production",
-  DATABASE_URL: "postgres://user:password@db.example.com:5432/app",
   DATABASE_URL_AUTH: "postgres://app_auth:a@db.example.com:5432/app",
   DATABASE_URL_PANEL: "postgres://app_panel:b@db.example.com:5432/app",
   DATABASE_URL_CLIENT: "postgres://app_client:c@db.example.com:5432/app",
@@ -28,7 +27,7 @@ describe("parseServerEnv", () => {
     expect(() =>
       parseServerEnv({ BETTER_AUTH_SECRET: "curto-demais" }),
     ).toThrowError(
-      /DATABASE_URL[\s\S]*BETTER_AUTH_SECRET[\s\S]*BETTER_AUTH_URL/,
+      /DATABASE_URL_AUTH[\s\S]*BETTER_AUTH_SECRET[\s\S]*BETTER_AUTH_URL/,
     );
 
     try {
@@ -73,7 +72,20 @@ describe("parseServerEnv", () => {
 
   it("rejects a database URL that is not PostgreSQL", () => {
     expect(() =>
-      parseServerEnv({ ...valid, DATABASE_URL: "mysql://db.example.com/app" }),
-    ).toThrowError(/DATABASE_URL/);
+      parseServerEnv({
+        ...valid,
+        DATABASE_URL_AUTH: "mysql://db.example.com/app",
+      }),
+    ).toThrowError(/DATABASE_URL_AUTH/);
+  });
+
+  // The app never connects as the owner of the tables.
+  it("neither needs nor keeps the owner DATABASE_URL", () => {
+    expect(() => parseServerEnv(valid)).not.toThrow();
+    const parsed = parseServerEnv({
+      ...valid,
+      DATABASE_URL: "postgres://owner:segredo@db.example.com:5432/app",
+    });
+    expect(parsed).not.toHaveProperty("DATABASE_URL");
   });
 });

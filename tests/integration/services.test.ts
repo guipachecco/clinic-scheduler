@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import { db, endPools } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { auditLogs, serviceCategories, services, users } from "@/db/schema";
 import {
   categoryFormSchema,

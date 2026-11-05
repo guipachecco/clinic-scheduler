@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { db, endPools } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import {
   FLEXIBLE_SERVICE_SLUG,
   OTHER_CATEGORY_SLUG,

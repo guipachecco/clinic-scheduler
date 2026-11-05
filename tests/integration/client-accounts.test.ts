@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { eq, like, or, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import { db, endPools } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { findPgError } from "@/db/errors";
 import { accounts, rateLimits, sessions, users } from "@/db/schema";
 import { auth } from "@/lib/auth";

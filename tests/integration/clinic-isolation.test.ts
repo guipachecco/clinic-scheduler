@@ -1,7 +1,8 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { currentDbUser, db, endPools, inClinic, type Tx } from "@/db/client";
+import { currentDbUser, inClinic, type Tx } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { appointments, patients, users } from "@/db/schema";
 import {
   createAppointment,

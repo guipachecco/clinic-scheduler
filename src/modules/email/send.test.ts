@@ -54,7 +54,6 @@ describe("sendEmail", () => {
 describe("e-mail configuration", () => {
   const production = {
     NODE_ENV: "production",
-    DATABASE_URL: "postgres://user:password@db.example.com:5432/app",
     DATABASE_URL_AUTH: "postgres://app_auth:a@db.example.com:5432/app",
     DATABASE_URL_PANEL: "postgres://app_panel:b@db.example.com:5432/app",
     DATABASE_URL_CLIENT: "postgres://app_client:c@db.example.com:5432/app",

@@ -9,7 +9,7 @@ import {
   vi,
 } from "vitest";
 
-import { db, endPools } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import {
   appointments,
   auditLogs,

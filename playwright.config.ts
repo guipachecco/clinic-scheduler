@@ -22,8 +22,9 @@ export const E2E_EMAIL_OUTBOX_DIR = path.join(
 );
 
 // Values for automated tests only. Real secrets never go in the repository.
+// No owner DATABASE_URL: the site runs (and builds) with the app roles only;
+// global-setup migrates and seeds through E2E_DATABASE_URL.
 export const E2E_SERVER_ENV = {
-  DATABASE_URL: E2E_DATABASE_URL,
   ...roleUrlEnv(devRoleUrls(E2E_DATABASE_URL)),
   BETTER_AUTH_SECRET: "segredo-apenas-para-testes-e2e-0123456789abcdef",
   BETTER_AUTH_URL: BASE_URL,

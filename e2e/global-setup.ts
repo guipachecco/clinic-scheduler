@@ -39,7 +39,7 @@ export default async function globalSetup() {
   // The account module reads its configuration when it is first imported.
   Object.assign(process.env, E2E_SERVER_ENV);
   const { createAdmin } = await import("../src/modules/auth/admin-accounts");
-  const { pool } = await import("../src/db/client");
+  const { endPools } = await import("../src/db/client");
   try {
     await createAdmin(TEST_ADMIN);
     await createAdmin(TEST_ADMIN_PATIENTS);
@@ -52,6 +52,6 @@ export default async function globalSetup() {
     await createAdmin(TEST_ROOT);
     await createAdmin(TEST_ROOT_BRANDING);
   } finally {
-    await pool.end();
+    await endPools();
   }
 }

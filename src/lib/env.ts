@@ -23,8 +23,9 @@ export const serverEnvSchema = z
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    DATABASE_URL: postgresUrl(),
-    // One login per PostgreSQL role (see src/db/roles.ts).
+    // One login per PostgreSQL role (see src/db/roles.ts). The owner
+    // DATABASE_URL is deliberately left out: the app never connects as the
+    // owner; only migrations, scripts and tests do (src/db/owner.ts).
     DATABASE_URL_AUTH: postgresUrl(),
     DATABASE_URL_PANEL: postgresUrl(),
     DATABASE_URL_CLIENT: postgresUrl(),
