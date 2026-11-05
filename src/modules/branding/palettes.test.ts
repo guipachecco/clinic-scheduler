@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { contrastRatio } from "./contrast";
 import {
+  CLINIC_BRANDING,
   initialsFor,
   paletteCss,
   PALETTES,
@@ -12,6 +13,14 @@ import {
 const BACKGROUND = { light: "#f7f5f8", dark: "#0b0b10" } as const;
 
 describe("palettes", () => {
+  it("every palette id used by a clinic exists", () => {
+    for (const [slug, branding] of Object.entries(CLINIC_BRANDING)) {
+      for (const id of branding.palettes) {
+        expect(PALETTES[id], `${slug}: ${id}`).toBeDefined();
+      }
+    }
+  });
+
   it("every palette is readable in both themes", () => {
     for (const palette of Object.values(PALETTES)) {
       for (const theme of ["light", "dark"] as const) {

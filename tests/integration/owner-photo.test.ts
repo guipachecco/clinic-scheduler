@@ -84,7 +84,7 @@ describe("owner photo", () => {
   it("refuses a big or wrong file", async () => {
     const big = await saveOwnerPhoto(
       CLINIC,
-      { bytes: Buffer.alloc(2 * 1024 * 1024 + 1), mimeType: "image/jpeg" },
+      { bytes: Buffer.alloc(10 * 1024 * 1024 + 1), mimeType: "image/jpeg" },
       actor,
     );
     expect(big.ok).toBe(false);
@@ -94,6 +94,17 @@ describe("owner photo", () => {
       actor,
     );
     expect(gif.ok).toBe(false);
+    const svg = await saveOwnerPhoto(
+      CLINIC,
+      {
+        bytes: Buffer.from(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10"/></svg>',
+        ),
+        mimeType: "image/png",
+      },
+      actor,
+    );
+    expect(svg.ok).toBe(false);
     const garbage = await saveOwnerPhoto(
       CLINIC,
       { bytes: Buffer.from("not an image"), mimeType: "image/png" },

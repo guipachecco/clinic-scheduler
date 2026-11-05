@@ -64,6 +64,9 @@ export function BrandingTextForm({
             value={name}
             maxLength={40}
             aria-invalid={Boolean(errors.displayName)}
+            aria-describedby={
+              errors.displayName ? "aparencia-nome-erro" : undefined
+            }
             onChange={(event) => setName(event.target.value)}
           />
           <FieldError id="aparencia-nome-erro" message={errors.displayName} />
@@ -75,6 +78,9 @@ export function BrandingTextForm({
             value={area}
             maxLength={40}
             aria-invalid={Boolean(errors.areaLabel)}
+            aria-describedby={
+              errors.areaLabel ? "aparencia-area-erro" : undefined
+            }
             onChange={(event) => setArea(event.target.value)}
           />
           <FieldError id="aparencia-area-erro" message={errors.areaLabel} />

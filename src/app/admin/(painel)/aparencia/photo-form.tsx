@@ -46,8 +46,8 @@ export function PhotoForm({
   function onPick(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError("A foto deve ter no máximo 2 MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      setError("A foto deve ter até 10 MB.");
       event.target.value = "";
       return;
     }
@@ -85,7 +85,7 @@ export function PhotoForm({
             onChange={onPick}
           />
           <p className="text-sm text-muted-foreground">
-            JPEG, PNG ou WebP, até 2 MB.
+            JPEG, PNG ou WebP, até 10 MB.
           </p>
         </div>
         {photoId ? (

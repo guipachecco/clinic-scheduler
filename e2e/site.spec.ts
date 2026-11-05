@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { PALETTES } from "../src/modules/branding/palettes";
+
 test("home page loads in Portuguese with the security headers", async ({
   page,
 }) => {
@@ -81,6 +83,13 @@ test("the theme button switches to the dark theme and remembers it", async ({
     "rgb(11, 11, 16)",
   );
   await expect(page.getByText("Painel", { exact: true })).toBeVisible();
+  // The dark palette cascades from the neutral one on the sign-in page.
+  const brand = await page.evaluate(() =>
+    getComputedStyle(document.documentElement)
+      .getPropertyValue("--brand")
+      .trim(),
+  );
+  expect(brand).toBe(PALETTES.painel!.dark.brand);
 
   await page.getByRole("button", { name: "Tema escuro" }).click();
   await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);

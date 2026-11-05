@@ -10,6 +10,7 @@ import { getTheme } from "@/lib/theme-server";
 import { countRequestedFrom } from "@/modules/appointments/appointments";
 import { requireAdmin } from "@/modules/auth/session";
 import { getClinicBranding } from "@/modules/branding/branding";
+import { initialsFor } from "@/modules/branding/palettes";
 
 import { PanelNav } from "./panel-nav";
 import { SignOutButton } from "./sign-out-button";
@@ -21,7 +22,12 @@ export async function generateMetadata(): Promise<Metadata> {
   const session = await requireAdmin();
   const branding = await brandingFor(session.clinicId);
   if (!branding || branding.usesBrandImages) return {};
-  return { icons: { icon: "/admin/icone" } };
+  // The query is ignored by the route; it only keeps browsers from reusing
+  // another clinic's (or an older palette's) cached icon.
+  const version = encodeURIComponent(
+    `${branding.clinicId}.${branding.palette.id}.${initialsFor(branding.displayName)}`,
+  );
+  return { icons: { icon: `/admin/icone?v=${version}` } };
 }
 
 export default async function PanelLayout({

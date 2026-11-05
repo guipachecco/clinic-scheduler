@@ -25,6 +25,13 @@ function brandToken(target: Page) {
   );
 }
 
+function iconHref(target: Page) {
+  return target.locator('link[rel="icon"]').first().getAttribute("href");
+}
+
+let karinaIcon: string | null = null;
+let sirleiIcon: string | null = null;
+
 async function openClinic(name: string) {
   await page.goto("/admin/clinicas");
   await page
@@ -110,6 +117,24 @@ test.describe("branding", () => {
     const icon = await page.request.get("/admin/icone");
     expect(icon.ok()).toBe(true);
     expect(await icon.text()).toContain(">K<");
+    karinaIcon = await iconHref(page);
+    expect(karinaIcon).toContain("/admin/icone?v=");
+  });
+
+  test("Sirlei's panel has a different icon URL", async () => {
+    await openClinic("Sirlei Massoterapia");
+    sirleiIcon = await iconHref(page);
+    expect(sirleiIcon).toContain("/admin/icone?v=");
+    expect(sirleiIcon).not.toBe(karinaIcon);
+  });
+
+  test("an unknown sale shows the not-found page in Karina's palette", async () => {
+    await openClinic("Karina Manicure");
+    await page.goto(
+      "/admin/financeiro/vendas/00000000-0000-4000-8000-000000000000",
+    );
+    await expect(page.getByText("Página não encontrada")).toBeVisible();
+    expect(await brandToken(page)).toBe("#b2295b");
   });
 
   test("switching to Grais restores its brand", async () => {
@@ -134,6 +159,7 @@ test.describe("branding", () => {
     await expect(card).toHaveAttribute("aria-pressed", "true");
     await page.reload();
     expect(await brandToken(page)).toBe("#22315a");
+    expect(await iconHref(page)).not.toBe(karinaIcon);
     await expect(
       page.getByRole("button", { name: /Marinho e coral/ }),
     ).toHaveAttribute("aria-pressed", "true");
