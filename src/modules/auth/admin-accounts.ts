@@ -2,7 +2,14 @@ import { and, eq } from "drizzle-orm";
 import * as z from "zod";
 
 import { db } from "@/db/client";
-import { accounts, auditLogs, sessions, twoFactors, users } from "@/db/schema";
+import {
+  accounts,
+  auditLogs,
+  clinics,
+  sessions,
+  twoFactors,
+  users,
+} from "@/db/schema";
 import { auth } from "@/lib/auth";
 
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./password-policy";
@@ -30,6 +37,9 @@ const passwordSchema = z
   );
 
 const createAdminSchema = z.object({
+  // admin: owner of the clinic in clinicSlug. root: every clinic, no clinicSlug.
+  role: z.enum(["admin", "root"]),
+  clinicSlug: z.string().trim().toLowerCase().optional(),
   email: emailSchema,
   name: z
     .string()
@@ -68,14 +78,38 @@ async function hashPassword(password: string) {
 }
 
 export async function createAdmin(input: {
+  role: "admin" | "root";
+  clinicSlug?: string;
   email: string;
   name: string;
   password: string;
 }) {
-  const { email, name, password } = parse(createAdminSchema, input);
+  const { role, clinicSlug, email, name, password } = parse(
+    createAdminSchema,
+    input,
+  );
+  if (role === "admin" && !clinicSlug) {
+    throw new AdminAccountError("Informe o endereço da clínica.");
+  }
+  if (role === "root" && clinicSlug) {
+    throw new AdminAccountError("A conta root não pertence a uma clínica.");
+  }
   const passwordHash = await hashPassword(password);
 
   return db.transaction(async (tx) => {
+    let clinicId: string | null = null;
+    if (clinicSlug) {
+      const [clinic] = await tx
+        .select({ id: clinics.id })
+        .from(clinics)
+        .where(eq(clinics.slug, clinicSlug));
+      if (!clinic) {
+        throw new AdminAccountError(
+          "Nenhuma clínica encontrada com esse endereço.",
+        );
+      }
+      clinicId = clinic.id;
+    }
     const [existing] = await tx
       .select({ id: users.id })
       .from(users)
@@ -86,7 +120,7 @@ export async function createAdmin(input: {
 
     const [user] = await tx
       .insert(users)
-      .values({ email, name, emailVerified: true, role: "admin" })
+      .values({ email, name, emailVerified: true, role, clinicId })
       .returning({ id: users.id });
     if (!user) throw new Error("Falha ao criar a conta.");
 
@@ -97,8 +131,9 @@ export async function createAdmin(input: {
       password: passwordHash,
     });
     await tx.insert(auditLogs).values({
+      clinicId,
       actorType: "system",
-      action: "admin.created",
+      action: role === "root" ? "root.created" : "admin.created",
       entityType: "user",
       entityId: user.id,
     });

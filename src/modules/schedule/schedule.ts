@@ -8,7 +8,7 @@ import {
   appointments,
   auditLogs,
   businessHours,
-  clinicSettings,
+  clinics,
   timeBlocks,
 } from "@/db/schema";
 
@@ -16,11 +16,12 @@ import type { BusinessHoursValues, TimeBlockValues } from "./fields";
 import { nationalHolidays } from "./holidays";
 import { formatLocal, localDayRange } from "./time";
 
-// Data functions for business hours and time blocks. Times are local
+// Data functions for business hours and time blocks of one clinic: every
+// function takes the clinicId from the session. Times are local
 // wall-clock for business hours and UTC instants for blocks. Block titles,
 // appointment details and interval times never go to audit_logs or into error
 // messages. The clinic time zone is the CLINIC_TIME_ZONE constant (see
-// time.ts), not clinic_settings.timezone.
+// time.ts), not clinics.timezone.
 
 export type DayHours = {
   weekday: number;
@@ -40,8 +41,16 @@ export type TimeBlockItem = {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Arbitrary constant so concurrent holiday runs serialize.
+// Arbitrary constants for advisory locks, taken together with a hash of the
+// clinic id so that only writes of the same clinic serialize.
 const HOLIDAYS_LOCK = 7_204_511;
+const HOURS_LOCK = 7_204_513;
+
+async function lockClinic(tx: Tx, key: number, clinicId: string) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(${key}, hashtext(${clinicId}))`,
+  );
+}
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -65,11 +74,13 @@ function emptyWeek(): DayHours[] {
 }
 
 async function readWeek(
+  clinicId: string,
   executor: Pick<Tx, "select"> = db,
 ): Promise<DayHours[]> {
   const rows = await executor
     .select()
     .from(businessHours)
+    .where(eq(businessHours.clinicId, clinicId))
     .orderBy(asc(businessHours.weekday), asc(businessHours.startTime));
   const week = emptyWeek();
   for (const row of rows) {
@@ -83,8 +94,8 @@ async function readWeek(
 
 // Always seven entries, Sunday (0) to Saturday (6). A day without intervals
 // is closed.
-export async function getBusinessHours(): Promise<DayHours[]> {
-  return readWeek();
+export async function getBusinessHours(clinicId: string): Promise<DayHours[]> {
+  return readWeek(clinicId);
 }
 
 const sameDay = (a: DayHours, b: DayHours) =>
@@ -93,13 +104,14 @@ const sameDay = (a: DayHours, b: DayHours) =>
 // Replaces the whole week in one transaction. Weekdays missing from the
 // input become closed. The audit entry lists only the changed weekdays.
 export async function saveBusinessHours(
+  clinicId: string,
   values: BusinessHoursValues,
   actorUserId: string,
 ): Promise<{ ok: true }> {
   try {
     await db.transaction(async (tx) => {
-      await tx.execute(sql`lock table business_hours in exclusive mode`);
-      const before = await readWeek(tx);
+      await lockClinic(tx, HOURS_LOCK, clinicId);
+      const before = await readWeek(clinicId, tx);
       const after = emptyWeek();
       for (const day of values.days) {
         after[day.weekday]!.intervals = day.intervals.map((i) => ({
@@ -112,9 +124,12 @@ export async function saveBusinessHours(
         .filter((day, i) => !sameDay(day, before[i]!))
         .map((day) => day.weekday);
 
-      await tx.delete(businessHours);
+      await tx
+        .delete(businessHours)
+        .where(eq(businessHours.clinicId, clinicId));
       const rows = after.flatMap((day) =>
         day.intervals.map((i) => ({
+          clinicId,
           weekday: day.weekday,
           startTime: i.start,
           endTime: i.end,
@@ -124,6 +139,7 @@ export async function saveBusinessHours(
 
       if (weekdays.length > 0) {
         await tx.insert(auditLogs).values({
+          clinicId,
           actorType: "admin",
           actorUserId,
           action: "business_hours.updated",
@@ -150,12 +166,13 @@ const blockColumns = {
 // Blocks that end after `now`, ordered by start. Only blocks that start in
 // the future can be deleted; past and ongoing ones stay as history.
 export async function listUpcomingBlocks(
+  clinicId: string,
   now: Date = new Date(),
 ): Promise<TimeBlockItem[]> {
   const rows = await db
     .select(blockColumns)
     .from(timeBlocks)
-    .where(gt(timeBlocks.endsAt, now))
+    .where(and(eq(timeBlocks.clinicId, clinicId), gt(timeBlocks.endsAt, now)))
     .orderBy(asc(timeBlocks.startsAt), asc(timeBlocks.id));
   return rows.map((row) => ({ ...row, deletable: row.startsAt > now }));
 }
@@ -163,6 +180,7 @@ export async function listUpcomingBlocks(
 // Creating a block never cancels anything. Active appointments that overlap
 // it are reported as local start times (dd/MM HH:mm), without patient data.
 export async function createTimeBlock(
+  clinicId: string,
   values: TimeBlockValues,
   actorUserId: string,
 ): Promise<{ ok: true; id: string; conflicts: string[] }> {
@@ -170,7 +188,7 @@ export async function createTimeBlock(
     return await db.transaction(async (tx) => {
       const [row] = await tx
         .insert(timeBlocks)
-        .values({ ...values, createdByUserId: actorUserId })
+        .values({ ...values, clinicId, createdByUserId: actorUserId })
         .returning({ id: timeBlocks.id });
 
       const clashing = await tx
@@ -178,6 +196,7 @@ export async function createTimeBlock(
         .from(appointments)
         .where(
           and(
+            eq(appointments.clinicId, clinicId),
             inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
             lt(appointments.occupiedFrom, values.endsAt),
             gt(appointments.occupiedUntil, values.startsAt),
@@ -189,6 +208,7 @@ export async function createTimeBlock(
       );
 
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "time_block.created",
@@ -208,6 +228,7 @@ export async function createTimeBlock(
 }
 
 export async function deleteTimeBlock(
+  clinicId: string,
   id: string,
   actorUserId: string,
   now: Date = new Date(),
@@ -220,14 +241,17 @@ export async function deleteTimeBlock(
       const [current] = await tx
         .select({ startsAt: timeBlocks.startsAt })
         .from(timeBlocks)
-        .where(eq(timeBlocks.id, id))
+        .where(and(eq(timeBlocks.id, id), eq(timeBlocks.clinicId, clinicId)))
         .for("update");
       if (!current) return { ok: false as const, reason: "not_found" as const };
       if (current.startsAt <= now) {
         return { ok: false as const, reason: "not_deletable" as const };
       }
-      await tx.delete(timeBlocks).where(eq(timeBlocks.id, id));
+      await tx
+        .delete(timeBlocks)
+        .where(and(eq(timeBlocks.id, id), eq(timeBlocks.clinicId, clinicId)));
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "time_block.deleted",
@@ -244,12 +268,13 @@ export async function deleteTimeBlock(
 // Creates the national holidays of `year` as all-day "holiday" blocks. A
 // holiday is skipped when a holiday block already starts on that local date.
 export async function addNationalHolidays(
+  clinicId: string,
   year: number,
   actorUserId: string,
 ): Promise<{ ok: true; created: number }> {
   try {
     return await db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(${HOLIDAYS_LOCK})`);
+      await lockClinic(tx, HOLIDAYS_LOCK, clinicId);
       let created = 0;
       for (const holiday of nationalHolidays(year)) {
         const { startsAt, endsAt } = localDayRange(holiday.date, holiday.date);
@@ -258,6 +283,7 @@ export async function addNationalHolidays(
           .from(timeBlocks)
           .where(
             and(
+              eq(timeBlocks.clinicId, clinicId),
               eq(timeBlocks.type, "holiday"),
               gte(timeBlocks.startsAt, startsAt),
               lt(timeBlocks.startsAt, endsAt),
@@ -266,6 +292,7 @@ export async function addNationalHolidays(
           .limit(1);
         if (existing) continue;
         await tx.insert(timeBlocks).values({
+          clinicId,
           type: "holiday",
           title: holiday.name,
           startsAt,
@@ -277,6 +304,7 @@ export async function addNationalHolidays(
       }
       if (created > 0) {
         await tx.insert(auditLogs).values({
+          clinicId,
           actorType: "admin",
           actorUserId,
           action: "time_block.holidays_added",
@@ -294,6 +322,7 @@ export async function addNationalHolidays(
 // For the availability engine: blocks that intersect the range, plus the
 // weekly business hours. Pass `executor` to read inside a transaction.
 export async function findBlocksAndHours(
+  clinicId: string,
   range: {
     from: Date;
     to: Date;
@@ -305,23 +334,28 @@ export async function findBlocksAndHours(
     .select(blockColumns)
     .from(timeBlocks)
     .where(
-      and(lt(timeBlocks.startsAt, range.to), gt(timeBlocks.endsAt, range.from)),
+      and(
+        eq(timeBlocks.clinicId, clinicId),
+        lt(timeBlocks.startsAt, range.to),
+        gt(timeBlocks.endsAt, range.from),
+      ),
     )
     .orderBy(asc(timeBlocks.startsAt), asc(timeBlocks.id));
   return {
     blocks: rows.map((row) => ({ ...row, deletable: row.startsAt > now })),
-    hours: await readWeek(executor),
+    hours: await readWeek(clinicId, executor),
   };
 }
 
 const DEFAULT_SLOT_STEP_MINUTES = 30;
 
-// The agenda grid step (clinic_settings.slot_step_minutes). The settings row
-// is created by a migration; the default covers a database without it.
-export async function getSlotStepMinutes(): Promise<number> {
+// The agenda grid step (clinics.slot_step_minutes). The default covers a
+// clinic id that no longer exists.
+export async function getSlotStepMinutes(clinicId: string): Promise<number> {
   const [row] = await db
-    .select({ slotStepMinutes: clinicSettings.slotStepMinutes })
-    .from(clinicSettings)
+    .select({ slotStepMinutes: clinics.slotStepMinutes })
+    .from(clinics)
+    .where(eq(clinics.id, clinicId))
     .limit(1);
   return row?.slotStepMinutes ?? DEFAULT_SLOT_STEP_MINUTES;
 }

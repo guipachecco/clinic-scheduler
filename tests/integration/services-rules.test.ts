@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { db, pool } from "@/db/client";
@@ -10,25 +10,13 @@ import {
   OTHER_CATEGORY_SLUG,
   serviceCategories,
   services,
+  users,
 } from "@/db/schema";
+import { createClinic } from "@/modules/clinics/clinics";
 
 afterAll(async () => {
   await pool.end();
 });
-
-// Other test files truncate services and service_categories, and file order
-// is not guaranteed. The seed migration is idempotent (on conflict do
-// nothing), so running its SQL again restores the rows exactly as the
-// migration leaves them, and checks the SQL itself.
-async function applySeedMigration() {
-  const file = readFileSync(
-    join(process.cwd(), "drizzle", "0005_flexible_service_seed.sql"),
-    "utf8",
-  );
-  for (const statement of file.split("--> statement-breakpoint")) {
-    if (statement.trim()) await db.execute(sql.raw(statement));
-  }
-}
 
 describe("migrations", () => {
   it("registers the service migrations in order and applies all of them", async () => {
@@ -53,10 +41,24 @@ describe("migrations", () => {
   });
 });
 
+// Every clinic starts with the "Outros" category and the flexible service:
+// the first clinic from migration 0005, new ones from createClinic.
 describe("flexible service seed", () => {
+  async function newClinic(slug: string) {
+    const [root] = await db
+      .insert(users)
+      .values({ name: "Root", email: `${slug}@example.com`, role: "root" })
+      .returning({ id: users.id });
+    const result = await createClinic(
+      { name: "Clínica fictícia", slug },
+      root!.id,
+    );
+    if (!result.ok) throw new Error("expected ok");
+    return result.id;
+  }
+
   it("seeds the Outros category and the flexible service", async () => {
-    await applySeedMigration();
-    await applySeedMigration(); // idempotent
+    const clinicId = await newClinic("seed-flexivel");
 
     const [row] = await db
       .select({
@@ -68,7 +70,12 @@ describe("flexible service seed", () => {
         serviceCategories,
         eq(services.categoryId, serviceCategories.id),
       )
-      .where(eq(services.slug, FLEXIBLE_SERVICE_SLUG));
+      .where(
+        and(
+          eq(services.clinicId, clinicId),
+          eq(services.slug, FLEXIBLE_SERVICE_SLUG),
+        ),
+      );
 
     expect(row.categorySlug).toBe(OTHER_CATEGORY_SLUG);
     expect(row.service).toMatchObject({
@@ -87,32 +94,53 @@ describe("flexible service seed", () => {
     const categories = await db
       .select()
       .from(serviceCategories)
-      .where(eq(serviceCategories.slug, OTHER_CATEGORY_SLUG));
+      .where(
+        and(
+          eq(serviceCategories.clinicId, clinicId),
+          eq(serviceCategories.slug, OTHER_CATEGORY_SLUG),
+        ),
+      );
     expect(categories).toHaveLength(1);
     expect(categories[0]).toMatchObject({ isActive: true, sortOrder: 999 });
   });
 
+  it("refuses a second clinic with the same address", async () => {
+    await newClinic("endereco-repetido");
+    const [root] = await db
+      .insert(users)
+      .values({ name: "Root", email: "root2@example.com", role: "root" })
+      .returning({ id: users.id });
+    const result = await createClinic(
+      { name: "Outra", slug: "endereco-repetido" },
+      root!.id,
+    );
+    expect(result).toEqual({
+      ok: false,
+      fieldErrors: { slug: "Já existe uma clínica com este endereço." },
+    });
+  });
+
   it("defaults is_flexible to false", async () => {
-    await applySeedMigration();
+    const clinicId = await newClinic("seed-padrao");
     const [category] = await db
       .select()
       .from(serviceCategories)
-      .where(eq(serviceCategories.slug, OTHER_CATEGORY_SLUG));
-    try {
-      const [service] = await db
-        .insert(services)
-        .values({
-          categoryId: category.id,
-          name: "Serviço comum",
-          slug: "servico-comum-flex-test",
-          durationMinutes: 45,
-        })
-        .returning();
-      expect(service.isFlexible).toBe(false);
-    } finally {
-      await db
-        .delete(services)
-        .where(eq(services.slug, "servico-comum-flex-test"));
-    }
+      .where(
+        and(
+          eq(serviceCategories.clinicId, clinicId),
+          eq(serviceCategories.slug, OTHER_CATEGORY_SLUG),
+        ),
+      );
+    const [service] = await db
+      .insert(services)
+      .values({
+        clinicId,
+        categoryId: category.id,
+        name: "Serviço comum",
+        slug: "servico-comum-flex-test",
+        durationMinutes: 45,
+      })
+      .returning();
+    expect(service.isFlexible).toBe(false);
   });
 });

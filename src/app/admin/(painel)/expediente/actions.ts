@@ -54,7 +54,7 @@ export async function saveBusinessHoursAction(
     return { ok: false, fieldErrors: collectErrors(parsed.error) };
   }
   try {
-    await saveBusinessHours(parsed.data, session.user.id);
+    await saveBusinessHours(session.clinicId, parsed.data, session.user.id);
   } catch {
     return failure(GENERIC_ERROR);
   }
@@ -70,7 +70,11 @@ export async function createTimeBlockAction(
     return { ok: false, fieldErrors: collectErrors(parsed.error) };
   }
   try {
-    const result = await createTimeBlock(parsed.data, session.user.id);
+    const result = await createTimeBlock(
+      session.clinicId,
+      parsed.data,
+      session.user.id,
+    );
     return { ok: true, conflicts: result.conflicts };
   } catch {
     return failure(GENERIC_ERROR);
@@ -82,7 +86,7 @@ export async function deleteTimeBlockAction(
 ): Promise<{ ok: true } | ActionFailure> {
   const session = await requireAdmin();
   try {
-    const result = await deleteTimeBlock(id, session.user.id);
+    const result = await deleteTimeBlock(session.clinicId, id, session.user.id);
     if (result.ok) return { ok: true };
     return failure(
       result.reason === "not_found"
@@ -103,7 +107,11 @@ export async function addNationalHolidaysAction(
     return failure("Escolha o ano atual ou o próximo.");
   }
   try {
-    const result = await addNationalHolidays(year, session.user.id);
+    const result = await addNationalHolidays(
+      session.clinicId,
+      year,
+      session.user.id,
+    );
     return { ok: true, created: result.created };
   } catch {
     return failure("Não foi possível adicionar os feriados. Tente novamente.");

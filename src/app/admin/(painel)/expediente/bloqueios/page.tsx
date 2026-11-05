@@ -27,10 +27,10 @@ function dateLabel(startsAt: Date, endsAt: Date, allDay: boolean) {
 }
 
 export default async function BlocksPage() {
-  await requireAdmin();
+  const { clinicId } = await requireAdmin();
   const today = todayLocal();
   const year = Number(today.slice(0, 4));
-  const blocks = await listUpcomingBlocks();
+  const blocks = await listUpcomingBlocks(clinicId);
 
   const rows: BlockRow[] = blocks.map((block) => ({
     id: block.id,

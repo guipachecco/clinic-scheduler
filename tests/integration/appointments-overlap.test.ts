@@ -10,6 +10,8 @@ import {
   services,
 } from "@/db/schema";
 
+import { CLINIC } from "../helpers/clinic";
+
 // The database itself must refuse two active appointments in overlapping
 // time ranges, even when the requests arrive at the same moment.
 // Every record here is fictitious and exists only during the test.
@@ -33,6 +35,7 @@ function appointmentAt(
   const startsAt = new Date(start);
   const endsAt = new Date(startsAt.getTime() + minutes * MINUTE);
   return {
+    clinicId: CLINIC,
     patientId,
     serviceId,
     serviceName: "Serviço fictício",
@@ -61,11 +64,16 @@ beforeEach(async () => {
   );
   const [category] = await db
     .insert(serviceCategories)
-    .values({ name: "Categoria fictícia", slug: "categoria-ficticia" })
+    .values({
+      clinicId: CLINIC,
+      name: "Categoria fictícia",
+      slug: "categoria-ficticia",
+    })
     .returning();
   const [service] = await db
     .insert(services)
     .values({
+      clinicId: CLINIC,
       categoryId: category!.id,
       name: "Serviço fictício",
       slug: "servico-ficticio",
@@ -75,6 +83,7 @@ beforeEach(async () => {
   const [patient] = await db
     .insert(patients)
     .values({
+      clinicId: CLINIC,
       name: "Paciente Fictício",
       nameNormalized: "paciente ficticio",
       phone: "+5500000000000",

@@ -14,12 +14,12 @@ export default async function ServicePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const { clinicId } = await requireAdmin();
   const { id } = await params;
-  const service = await getService(id);
+  const service = await getService(clinicId, id);
   if (!service) notFound();
 
-  const catalog = await listCatalog();
+  const catalog = await listCatalog(clinicId);
   // Active categories, plus the service's own even when it is inactive.
   const categories = catalog
     .filter(

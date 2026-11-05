@@ -6,6 +6,7 @@ import {
   listPatientAppointments,
   type PatientAppointmentItem,
 } from "@/modules/appointments/appointments";
+import { requireAdmin } from "@/modules/auth/session";
 import { formatLocal } from "@/modules/schedule/time";
 
 import { StatusBadge } from "../../agenda/status-badge";
@@ -50,7 +51,8 @@ export async function AppointmentHistory({
   patientId: string;
   canSchedule: boolean;
 }) {
-  const { upcoming, past } = await listPatientAppointments(patientId);
+  const { clinicId } = await requireAdmin();
+  const { upcoming, past } = await listPatientAppointments(clinicId, patientId);
   return (
     <section aria-labelledby="atendimentos" className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">

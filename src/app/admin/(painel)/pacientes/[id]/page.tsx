@@ -19,6 +19,7 @@ import { PatientForm } from "../patient-form";
 
 import { AnonymizeForm } from "./anonymize-form";
 import { AppointmentHistory } from "./appointment-history";
+import { PatientFinance } from "./patient-finance";
 
 // No patient data in the title: it would reach the browser history.
 export const metadata: Metadata = { title: "Paciente" };
@@ -28,9 +29,9 @@ export default async function PatientPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const { clinicId } = await requireAdmin();
   const { id } = await params;
-  const patient = await getPatient(id);
+  const patient = await getPatient(clinicId, id);
   if (!patient) notFound();
 
   if (patient.anonymizedAt) {
@@ -53,6 +54,7 @@ export default async function PatientPage({
           O histórico de agendamentos é mantido.
         </p>
         <AppointmentHistory patientId={patient.id} canSchedule={false} />
+        <PatientFinance patientId={patient.id} canQuote={false} />
         <Button asChild variant="outline" className="w-fit">
           <Link href="/admin/pacientes">Voltar à lista</Link>
         </Button>
@@ -115,6 +117,7 @@ export default async function PatientPage({
       </section>
 
       <AppointmentHistory patientId={patient.id} canSchedule />
+      <PatientFinance patientId={patient.id} canQuote />
 
       <details className="rounded-2xl border p-4 md:p-6">
         <summary className="flex h-11 cursor-pointer items-center rounded-md text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">

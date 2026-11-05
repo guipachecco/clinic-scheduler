@@ -28,6 +28,8 @@ import {
   type AppointmentFormValues,
 } from "@/modules/appointments/fields";
 
+import { CLINIC } from "../helpers/clinic";
+
 // Every record here is fictitious and exists only during the test.
 
 const MINUTE = 60_000;
@@ -61,7 +63,7 @@ function form(overrides: Record<string, unknown> = {}): AppointmentFormValues {
 }
 
 async function created(overrides: Record<string, unknown> = {}) {
-  const result = await createAppointment(form(overrides), actorId, NOW);
+  const result = await createAppointment(CLINIC, form(overrides), actorId, NOW);
   if (!result.ok) throw new Error(`expected ok: ${JSON.stringify(result)}`);
   return result.id;
 }
@@ -93,15 +95,29 @@ beforeEach(async () => {
   );
   const [user] = await db
     .insert(users)
-    .values({ name: "Admin", email: "admin@example.com", role: "admin" })
+    .values({
+      name: "Admin",
+      email: "admin@example.com",
+      role: "admin",
+      clinicId: CLINIC,
+    })
     .returning();
   actorId = user!.id;
 
   const [category, closedCategory] = await db
     .insert(serviceCategories)
     .values([
-      { name: "Categoria fictícia", slug: "categoria-ficticia" },
-      { name: "Categoria inativa", slug: "categoria-inativa", isActive: false },
+      {
+        clinicId: CLINIC,
+        name: "Categoria fictícia",
+        slug: "categoria-ficticia",
+      },
+      {
+        clinicId: CLINIC,
+        name: "Categoria inativa",
+        slug: "categoria-inativa",
+        isActive: false,
+      },
     ])
     .returning();
   const insertService = async (values: Partial<typeof services.$inferInsert>) =>
@@ -109,6 +125,7 @@ beforeEach(async () => {
       await db
         .insert(services)
         .values({
+          clinicId: CLINIC,
           categoryId: category!.id,
           name: values.slug!,
           slug: values.slug!,
@@ -148,17 +165,23 @@ beforeEach(async () => {
     .insert(patients)
     .values([
       {
+        clinicId: CLINIC,
         name: PATIENT_NAME,
         nameNormalized: "maria ficticia da silva",
         nickname: "Mari",
         phone: "+5500000000001",
       },
       {
+        clinicId: CLINIC,
         name: "João Fictício",
         nameNormalized: "joao ficticio",
         phone: "+5500000000002",
       },
-      { name: "Paciente anonimizado", anonymizedAt: new Date() },
+      {
+        clinicId: CLINIC,
+        name: "Paciente anonimizado",
+        anonymizedAt: new Date(),
+      },
     ])
     .returning();
   patientId = patient!.id;
@@ -168,6 +191,7 @@ beforeEach(async () => {
   // Monday to Saturday, 08:00 to 18:00.
   await db.insert(businessHours).values(
     [1, 2, 3, 4, 5, 6].map((weekday) => ({
+      clinicId: CLINIC,
       weekday,
       startTime: "08:00",
       endTime: "18:00",
@@ -217,7 +241,7 @@ describe("createAppointment", () => {
   it("returns warnings and writes nothing until they are acknowledged", async () => {
     // Sunday is closed.
     const values = form({ date: "2026-11-08" });
-    const first = await createAppointment(values, actorId, NOW);
+    const first = await createAppointment(CLINIC, values, actorId, NOW);
     expect(first).toEqual({
       ok: false,
       warnings: [{ code: "outside_hours", message: "Fora do expediente." }],
@@ -225,6 +249,7 @@ describe("createAppointment", () => {
     expect(await appointmentCount()).toBe(0);
 
     const second = await createAppointment(
+      CLINIC,
       { ...values, acknowledgeWarnings: true },
       actorId,
       NOW,
@@ -235,12 +260,13 @@ describe("createAppointment", () => {
 
   it("warns about blocks and the past", async () => {
     await db.insert(timeBlocks).values({
+      clinicId: CLINIC,
       type: "day_off",
       title: "Folga fictícia",
       startsAt: new Date("2026-11-10T12:00:00Z"),
       endsAt: new Date("2026-11-10T16:00:00Z"),
     });
-    const onBlock = await createAppointment(form(), actorId, NOW);
+    const onBlock = await createAppointment(CLINIC, form(), actorId, NOW);
     expect(onBlock).toEqual({
       ok: false,
       warnings: [
@@ -248,6 +274,7 @@ describe("createAppointment", () => {
       ],
     });
     const past = await createAppointment(
+      CLINIC,
       form({ date: "2026-11-02" }),
       actorId,
       NOW,
@@ -262,6 +289,7 @@ describe("createAppointment", () => {
     await created();
     // 11:10 local falls inside the 15-minute cleanup buffer of the first.
     const result = await createAppointment(
+      CLINIC,
       form({ startTime: "11:10", patientId: plainPatientId }),
       actorId,
       NOW,
@@ -277,12 +305,14 @@ describe("createAppointment", () => {
 
   it("refuses an overlap before looking at warnings", async () => {
     await db.insert(timeBlocks).values({
+      clinicId: CLINIC,
       type: "day_off",
       startsAt: new Date("2026-11-10T12:00:00Z"),
       endsAt: new Date("2026-11-10T16:00:00Z"),
     });
     await created({ acknowledgeWarnings: true });
     const result = await createAppointment(
+      CLINIC,
       form({ startTime: "10:30", patientId: plainPatientId }),
       actorId,
       NOW,
@@ -296,9 +326,14 @@ describe("createAppointment", () => {
 
   it("lets exactly one of two simultaneous creates for the same slot through", async () => {
     const results = await Promise.all([
-      createAppointment(form(), actorId, NOW),
-      createAppointment(form({ patientId: plainPatientId }), actorId, NOW),
-      createAppointment(form({ startTime: "10:30" }), actorId, NOW),
+      createAppointment(CLINIC, form(), actorId, NOW),
+      createAppointment(
+        CLINIC,
+        form({ patientId: plainPatientId }),
+        actorId,
+        NOW,
+      ),
+      createAppointment(CLINIC, form({ startTime: "10:30" }), actorId, NOW),
     ]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     for (const result of results.filter((r) => !r.ok)) {
@@ -313,6 +348,7 @@ describe("createAppointment", () => {
   it("refuses an anonymized or missing patient", async () => {
     expect(
       await createAppointment(
+        CLINIC,
         form({ patientId: anonymizedPatientId }),
         actorId,
         NOW,
@@ -322,6 +358,7 @@ describe("createAppointment", () => {
       formError: "Paciente anonimizado não pode ser agendado.",
     });
     const missing = await createAppointment(
+      CLINIC,
       form({ patientId: crypto.randomUUID() }),
       actorId,
       NOW,
@@ -336,10 +373,11 @@ describe("createAppointment", () => {
   it("refuses an inactive service or one in an inactive category", async () => {
     for (const id of [inactiveServiceId, inactiveCategoryServiceId]) {
       expect(
-        await createAppointment(form({ serviceId: id }), actorId, NOW),
+        await createAppointment(CLINIC, form({ serviceId: id }), actorId, NOW),
       ).toEqual({ ok: false, fieldErrors: { serviceId: "Serviço inativo." } });
     }
     const missing = await createAppointment(
+      CLINIC,
       form({ serviceId: crypto.randomUUID() }),
       actorId,
       NOW,
@@ -353,6 +391,7 @@ describe("createAppointment", () => {
 
   it("requires a label for a flexible service and rejects one otherwise", async () => {
     const noLabel = await createAppointment(
+      CLINIC,
       form({ serviceId: flexibleServiceId }),
       actorId,
       NOW,
@@ -362,6 +401,7 @@ describe("createAppointment", () => {
       fieldErrors: { customLabel: expect.any(String) },
     });
     const withLabel = await createAppointment(
+      CLINIC,
       form({ customLabel: LABEL }),
       actorId,
       NOW,
@@ -381,8 +421,8 @@ describe("createAppointment", () => {
 
   it("returns the same id for a repeated idempotency key", async () => {
     const values = form();
-    const first = await createAppointment(values, actorId, NOW);
-    const second = await createAppointment(values, actorId, NOW);
+    const first = await createAppointment(CLINIC, values, actorId, NOW);
+    const second = await createAppointment(CLINIC, values, actorId, NOW);
     expect(first.ok && second.ok).toBe(true);
     if (first.ok && second.ok) expect(second.id).toBe(first.id);
     expect(await appointmentCount()).toBe(1);
@@ -392,6 +432,7 @@ describe("createAppointment", () => {
   it("refuses a repeated key that carries a different request", async () => {
     const idempotencyKey = crypto.randomUUID();
     const first = await createAppointment(
+      CLINIC,
       form({ idempotencyKey }),
       actorId,
       NOW,
@@ -403,6 +444,7 @@ describe("createAppointment", () => {
       { patientId: plainPatientId },
     ]) {
       const again = await createAppointment(
+        CLINIC,
         form({ idempotencyKey, ...overrides }),
         actorId,
         NOW,
@@ -421,6 +463,7 @@ describe("updateAppointment", () => {
   it("changes the service and recomputes buffers as appointment.updated", async () => {
     const id = await created();
     const result = await updateAppointment(
+      CLINIC,
       id,
       form({ serviceId: otherServiceId }),
       actorId,
@@ -450,6 +493,7 @@ describe("updateAppointment", () => {
   it("logs a time and service change as one appointment.rescheduled", async () => {
     const id = await created();
     await updateAppointment(
+      CLINIC,
       id,
       form({ serviceId: otherServiceId, startTime: "15:00" }),
       actorId,
@@ -468,7 +512,7 @@ describe("updateAppointment", () => {
 
   it("writes nothing when nothing changed", async () => {
     const id = await created();
-    expect(await updateAppointment(id, form(), actorId, NOW)).toEqual({
+    expect(await updateAppointment(CLINIC, id, form(), actorId, NOW)).toEqual({
       ok: true,
       id,
     });
@@ -482,10 +526,17 @@ describe("updateAppointment", () => {
       .set({ isActive: false })
       .where(eq(services.id, serviceId));
     expect(
-      await updateAppointment(id, form({ startTime: "11:00" }), actorId, NOW),
+      await updateAppointment(
+        CLINIC,
+        id,
+        form({ startTime: "11:00" }),
+        actorId,
+        NOW,
+      ),
     ).toEqual({ ok: true, id });
     expect(
       await updateAppointment(
+        CLINIC,
         id,
         form({ serviceId: inactiveServiceId }),
         actorId,
@@ -497,6 +548,7 @@ describe("updateAppointment", () => {
   it("keeps the patient and ignores another patient id in the values", async () => {
     const id = await created();
     await updateAppointment(
+      CLINIC,
       id,
       form({ patientId: plainPatientId, startTime: "11:00" }),
       actorId,
@@ -510,10 +562,22 @@ describe("updateAppointment", () => {
     await created({ startTime: "14:00", patientId: plainPatientId });
     // Moving by 15 minutes overlaps only itself.
     expect(
-      await updateAppointment(id, form({ startTime: "10:15" }), actorId, NOW),
+      await updateAppointment(
+        CLINIC,
+        id,
+        form({ startTime: "10:15" }),
+        actorId,
+        NOW,
+      ),
     ).toEqual({ ok: true, id });
     expect(
-      await updateAppointment(id, form({ startTime: "13:30" }), actorId, NOW),
+      await updateAppointment(
+        CLINIC,
+        id,
+        form({ startTime: "13:30" }),
+        actorId,
+        NOW,
+      ),
     ).toEqual({
       ok: false,
       formError:
@@ -522,12 +586,20 @@ describe("updateAppointment", () => {
   });
 
   it("refuses a missing id or a non-UUID", async () => {
-    expect(await updateAppointment("x", form(), actorId, NOW)).toMatchObject({
+    expect(
+      await updateAppointment(CLINIC, "x", form(), actorId, NOW),
+    ).toMatchObject({
       ok: false,
       formError: expect.any(String),
     });
     expect(
-      await updateAppointment(crypto.randomUUID(), form(), actorId, NOW),
+      await updateAppointment(
+        CLINIC,
+        crypto.randomUUID(),
+        form(),
+        actorId,
+        NOW,
+      ),
     ).toMatchObject({ ok: false, formError: expect.any(String) });
   });
 });
@@ -541,6 +613,7 @@ describe("rescheduleAppointment", () => {
       .set({ bufferBeforeMinutes: 0, bufferAfterMinutes: 30 })
       .where(eq(services.id, serviceId));
     const result = await rescheduleAppointment(
+      CLINIC,
       id,
       {
         startsAt: new Date("2026-11-11T14:00:00Z"),
@@ -578,6 +651,7 @@ describe("rescheduleAppointment", () => {
     };
     expect(
       await rescheduleAppointment(
+        CLINIC,
         id,
         { ...move, acknowledgeWarnings: false },
         actorId,
@@ -592,6 +666,7 @@ describe("rescheduleAppointment", () => {
     );
     expect(
       await rescheduleAppointment(
+        CLINIC,
         id,
         { ...move, acknowledgeWarnings: true },
         actorId,
@@ -603,6 +678,7 @@ describe("rescheduleAppointment", () => {
   it("refuses moving a cancelled or completed appointment", async () => {
     const cancelled = await created();
     await changeAppointmentStatus(
+      CLINIC,
       cancelled,
       { to: "cancelled", reason: "other" },
       actorId,
@@ -615,6 +691,7 @@ describe("rescheduleAppointment", () => {
     expect(
       (
         await changeAppointmentStatus(
+          CLINIC,
           completed,
           { to: "completed" },
           actorId,
@@ -624,6 +701,7 @@ describe("rescheduleAppointment", () => {
     ).toBe(true);
     for (const id of [cancelled, completed]) {
       const result = await rescheduleAppointment(
+        CLINIC,
         id,
         {
           startsAt: new Date("2026-11-12T13:00:00Z"),
@@ -638,7 +716,13 @@ describe("rescheduleAppointment", () => {
         formError: "Este atendimento não pode mais ser alterado.",
       });
       expect(
-        await updateAppointment(id, form({ startTime: "15:00" }), actorId, NOW),
+        await updateAppointment(
+          CLINIC,
+          id,
+          form({ startTime: "15:00" }),
+          actorId,
+          NOW,
+        ),
       ).toEqual({
         ok: false,
         formError: "Este atendimento não pode mais ser alterado.",
@@ -651,6 +735,7 @@ describe("changeAppointmentStatus", () => {
   it("cancels with a reason code, cancelled_by clinic and cancelled_at", async () => {
     const id = await created();
     const result = await changeAppointmentStatus(
+      CLINIC,
       id,
       { to: "cancelled", reason: "patient_request" },
       actorId,
@@ -679,7 +764,13 @@ describe("changeAppointmentStatus", () => {
   it("refuses a cancellation without a valid reason", async () => {
     const id = await created();
     expect(
-      await changeAppointmentStatus(id, { to: "cancelled" }, actorId, NOW),
+      await changeAppointmentStatus(
+        CLINIC,
+        id,
+        { to: "cancelled" },
+        actorId,
+        NOW,
+      ),
     ).toMatchObject({ ok: false, fieldErrors: { reason: expect.any(String) } });
     expect((await row(id)).status).toBe("confirmed");
   });
@@ -692,7 +783,13 @@ describe("changeAppointmentStatus", () => {
       .where(eq(appointments.id, id));
     const later = new Date(NOW.getTime() + 5 * MINUTE);
     expect(
-      await changeAppointmentStatus(id, { to: "confirmed" }, actorId, later),
+      await changeAppointmentStatus(
+        CLINIC,
+        id,
+        { to: "confirmed" },
+        actorId,
+        later,
+      ),
     ).toEqual({ ok: true, id });
     expect(await row(id)).toMatchObject({
       status: "confirmed",
@@ -703,14 +800,32 @@ describe("changeAppointmentStatus", () => {
   it("refuses completed before the start and allows it after", async () => {
     const id = await created();
     expect(
-      await changeAppointmentStatus(id, { to: "completed" }, actorId, NOW),
+      await changeAppointmentStatus(
+        CLINIC,
+        id,
+        { to: "completed" },
+        actorId,
+        NOW,
+      ),
     ).toEqual({ ok: false, formError: "Só depois do horário de início." });
     const after = new Date("2026-11-10T13:00:00Z");
     expect(
-      await changeAppointmentStatus(id, { to: "completed" }, actorId, after),
+      await changeAppointmentStatus(
+        CLINIC,
+        id,
+        { to: "completed" },
+        actorId,
+        after,
+      ),
     ).toEqual({ ok: true, id });
     expect(
-      await changeAppointmentStatus(id, { to: "no_show" }, actorId, after),
+      await changeAppointmentStatus(
+        CLINIC,
+        id,
+        { to: "no_show" },
+        actorId,
+        after,
+      ),
     ).toEqual({ ok: true, id });
     expect((await row(id)).status).toBe("no_show");
   });
@@ -718,12 +833,14 @@ describe("changeAppointmentStatus", () => {
   it("treats cancelled as final", async () => {
     const id = await created();
     await changeAppointmentStatus(
+      CLINIC,
       id,
       { to: "cancelled", reason: "other" },
       actorId,
       NOW,
     );
     const result = await changeAppointmentStatus(
+      CLINIC,
       id,
       { to: "confirmed" },
       actorId,
@@ -741,6 +858,7 @@ describe("audit changes", () => {
       customLabel: LABEL,
     });
     await updateAppointment(
+      CLINIC,
       id,
       form({
         serviceId: flexibleServiceId,
@@ -751,6 +869,7 @@ describe("audit changes", () => {
       NOW,
     );
     await rescheduleAppointment(
+      CLINIC,
       id,
       {
         startsAt: new Date("2026-11-12T13:00:00Z"),
@@ -761,6 +880,7 @@ describe("audit changes", () => {
       NOW,
     );
     await changeAppointmentStatus(
+      CLINIC,
       id,
       { to: "cancelled", reason: "rescheduled" },
       actorId,
@@ -795,7 +915,7 @@ describe("getAppointment", () => {
       customLabel: LABEL,
       durationMinutes: "45",
     });
-    expect(await getAppointment(id, NOW)).toEqual({
+    expect(await getAppointment(CLINIC, id, NOW)).toEqual({
       id,
       patientId,
       patientName: PATIENT_NAME,
@@ -813,7 +933,11 @@ describe("getAppointment", () => {
       editable: true,
       allowedTransitions: ["cancelled"],
     });
-    const after = await getAppointment(id, new Date("2026-11-10T14:00:00Z"));
+    const after = await getAppointment(
+      CLINIC,
+      id,
+      new Date("2026-11-10T14:00:00Z"),
+    );
     expect(after?.allowedTransitions).toEqual([
       "cancelled",
       "completed",
@@ -822,8 +946,8 @@ describe("getAppointment", () => {
   });
 
   it("returns null for a missing id or a non-UUID", async () => {
-    expect(await getAppointment("x")).toBeNull();
-    expect(await getAppointment(crypto.randomUUID())).toBeNull();
+    expect(await getAppointment(CLINIC, "x")).toBeNull();
+    expect(await getAppointment(CLINIC, crypto.randomUUID())).toBeNull();
   });
 });
 
@@ -838,6 +962,7 @@ describe("listAppointmentsInRange", () => {
     });
     const cancelled = await created({ startTime: "16:00" });
     await changeAppointmentStatus(
+      CLINIC,
       cancelled,
       { to: "cancelled", reason: "other" },
       actorId,
@@ -849,7 +974,7 @@ describe("listAppointmentsInRange", () => {
       from: new Date("2026-11-10T03:00:00Z"),
       to: new Date("2026-11-11T03:00:00Z"),
     };
-    const events = await listAppointmentsInRange({
+    const events = await listAppointmentsInRange(CLINIC, {
       ...range,
       includeCancelled: false,
     });
@@ -876,7 +1001,7 @@ describe("listAppointmentsInRange", () => {
       },
     ]);
 
-    const all = await listAppointmentsInRange({
+    const all = await listAppointmentsInRange(CLINIC, {
       ...range,
       includeCancelled: true,
     });
@@ -890,7 +1015,7 @@ describe("listAppointmentsInRange", () => {
       .update(appointments)
       .set({ patientId: anonymizedPatientId })
       .where(eq(appointments.id, id));
-    const events = await listAppointmentsInRange({
+    const events = await listAppointmentsInRange(CLINIC, {
       from: new Date("2026-11-01T00:00:00Z"),
       to: new Date("2026-11-04T00:00:00Z"),
       includeCancelled: false,
@@ -913,7 +1038,7 @@ describe("listRequestedFrom", () => {
       .set({ status: "requested", confirmedAt: null })
       .where(sql`${appointments.id} in (${later}, ${sooner}, ${past})`);
 
-    const requested = await listRequestedFrom(NOW);
+    const requested = await listRequestedFrom(CLINIC, NOW);
     expect(requested.map((e) => e.id)).toEqual([sooner, later]);
     expect(requested[0]).toMatchObject({
       patientLabel: "Mari",
@@ -923,7 +1048,7 @@ describe("listRequestedFrom", () => {
       requiresApproval: true,
     });
     expect(requested.map((e) => e.id)).not.toContain(confirmed);
-    expect(await countRequestedFrom(NOW)).toBe(2);
+    expect(await countRequestedFrom(CLINIC, NOW)).toBe(2);
   });
 });
 
@@ -942,7 +1067,7 @@ describe("listPatientAppointments", () => {
     });
     await created({ patientId: plainPatientId, date: "2026-11-25" });
 
-    const result = await listPatientAppointments(patientId, NOW);
+    const result = await listPatientAppointments(CLINIC, patientId, NOW);
     expect(result.upcoming.map((i) => i.id)).toEqual(upcoming.slice(0, 10));
     expect(result.past.map((i) => i.id)).toEqual([past]);
     expect(result.upcoming[0]).toEqual({
@@ -956,7 +1081,7 @@ describe("listPatientAppointments", () => {
   });
 
   it("returns empty lists for a non-UUID", async () => {
-    expect(await listPatientAppointments("x")).toEqual({
+    expect(await listPatientAppointments(CLINIC, "x")).toEqual({
       upcoming: [],
       past: [],
     });
@@ -977,7 +1102,7 @@ describe("anonymized patients", () => {
       })
       .where(eq(patients.id, patientId));
 
-    const before = await getAppointment(id, NOW);
+    const before = await getAppointment(CLINIC, id, NOW);
     expect(before?.editable).toBe(false);
     expect(before?.allowedTransitions).toEqual([
       "cancelled",
@@ -985,13 +1110,20 @@ describe("anonymized patients", () => {
       "no_show",
     ]);
     expect(
-      await changeAppointmentStatus(id, { to: "completed" }, actorId, NOW),
+      await changeAppointmentStatus(
+        CLINIC,
+        id,
+        { to: "completed" },
+        actorId,
+        NOW,
+      ),
     ).toEqual({ ok: true, id });
     expect((await row(id)).status).toBe("completed");
 
     // Scheduling changes stay refused.
     expect(
       await rescheduleAppointment(
+        CLINIC,
         id,
         {
           startsAt: new Date("2026-11-12T13:00:00Z"),
@@ -1021,6 +1153,7 @@ describe("overlap race backstop", () => {
     const endsAt = new Date("2026-11-10T14:00:00Z");
     const holder = db.transaction(async (tx) => {
       await tx.insert(appointments).values({
+        clinicId: CLINIC,
         patientId: plainPatientId,
         serviceId,
         serviceName: "Limpeza fictícia",
@@ -1036,7 +1169,7 @@ describe("overlap race backstop", () => {
     });
     await insertedSignal;
 
-    const attempt = createAppointment(form(), actorId, NOW);
+    const attempt = createAppointment(CLINIC, form(), actorId, NOW);
     // Wait until the attempt is blocked on the other writer's row.
     for (let i = 0; i < 100; i++) {
       const result = await db.execute<{ waiting: number }>(

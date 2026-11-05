@@ -21,7 +21,13 @@ async function clearRateLimits() {
 
 // Signs in with a fresh account, sets up its 2FA and lands in the panel.
 // Used by suites that need a logged-in admin without relying on other specs.
-export async function signInWithFreshTwoFactor(page: Page, account: Account) {
+// `landing` is where the panel opens: root without a chosen clinic goes to
+// the clinic list.
+export async function signInWithFreshTwoFactor(
+  page: Page,
+  account: Account,
+  landing: RegExp = /\/admin$/,
+) {
   await clearRateLimits();
   await page.goto("/admin/entrar");
   await page.getByLabel("E-mail").fill(account.email);
@@ -37,5 +43,5 @@ export async function signInWithFreshTwoFactor(page: Page, account: Account) {
   const code = new TOTP({ secret: Secret.fromBase32(secret) }).generate();
   await page.getByLabel("Código de 6 números").fill(code);
   await page.getByRole("button", { name: "Ativar e entrar no painel" }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(landing);
 }

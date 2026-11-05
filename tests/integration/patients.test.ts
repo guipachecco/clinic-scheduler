@@ -24,6 +24,8 @@ import {
   updatePatient,
 } from "@/modules/patients/patients";
 
+import { CLINIC } from "../helpers/clinic";
+
 // Every record here is fictitious and exists only during the test.
 
 let actorId: string;
@@ -48,7 +50,7 @@ function form(overrides: Record<string, string> = {}): PatientFormValues {
 }
 
 async function created(overrides: Record<string, string> = {}) {
-  const result = await createPatient(form(overrides), actorId);
+  const result = await createPatient(CLINIC, form(overrides), actorId);
   if (!result.ok) throw new Error("expected create to succeed");
   return result.id;
 }
@@ -60,6 +62,7 @@ async function addAppointment(
 ) {
   const endsAt = new Date(startsAt.getTime() + 60 * 60_000);
   await db.insert(appointments).values({
+    clinicId: CLINIC,
     patientId,
     serviceId,
     serviceName: "Serviço fictício",
@@ -87,16 +90,22 @@ beforeEach(async () => {
       name: "Admin Fictício",
       email: "admin@example.com",
       role: "admin",
+      clinicId: CLINIC,
     })
     .returning();
   actorId = user!.id;
   const [category] = await db
     .insert(serviceCategories)
-    .values({ name: "Categoria fictícia", slug: "categoria-ficticia" })
+    .values({
+      clinicId: CLINIC,
+      name: "Categoria fictícia",
+      slug: "categoria-ficticia",
+    })
     .returning();
   const [service] = await db
     .insert(services)
     .values({
+      clinicId: CLINIC,
       categoryId: category!.id,
       name: "Serviço fictício",
       slug: "servico-ficticio",
@@ -113,7 +122,7 @@ afterAll(async () => {
 describe("createPatient / getPatient", () => {
   it("round-trips every field", async () => {
     const id = await created();
-    const record = await getPatient(id);
+    const record = await getPatient(CLINIC, id);
     expect(record).toMatchObject({
       id,
       name: "Maria Fictícia",
@@ -132,15 +141,17 @@ describe("createPatient / getPatient", () => {
   });
 
   it("returns null for a missing id and a non-UUID id", async () => {
-    expect(await getPatient("00000000-0000-4000-8000-000000000000")).toBeNull();
-    expect(await getPatient("not-a-uuid")).toBeNull();
+    expect(
+      await getPatient(CLINIC, "00000000-0000-4000-8000-000000000000"),
+    ).toBeNull();
+    expect(await getPatient(CLINIC, "not-a-uuid")).toBeNull();
   });
 
   it("returns an anonymized patient with anonymizedAt set", async () => {
     const id = await created();
-    expect((await getPatient(id))?.anonymizedAt).toBeNull();
-    await anonymizePatient(id, actorId);
-    const record = await getPatient(id);
+    expect((await getPatient(CLINIC, id))?.anonymizedAt).toBeNull();
+    await anonymizePatient(CLINIC, id, actorId);
+    const record = await getPatient(CLINIC, id);
     expect(record?.name).toBe(ANONYMIZED_NAME);
     expect(record?.anonymizedAt).toBeInstanceOf(Date);
     expect(record?.cpf).toBeNull();
@@ -176,6 +187,7 @@ describe("createPatient / getPatient", () => {
   it("reports a duplicate CPF with the existing patient", async () => {
     const existing = await created();
     const result = await createPatient(
+      CLINIC,
       form({ name: "Outra Pessoa", phone: "(48) 98888-0000" }),
       actorId,
     );
@@ -188,7 +200,7 @@ describe("createPatient / getPatient", () => {
 
   it("reports a duplicate phone and name with the existing patient", async () => {
     const existing = await created();
-    const result = await createPatient(form({ cpf: "" }), actorId);
+    const result = await createPatient(CLINIC, form({ cpf: "" }), actorId);
     expect(result).toEqual({
       ok: false,
       fieldErrors: { phone: expect.any(String) },
@@ -199,10 +211,12 @@ describe("createPatient / getPatient", () => {
   it("lets exactly one of two concurrent creates with the same CPF win", async () => {
     const results = await Promise.all([
       createPatient(
+        CLINIC,
         form({ name: "Primeira Pessoa", phone: "(48) 97777-0001" }),
         actorId,
       ),
       createPatient(
+        CLINIC,
         form({ name: "Segunda Pessoa", phone: "(48) 97777-0002" }),
         actorId,
       ),
@@ -224,6 +238,7 @@ describe("updatePatient", () => {
   it("audits exactly the changed field names", async () => {
     const id = await created();
     const result = await updatePatient(
+      CLINIC,
       id,
       form({ nickname: "Mara", notes: "Outra observação." }),
       actorId,
@@ -247,16 +262,18 @@ describe("updatePatient", () => {
       "nickname",
       "notes",
     ]);
-    expect((await getPatient(id))?.nickname).toBe("Mara");
+    expect((await getPatient(CLINIC, id))?.nickname).toBe("Mara");
   });
 
   it("keeps the name search in step with a rename", async () => {
     const id = await created();
-    await updatePatient(id, form({ name: "Joana Nova" }), actorId);
+    await updatePatient(CLINIC, id, form({ name: "Joana Nova" }), actorId);
     expect(
-      (await searchPatients({ term: "joana" })).items.map((i) => i.id),
+      (await searchPatients(CLINIC, { term: "joana" })).items.map((i) => i.id),
     ).toEqual([id]);
-    expect((await searchPatients({ term: "maria" })).items).toHaveLength(0);
+    expect(
+      (await searchPatients(CLINIC, { term: "maria" })).items,
+    ).toHaveLength(0);
   });
 
   it("reports a CPF that belongs to another patient", async () => {
@@ -267,6 +284,7 @@ describe("updatePatient", () => {
       phone: "(48) 96666-0000",
     });
     const result = await updatePatient(
+      CLINIC,
       id,
       form({ name: "Terceira Pessoa", phone: "(48) 96666-0000" }),
       actorId,
@@ -280,15 +298,16 @@ describe("updatePatient", () => {
 
   it("refuses a missing or anonymized patient without writing", async () => {
     const missing = await updatePatient(
+      CLINIC,
       "00000000-0000-4000-8000-000000000000",
       form(),
       actorId,
     );
     expect(missing).toEqual({ ok: false, fieldErrors: {} });
     const id = await created();
-    await anonymizePatient(id, actorId);
+    await anonymizePatient(CLINIC, id, actorId);
     expect(
-      await updatePatient(id, form({ name: "Outro Nome" }), actorId),
+      await updatePatient(CLINIC, id, form({ name: "Outro Nome" }), actorId),
     ).toEqual({
       ok: false,
       fieldErrors: {},
@@ -311,7 +330,7 @@ describe("searchPatients", () => {
       cpf: "",
       phone: "(48) 98888-0000",
     });
-    const { items } = await searchPatients({ term: "MARCIA" });
+    const { items } = await searchPatients(CLINIC, { term: "MARCIA" });
     expect(items.map((i) => i.id)).toEqual([id]);
     expect(items[0]).toEqual({
       id,
@@ -326,38 +345,46 @@ describe("searchPatients", () => {
   it("finds by nickname, ignoring accents", async () => {
     const id = await created({ nickname: "Zezé" });
     expect(
-      (await searchPatients({ term: "zeze" })).items.map((i) => i.id),
+      (await searchPatients(CLINIC, { term: "zeze" })).items.map((i) => i.id),
     ).toEqual([id]);
   });
 
   it("finds a nickname with repeated inner spaces", async () => {
     const id = await created({ nickname: "Zé  Maria" });
     expect(
-      (await searchPatients({ term: "ze maria" })).items.map((i) => i.id),
+      (await searchPatients(CLINIC, { term: "ze maria" })).items.map(
+        (i) => i.id,
+      ),
     ).toEqual([id]);
   });
 
   it("finds by phone when the term starts with +", async () => {
     const id = await created();
     expect(
-      (await searchPatients({ term: "+55 48 9" })).items.map((i) => i.id),
+      (await searchPatients(CLINIC, { term: "+55 48 9" })).items.map(
+        (i) => i.id,
+      ),
     ).toEqual([id]);
   });
 
   it("finds by the last 4 phone digits and by a CPF prefix", async () => {
     const id = await created();
     expect(
-      (await searchPatients({ term: "1234" })).items.map((i) => i.id),
+      (await searchPatients(CLINIC, { term: "1234" })).items.map((i) => i.id),
     ).toEqual([id]);
     expect(
-      (await searchPatients({ term: "529.982" })).items.map((i) => i.id),
+      (await searchPatients(CLINIC, { term: "529.982" })).items.map(
+        (i) => i.id,
+      ),
     ).toEqual([id]);
   });
 
   it("treats % and _ as plain characters", async () => {
     await created();
-    expect((await searchPatients({ term: "%" })).items).toHaveLength(0);
-    expect((await searchPatients({ term: "m_ria" })).items).toHaveLength(0);
+    expect((await searchPatients(CLINIC, { term: "%" })).items).toHaveLength(0);
+    expect(
+      (await searchPatients(CLINIC, { term: "m_ria" })).items,
+    ).toHaveLength(0);
   });
 
   it("lists anonymized patients, sorted among the other names", async () => {
@@ -377,8 +404,8 @@ describe("searchPatients", () => {
       cpf: "",
       phone: "(48) 98888-0003",
     });
-    await anonymizePatient(anon, actorId);
-    const { items } = await searchPatients({
+    await anonymizePatient(CLINIC, anon, actorId);
+    const { items } = await searchPatients(CLINIC, {
       term: "",
       includeAnonymized: true,
     });
@@ -394,34 +421,39 @@ describe("searchPatients", () => {
 
   it("finds anonymized patients by the name search only", async () => {
     const id = await created();
-    await anonymizePatient(id, actorId);
+    await anonymizePatient(CLINIC, id, actorId);
     expect(
       (
-        await searchPatients({ term: "anonimizado", includeAnonymized: true })
+        await searchPatients(CLINIC, {
+          term: "anonimizado",
+          includeAnonymized: true,
+        })
       ).items.map((i) => i.id),
     ).toEqual([id]);
     expect(
       (
-        await searchPatients({
+        await searchPatients(CLINIC, {
           term: "Paciente Anonimizado",
           includeAnonymized: true,
         })
       ).items,
     ).toHaveLength(1);
-    expect((await searchPatients({ term: "529982" })).items).toHaveLength(0);
+    expect(
+      (await searchPatients(CLINIC, { term: "529982" })).items,
+    ).toHaveLength(0);
   });
 
   it("hides anonymized patients unless asked for", async () => {
     const id = await created();
-    await anonymizePatient(id, actorId);
-    expect((await searchPatients({ term: "" })).items).toHaveLength(0);
-    expect((await searchPatients({ term: "anonimizado" })).items).toHaveLength(
-      0,
-    );
+    await anonymizePatient(CLINIC, id, actorId);
+    expect((await searchPatients(CLINIC, { term: "" })).items).toHaveLength(0);
     expect(
-      (await searchPatients({ term: "", includeAnonymized: true })).items.map(
-        (i) => i.id,
-      ),
+      (await searchPatients(CLINIC, { term: "anonimizado" })).items,
+    ).toHaveLength(0);
+    expect(
+      (
+        await searchPatients(CLINIC, { term: "", includeAnonymized: true })
+      ).items.map((i) => i.id),
     ).toEqual([id]);
   });
 
@@ -431,6 +463,7 @@ describe("searchPatients", () => {
       Array.from({ length: 60 }, (_, i) => {
         const n = String(i).padStart(2, "0");
         return {
+          clinicId: CLINIC,
           name: `Paciente ${n}`,
           nameNormalized: `paciente ${n}`,
           phone: `+55489000000${n}`,
@@ -439,6 +472,7 @@ describe("searchPatients", () => {
     );
     await db.insert(patients).values(
       Array.from({ length: 8 }, () => ({
+        clinicId: CLINIC,
         name: ANONYMIZED_NAME,
         nameNormalized: null,
         phone: null,
@@ -452,7 +486,7 @@ describe("searchPatients", () => {
     let after: PatientCursor | undefined;
     let pages = 0;
     do {
-      const page = await searchPatients({
+      const page = await searchPatients(CLINIC, {
         term: "",
         after,
         includeAnonymized: true,
@@ -471,6 +505,7 @@ describe("searchPatients", () => {
       Array.from({ length: 49 }, (_, i) => {
         const n = String(i).padStart(2, "0");
         return {
+          clinicId: CLINIC,
           name: `Aaa ${n}`,
           nameNormalized: `aaa ${n}`,
           phone: `+55489100000${n}`,
@@ -479,16 +514,20 @@ describe("searchPatients", () => {
     );
     await db.insert(patients).values(
       Array.from({ length: 5 }, () => ({
+        clinicId: CLINIC,
         name: ANONYMIZED_NAME,
         nameNormalized: null,
         phone: null,
         anonymizedAt: new Date(),
       })),
     );
-    const first = await searchPatients({ term: "", includeAnonymized: true });
+    const first = await searchPatients(CLINIC, {
+      term: "",
+      includeAnonymized: true,
+    });
     expect(first.items).toHaveLength(50);
     expect(first.next?.nameNormalized).toBe("paciente anonimizado");
-    const second = await searchPatients({
+    const second = await searchPatients(CLINIC, {
       term: "",
       after: first.next,
       includeAnonymized: true,
@@ -503,16 +542,17 @@ describe("searchPatients", () => {
     const values = Array.from({ length: 55 }, (_, i) => {
       const n = String(i).padStart(2, "0");
       return {
+        clinicId: CLINIC,
         name: `Paciente ${n}`,
         nameNormalized: `paciente ${n}`,
         phone: `+55489000000${n}`,
       };
     });
     await db.insert(patients).values(values);
-    const first = await searchPatients({ term: "paciente" });
+    const first = await searchPatients(CLINIC, { term: "paciente" });
     expect(first.items).toHaveLength(50);
     expect(first.next).toBeDefined();
-    const second = await searchPatients({
+    const second = await searchPatients(CLINIC, {
       term: "paciente",
       after: first.next,
     });
@@ -526,7 +566,7 @@ describe("searchPatients", () => {
 describe("anonymizePatient", () => {
   it("clears every personal field and sets the label", async () => {
     const id = await created();
-    expect(await anonymizePatient(id, actorId)).toEqual({ ok: true });
+    expect(await anonymizePatient(CLINIC, id, actorId)).toEqual({ ok: true });
     const [row] = await db.select().from(patients).where(eq(patients.id, id));
     expect(row).toMatchObject({
       name: "Paciente anonimizado",
@@ -564,7 +604,7 @@ describe("anonymizePatient", () => {
     const future = new Date(Date.now() + 7 * 24 * 60 * 60_000);
     const a = await created();
     await addAppointment(a, future, "confirmed");
-    expect(await anonymizePatient(a, actorId)).toEqual({
+    expect(await anonymizePatient(CLINIC, a, actorId)).toEqual({
       ok: false,
       reason: "has_future_appointments",
     });
@@ -578,11 +618,11 @@ describe("anonymizePatient", () => {
       new Date(future.getTime() + 3 * 60 * 60_000),
       "requested",
     );
-    expect(await anonymizePatient(b, actorId)).toEqual({
+    expect(await anonymizePatient(CLINIC, b, actorId)).toEqual({
       ok: false,
       reason: "has_future_appointments",
     });
-    expect((await getPatient(a))?.name).toBe("Maria Fictícia");
+    expect((await getPatient(CLINIC, a))?.name).toBe("Maria Fictícia");
   });
 
   it("is allowed with a past or cancelled appointment", async () => {
@@ -591,12 +631,16 @@ describe("anonymizePatient", () => {
     const a = await created();
     await addAppointment(a, past, "completed");
     await addAppointment(a, future, "cancelled");
-    expect(await anonymizePatient(a, actorId)).toEqual({ ok: true });
+    expect(await anonymizePatient(CLINIC, a, actorId)).toEqual({ ok: true });
   });
 
   it("returns not_found for a missing patient", async () => {
     expect(
-      await anonymizePatient("00000000-0000-4000-8000-000000000000", actorId),
+      await anonymizePatient(
+        CLINIC,
+        "00000000-0000-4000-8000-000000000000",
+        actorId,
+      ),
     ).toEqual({ ok: false, reason: "not_found" });
   });
 });

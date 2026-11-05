@@ -12,7 +12,7 @@ Sistema web de agendamentos para uma clínica de biomedicina: site institucional
 | 4     | Qualidade: testes dos fluxos, segurança e responsividade     | A fazer                                                                  |
 | 5     | Publicação: produção, domínio, backups e monitoramento       | A fazer                                                                  |
 
-O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), expediente semanal e bloqueios de agenda no painel (horários de atendimento por dia da semana, folgas, férias e feriados, com a lista de feriados nacionais pronta para adicionar), agenda no painel (visões de dia, semana, mês e lista no fuso da clínica, novo agendamento com busca de paciente, remarcação arrastando no calendário ou pela ficha do atendimento, avisos de fora do expediente, sobre bloqueio ou no passado que pedem confirmação, recusa de horários sobrepostos, confirmação, conclusão, falta e cancelamento com motivo, e o histórico de atendimentos na ficha do paciente), identidade visual da clínica aplicada (cores, logo e fontes Archivo e Figtree), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
+O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), expediente semanal e bloqueios de agenda no painel (horários de atendimento por dia da semana, folgas, férias e feriados, com a lista de feriados nacionais pronta para adicionar), agenda no painel (visões de dia, semana, mês e lista no fuso da clínica, novo agendamento com busca de paciente, remarcação arrastando no calendário ou pela ficha do atendimento, avisos de fora do expediente, sobre bloqueio ou no passado que pedem confirmação, recusa de horários sobrepostos, confirmação, conclusão, falta e cancelamento com motivo, e o histórico de atendimentos na ficha do paciente), financeiro no painel (orçamento, aprovação à vista, parcelada ou por sessão, agendamento do pacote de uma vez, baixa e estorno de pagamentos, despesas, caixa e valores a receber, descrito em [docs/financeiro.md](docs/financeiro.md)), várias clínicas no mesmo sistema (cada uma só enxerga os próprios dados; o root cria clínicas e escolhe qual abrir no painel, descrito em [docs/multiclinica.md](docs/multiclinica.md)), identidade visual da clínica aplicada (cores, logo e fontes Archivo e Figtree), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
 
 ## Tecnologias
 
@@ -51,7 +51,8 @@ Suba o banco, crie as tabelas e a conta de administração:
 ```bash
 docker compose up -d        # PostgreSQL local em localhost:5432
 pnpm db:migrate             # aplica as migrações da pasta drizzle/
-pnpm admin create           # pede e-mail, nome e senha (mínimo de 12 caracteres)
+pnpm admin create-root      # sua conta root, que vê todas as clínicas
+pnpm admin create           # conta da dona: pede o endereço da clínica (ex.: grais), e-mail, nome e senha
 ```
 
 O `pnpm admin` precisa de um terminal interativo (o do VS Code serve), porque a senha é digitada sem aparecer na tela.
@@ -98,7 +99,8 @@ Trocar o `BETTER_AUTH_SECRET` encerra todas as sessões e invalida o 2FA já con
 | `pnpm db:migrate`                   | Aplica as migrações pendentes                                              |
 | `pnpm db:generate`                  | Gera uma migração a partir de mudanças em `src/db/schema`                  |
 | `pnpm db:studio`                    | Abre o Drizzle Studio para consultar o banco local                         |
-| `pnpm admin create`                 | Cria uma conta de administração                                            |
+| `pnpm admin create`                 | Cria a conta da dona de uma clínica (pede o endereço da clínica)           |
+| `pnpm admin create-root`            | Cria uma conta root, que escolhe a clínica em `/admin/clinicas`            |
 | `pnpm admin reset-password <email>` | Define uma nova senha e encerra as sessões da conta                        |
 | `pnpm admin reset-2fa <email>`      | Remove o 2FA (celular perdido); o próximo login pede uma nova configuração |
 
@@ -176,3 +178,5 @@ A publicação é a Etapa 5. O plano aprovado é Vercel Pro (funções em São P
 - [Planejamento da Etapa 1](docs/planejamento-etapa-1.md): requisitos, stack, arquitetura, modelo de dados, segurança, LGPD e riscos.
 - [Decisões técnicas](docs/decisoes-tecnicas.md): escolhas feitas na implementação e seus motivos.
 - [Identidade visual](docs/identidade-visual.md): cores, fontes, logos e como usá-los no sistema.
+- [Financeiro](docs/financeiro.md): orçamentos, vendas, parcelas, pagamentos, despesas e caixa.
+- [Várias clínicas](docs/multiclinica.md): como os dados de cada clínica ficam separados e o papel do root.

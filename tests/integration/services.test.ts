@@ -19,6 +19,8 @@ import {
   updateService,
 } from "@/modules/services/services";
 
+import { CLINIC } from "../helpers/clinic";
+
 let actorId: string;
 let categoryId: string;
 
@@ -51,7 +53,7 @@ function catForm(overrides: Record<string, unknown> = {}): CategoryFormValues {
 }
 
 async function createdService(overrides: Record<string, unknown> = {}) {
-  const r = await createService(form(overrides), actorId);
+  const r = await createService(CLINIC, form(overrides), actorId);
   if (!r.ok) throw new Error("expected create to succeed");
   return r.id;
 }
@@ -62,10 +64,15 @@ beforeEach(async () => {
   );
   const [user] = await db
     .insert(users)
-    .values({ name: "Admin", email: "admin@example.com", role: "admin" })
+    .values({
+      name: "Admin",
+      email: "admin@example.com",
+      role: "admin",
+      clinicId: CLINIC,
+    })
     .returning();
   actorId = user!.id;
-  const r = await createCategory(catForm(), actorId);
+  const r = await createCategory(CLINIC, catForm(), actorId);
   if (!r.ok) throw new Error("category");
   categoryId = r.id;
   await db.delete(auditLogs);
@@ -78,7 +85,7 @@ afterAll(async () => {
 describe("createService / getService", () => {
   it("round-trips every field", async () => {
     const id = await createdService();
-    expect(await getService(id)).toMatchObject({
+    expect(await getService(CLINIC, id)).toMatchObject({
       id,
       categoryId,
       name: "Limpeza de Pele",
@@ -99,8 +106,10 @@ describe("createService / getService", () => {
   });
 
   it("returns null for a non-UUID or missing id", async () => {
-    expect(await getService("nope")).toBeNull();
-    expect(await getService("00000000-0000-4000-8000-000000000000")).toBeNull();
+    expect(await getService(CLINIC, "nope")).toBeNull();
+    expect(
+      await getService(CLINIC, "00000000-0000-4000-8000-000000000000"),
+    ).toBeNull();
   });
 
   it("writes an audit row without values", async () => {
@@ -120,7 +129,11 @@ describe("createService / getService", () => {
 
   it("rejects a duplicate name with a name error", async () => {
     await createdService();
-    const r = await createService(form({ name: "LIMPEZA de pele" }), actorId);
+    const r = await createService(
+      CLINIC,
+      form({ name: "LIMPEZA de pele" }),
+      actorId,
+    );
     expect(r).toEqual({
       ok: false,
       fieldErrors: { name: "Já existe um serviço com este nome." },
@@ -129,6 +142,7 @@ describe("createService / getService", () => {
 
   it("reports a missing category", async () => {
     const r = await createService(
+      CLINIC,
       form({ categoryId: "00000000-0000-4000-8000-000000000000" }),
       actorId,
     );
@@ -142,12 +156,13 @@ describe("updateService", () => {
     const id = await createdService();
     await db.delete(auditLogs);
     const r = await updateService(
+      CLINIC,
       id,
       form({ name: "Limpeza Profunda", durationMinutes: "80" }),
       actorId,
     );
     expect(r).toEqual({ ok: true, id });
-    const rec = await getService(id);
+    const rec = await getService(CLINIC, id);
     expect(rec!.slug).toBe("limpeza-de-pele");
     expect(rec!.name).toBe("Limpeza Profunda");
     const [row] = await db.select().from(auditLogs);
@@ -166,7 +181,10 @@ describe("updateService", () => {
   it("writes nothing when nothing changed", async () => {
     const id = await createdService();
     await db.delete(auditLogs);
-    expect(await updateService(id, form(), actorId)).toEqual({ ok: true, id });
+    expect(await updateService(CLINIC, id, form(), actorId)).toEqual({
+      ok: true,
+      id,
+    });
     expect(await db.select().from(auditLogs)).toHaveLength(0);
   });
 
@@ -174,6 +192,7 @@ describe("updateService", () => {
     await createdService();
     const id = await createdService({ name: "Peeling" });
     const r = await updateService(
+      CLINIC,
       id,
       form({ name: "limpeza de pele" }),
       actorId,
@@ -185,7 +204,7 @@ describe("updateService", () => {
   });
 
   it("returns an empty failure for a missing id", async () => {
-    expect(await updateService("nope", form(), actorId)).toEqual({
+    expect(await updateService(CLINIC, "nope", form(), actorId)).toEqual({
       ok: false,
       fieldErrors: {},
     });
@@ -195,6 +214,7 @@ describe("updateService", () => {
     const [row] = await db
       .insert(services)
       .values({
+        clinicId: CLINIC,
         categoryId,
         name: "Avaliação / encaixe",
         slug: "avaliacao-encaixe",
@@ -203,6 +223,7 @@ describe("updateService", () => {
       })
       .returning();
     const r = await updateService(
+      CLINIC,
       row!.id,
       form({ name: "Avaliação / encaixe" }),
       actorId,
@@ -219,6 +240,7 @@ describe("updateService", () => {
 describe("listCatalog", () => {
   it("orders categories and services and includes inactive ones", async () => {
     const b = await createCategory(
+      CLINIC,
       catForm({ name: "Corporal", sortOrder: "0", isActive: false }),
       actorId,
     );
@@ -228,7 +250,7 @@ describe("listCatalog", () => {
     await createdService({ name: "Beta", sortOrder: "1", isActive: false });
     await createdService({ name: "Massagem", categoryId: b.id });
 
-    const catalog = await listCatalog();
+    const catalog = await listCatalog(CLINIC);
     expect(catalog.map((c) => c.name)).toEqual(["Corporal", "Facial"]);
     expect(catalog[0]!.isActive).toBe(false);
     expect(catalog[0]!.services.map((s) => s.name)).toEqual(["Massagem"]);
@@ -245,13 +267,14 @@ describe("listActiveServices", () => {
     await createdService({ name: "Ativo" });
     await createdService({ name: "Inativo", isActive: false });
     const c = await createCategory(
+      CLINIC,
       catForm({ name: "Off", isActive: false }),
       actorId,
     );
     if (!c.ok) throw new Error("cat");
     await createdService({ name: "Em categoria off", categoryId: c.id });
 
-    const list = await listActiveServices();
+    const list = await listActiveServices(CLINIC);
     expect(list).toEqual([
       {
         id: expect.any(String),
@@ -268,7 +291,11 @@ describe("listActiveServices", () => {
 
 describe("categories", () => {
   it("creates with an audit row", async () => {
-    const r = await createCategory(catForm({ name: "Capilar" }), actorId);
+    const r = await createCategory(
+      CLINIC,
+      catForm({ name: "Capilar" }),
+      actorId,
+    );
     if (!r.ok) throw new Error("cat");
     const [row] = await db
       .select()
@@ -293,9 +320,14 @@ describe("categories", () => {
   });
 
   it("renames keeping the slug, deactivates, and audits the fields", async () => {
-    const r = await createCategory(catForm({ name: "Capilar" }), actorId);
+    const r = await createCategory(
+      CLINIC,
+      catForm({ name: "Capilar" }),
+      actorId,
+    );
     if (!r.ok) throw new Error("cat");
     const u = await updateCategory(
+      CLINIC,
       r.id,
       catForm({ name: "Cabelo", isActive: false }),
       actorId,
@@ -328,14 +360,20 @@ describe("categories", () => {
 
   it("rejects duplicate names on create and rename", async () => {
     const msg = { name: "Já existe uma categoria com este nome." };
-    expect(await createCategory(catForm({ name: "FACIAL" }), actorId)).toEqual({
+    expect(
+      await createCategory(CLINIC, catForm({ name: "FACIAL" }), actorId),
+    ).toEqual({
       ok: false,
       fieldErrors: msg,
     });
-    const r = await createCategory(catForm({ name: "Capilar" }), actorId);
+    const r = await createCategory(
+      CLINIC,
+      catForm({ name: "Capilar" }),
+      actorId,
+    );
     if (!r.ok) throw new Error("cat");
     expect(
-      await updateCategory(r.id, catForm({ name: "facial" }), actorId),
+      await updateCategory(CLINIC, r.id, catForm({ name: "facial" }), actorId),
     ).toEqual({ ok: false, fieldErrors: msg });
   });
 });

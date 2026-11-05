@@ -50,6 +50,27 @@
       "when": 1793717622944,
       "tag": "0006_appointment_label_and_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793836896125,
+      "tag": "0007_multi_clinic",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793836897820,
+      "tag": "0008_drop_clinic_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793838035766,
+      "tag": "0009_finance",
+      "breakpoints": true
     }
   ]
 }

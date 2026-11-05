@@ -10,8 +10,8 @@ import { BusinessHoursForm } from "./business-hours-form";
 export const metadata: Metadata = { title: "Expediente" };
 
 export default async function BusinessHoursPage() {
-  await requireAdmin();
-  const days = await getBusinessHours();
+  const { clinicId } = await requireAdmin();
+  const days = await getBusinessHours(clinicId);
 
   return (
     <div className="grid max-w-3xl gap-6">

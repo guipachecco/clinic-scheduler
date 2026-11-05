@@ -3,6 +3,8 @@ import { afterAll, describe, expect, it } from "vitest";
 import { db, pool } from "@/db/client";
 import { patients } from "@/db/schema";
 
+import { CLINIC } from "../helpers/clinic";
+
 afterAll(async () => {
   await pool.end();
 });
@@ -21,6 +23,7 @@ describe("patient registry rules", () => {
     expect(
       await failure(
         db.insert(patients).values({
+          clinicId: CLINIC,
           name: "Paciente Fictício",
           nameNormalized: "paciente ficticio cpf",
           phone: "+5500000000101",
@@ -32,6 +35,7 @@ describe("patient registry rules", () => {
 
   it("rejects two patients with the same CPF", async () => {
     await db.insert(patients).values({
+      clinicId: CLINIC,
       name: "Paciente Um",
       nameNormalized: "paciente um",
       phone: "+5500000000102",
@@ -40,6 +44,7 @@ describe("patient registry rules", () => {
     expect(
       await failure(
         db.insert(patients).values({
+          clinicId: CLINIC,
           name: "Paciente Dois",
           nameNormalized: "paciente dois",
           phone: "+5500000000103",
@@ -53,6 +58,7 @@ describe("patient registry rules", () => {
     expect(
       await failure(
         db.insert(patients).values({
+          clinicId: CLINIC,
           name: "Paciente Fictício",
           nameNormalized: "paciente ficticio ref",
           phone: "+5500000000104",
@@ -67,6 +73,7 @@ describe("patient registry rules", () => {
     expect(
       await failure(
         db.insert(patients).values({
+          clinicId: CLINIC,
           name: "Paciente anonimizado",
           anonymizedAt: new Date(),
           birthDate: "1990-01-31",
@@ -79,6 +86,7 @@ describe("patient registry rules", () => {
     const [patient] = await db
       .insert(patients)
       .values({
+        clinicId: CLINIC,
         name: "Paciente Simples",
         nameNormalized: "paciente simples",
         phone: "+5500000000105",

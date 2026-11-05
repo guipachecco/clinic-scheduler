@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   check,
   customType,
   date,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -13,6 +15,7 @@ import {
   text,
   time,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -98,6 +101,9 @@ export const media = pgTable(
   "media",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references((): AnyPgColumn => clinics.id, { onDelete: "restrict" }),
     kind: mediaKind("kind").notNull(),
     mimeType: text("mime_type").notNull(),
     data: bytea("data").notNull(),
@@ -108,6 +114,7 @@ export const media = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
+    index("media_clinic_id_idx").on(t.clinicId),
     check(
       "media_mime_type_check",
       sql`${t.mimeType} in ('image/jpeg', 'image/png', 'image/webp')`,
@@ -124,13 +131,21 @@ export type ClinicTheme = {
   primaryColor?: string;
 };
 
-// Single row (id = 1) with the site content and the booking rules. Content
-// fields stay empty until the clinic fills them in; nothing is pre-filled.
-export const clinicSettings = pgTable(
-  "clinic_settings",
+// The clinic that existed before multi-clinic support (migration 0007).
+export const GRAIS_CLINIC_ID = "00000000-0000-4000-8000-000000000100";
+
+// One row per clinic: identity, site content and booking rules. Every other
+// clinic-owned table carries clinic_id. Content fields stay empty until the
+// clinic fills them in; nothing is pre-filled.
+export const clinics = pgTable(
+  "clinics",
   {
-    id: smallint("id").primaryKey().default(1),
-    clinicName: text("clinic_name"),
+    id: uuid("id").primaryKey().defaultRandom(),
+    // Public path of the clinic (markhora.com.br/<slug>). It should not change
+    // once the clinic is live, because printed QR codes point to it.
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    isActive: boolean("is_active").notNull().default(true),
     professionalName: text("professional_name"),
     professionalRegistration: text("professional_registration"),
     headline: text("headline"),
@@ -139,7 +154,7 @@ export const clinicSettings = pgTable(
     contactEmail: text("contact_email"),
     address: text("address"),
     mapsUrl: text("maps_url"),
-    logoMediaId: uuid("logo_media_id").references(() => media.id, {
+    logoMediaId: uuid("logo_media_id").references((): AnyPgColumn => media.id, {
       onDelete: "set null",
     }),
     theme: jsonb("theme").$type<ClinicTheme>().notNull().default({}),
@@ -156,28 +171,27 @@ export const clinicSettings = pgTable(
     onlineBookingEnabled: boolean("online_booking_enabled")
       .notNull()
       .default(false),
+    createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
-    check("clinic_settings_singleton_check", sql`${t.id} = 1`),
+    check("clinics_slug_check", sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
+    check("clinics_name_check", sql`char_length(${t.name}) between 1 and 100`),
+    check("clinics_min_advance_check", sql`${t.minAdvanceMinutes} >= 0`),
     check(
-      "clinic_settings_min_advance_check",
-      sql`${t.minAdvanceMinutes} >= 0`,
-    ),
-    check(
-      "clinic_settings_max_advance_check",
+      "clinics_max_advance_check",
       sql`${t.maxAdvanceDays} between 1 and 365`,
     ),
     check(
-      "clinic_settings_slot_step_check",
+      "clinics_slot_step_check",
       sql`${t.slotStepMinutes} between 5 and 240`,
     ),
     check(
-      "clinic_settings_cancellation_deadline_check",
+      "clinics_cancellation_deadline_check",
       sql`${t.cancellationDeadlineMinutes} >= 0`,
     ),
     check(
-      "clinic_settings_max_active_check",
+      "clinics_max_active_check",
       sql`${t.maxActiveAppointmentsPerPhone} between 1 and 20`,
     ),
   ],
@@ -187,14 +201,19 @@ export const serviceCategories = pgTable(
   "service_categories",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
+    slug: text("slug").notNull(),
     sortOrder: integer("sort_order").notNull().default(0),
     isActive: boolean("is_active").notNull().default(true),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
+    unique("service_categories_clinic_slug_unique").on(t.clinicId, t.slug),
+    unique("service_categories_clinic_id_id_unique").on(t.clinicId, t.id),
     check(
       "service_categories_slug_check",
       sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`,
@@ -202,7 +221,8 @@ export const serviceCategories = pgTable(
   ],
 );
 
-// Slugs of the rows seeded by migration 0005_flexible_service_seed.
+// Slugs of the rows every clinic gets: seeded for the first clinic by
+// migration 0005_flexible_service_seed and by createClinic for new ones.
 export const FLEXIBLE_SERVICE_SLUG = "avaliacao-encaixe";
 export const OTHER_CATEGORY_SLUG = "outros";
 
@@ -211,11 +231,12 @@ export const services = pgTable(
   "services",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    categoryId: uuid("category_id")
+    clinicId: uuid("clinic_id")
       .notNull()
-      .references(() => serviceCategories.id, { onDelete: "restrict" }),
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    categoryId: uuid("category_id").notNull(),
     name: text("name").notNull(),
-    slug: text("slug").notNull().unique(),
+    slug: text("slug").notNull(),
     description: text("description"),
     durationMinutes: integer("duration_minutes").notNull(),
     bufferBeforeMinutes: integer("buffer_before_minutes").notNull().default(0),
@@ -234,6 +255,13 @@ export const services = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
+    foreignKey({
+      name: "services_category_fk",
+      columns: [t.clinicId, t.categoryId],
+      foreignColumns: [serviceCategories.clinicId, serviceCategories.id],
+    }).onDelete("restrict"),
+    unique("services_clinic_slug_unique").on(t.clinicId, t.slug),
+    unique("services_clinic_id_id_unique").on(t.clinicId, t.id),
     index("services_category_id_idx").on(t.categoryId),
     check("services_slug_check", sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check(
@@ -286,12 +314,15 @@ export const businessHours = pgTable(
   "business_hours",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
     weekday: smallint("weekday").notNull(),
     startTime: time("start_time").notNull(),
     endTime: time("end_time").notNull(),
   },
   (t) => [
-    index("business_hours_weekday_idx").on(t.weekday),
+    index("business_hours_weekday_idx").on(t.clinicId, t.weekday),
     check("business_hours_weekday_check", sql`${t.weekday} between 0 and 6`),
     check("business_hours_time_check", sql`${t.startTime} < ${t.endTime}`),
   ],
@@ -301,6 +332,9 @@ export const timeBlocks = pgTable(
   "time_blocks",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
     type: timeBlockType("type").notNull(),
     title: text("title"),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
@@ -313,7 +347,7 @@ export const timeBlocks = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    index("time_blocks_period_idx").on(t.startsAt, t.endsAt),
+    index("time_blocks_period_idx").on(t.clinicId, t.startsAt, t.endsAt),
     check("time_blocks_period_check", sql`${t.startsAt} < ${t.endsAt}`),
   ],
 );
@@ -326,6 +360,9 @@ export const patients = pgTable(
   "patients",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     nameNormalized: text("name_normalized"),
     phone: text("phone"),
@@ -344,9 +381,14 @@ export const patients = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    uniqueIndex("patients_phone_name_idx").on(t.phone, t.nameNormalized),
+    unique("patients_clinic_id_id_unique").on(t.clinicId, t.id),
+    uniqueIndex("patients_phone_name_idx").on(
+      t.clinicId,
+      t.phone,
+      t.nameNormalized,
+    ),
     uniqueIndex("patients_cpf_idx")
-      .on(t.cpf)
+      .on(t.clinicId, t.cpf)
       .where(sql`${t.cpf} is not null`),
     check(
       "patients_identity_check",
@@ -388,17 +430,16 @@ export const CANCELLATION_REASONS = [
 
 // occupied_from/occupied_until include the preparation and cleanup buffers.
 // The appointments_no_overlap exclusion constraint (custom migration) rejects
-// two active appointments whose occupied ranges overlap.
+// two active appointments of the same clinic whose occupied ranges overlap.
 export const appointments = pgTable(
   "appointments",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    patientId: uuid("patient_id")
+    clinicId: uuid("clinic_id")
       .notNull()
-      .references(() => patients.id, { onDelete: "restrict" }),
-    serviceId: uuid("service_id")
-      .notNull()
-      .references(() => services.id, { onDelete: "restrict" }),
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    patientId: uuid("patient_id").notNull(),
+    serviceId: uuid("service_id").notNull(),
     serviceName: text("service_name").notNull(),
     serviceDurationMinutes: integer("service_duration_minutes").notNull(),
     // Free-text name for flexible services. Never health information.
@@ -422,7 +463,18 @@ export const appointments = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
-    index("appointments_starts_at_idx").on(t.startsAt),
+    foreignKey({
+      name: "appointments_patient_fk",
+      columns: [t.clinicId, t.patientId],
+      foreignColumns: [patients.clinicId, patients.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "appointments_service_fk",
+      columns: [t.clinicId, t.serviceId],
+      foreignColumns: [services.clinicId, services.id],
+    }).onDelete("restrict"),
+    unique("appointments_clinic_id_id_unique").on(t.clinicId, t.id),
+    index("appointments_starts_at_idx").on(t.clinicId, t.startsAt),
     index("appointments_patient_id_idx").on(t.patientId),
     index("appointments_service_id_idx").on(t.serviceId),
     check("appointments_period_check", sql`${t.startsAt} < ${t.endsAt}`),
@@ -451,6 +503,10 @@ export const auditLogs = pgTable(
   "audit_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
+    // Empty for actions outside any clinic (root and account management).
+    clinicId: uuid("clinic_id").references(() => clinics.id, {
+      onDelete: "restrict",
+    }),
     actorType: auditActorType("actor_type").notNull(),
     actorUserId: uuid("actor_user_id").references(() => users.id, {
       onDelete: "set null",
@@ -463,6 +519,7 @@ export const auditLogs = pgTable(
   },
   (t) => [
     index("audit_logs_entity_idx").on(t.entityType, t.entityId),
+    index("audit_logs_clinic_id_idx").on(t.clinicId, t.createdAt),
     index("audit_logs_created_at_idx").on(t.createdAt),
   ],
 );

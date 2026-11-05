@@ -75,15 +75,15 @@ export async function loadCalendarAction(input: {
   to: string;
   includeCancelled: boolean;
 }): Promise<LoadCalendarResult> {
-  await requireAdmin();
+  const { clinicId } = await requireAdmin();
   const parsed = rangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, formError: LOAD_ERROR };
   const { from, to, includeCancelled } = parsed.data;
 
   try {
     const [events, { blocks }] = await Promise.all([
-      listAppointmentsInRange({ from, to, includeCancelled }),
-      findBlocksAndHours({ from, to }),
+      listAppointmentsInRange(clinicId, { from, to, includeCancelled }),
+      findBlocksAndHours(clinicId, { from, to }),
     ]);
     return {
       ok: true,
@@ -116,6 +116,7 @@ export async function rescheduleAction(
 
   try {
     return await rescheduleAppointment(
+      session.clinicId,
       id,
       { startsAt, endsAt, acknowledgeWarnings },
       session.user.id,
@@ -149,7 +150,11 @@ export async function createAppointmentAction(
   const parsed = appointmentFormSchema.safeParse(input);
   if (!parsed.success) return fieldErrorsOf(parsed.error.issues);
   try {
-    return await createAppointment(parsed.data, session.user.id);
+    return await createAppointment(
+      session.clinicId,
+      parsed.data,
+      session.user.id,
+    );
   } catch {
     return { ok: false, formError: FORM_ERROR };
   }
@@ -166,7 +171,12 @@ export async function updateAppointmentAction(
   const parsed = appointmentFormSchema.safeParse(input);
   if (!parsed.success) return fieldErrorsOf(parsed.error.issues);
   try {
-    return await updateAppointment(id, parsed.data, session.user.id);
+    return await updateAppointment(
+      session.clinicId,
+      id,
+      parsed.data,
+      session.user.id,
+    );
   } catch {
     return { ok: false, formError: FORM_ERROR };
   }
@@ -180,7 +190,12 @@ export async function changeStatusAction(
   if (!parsed.success) return fieldErrorsOf(parsed.error.issues);
   const { id, ...change } = parsed.data;
   try {
-    return await changeAppointmentStatus(id, change, session.user.id);
+    return await changeAppointmentStatus(
+      session.clinicId,
+      id,
+      change,
+      session.user.id,
+    );
   } catch {
     return { ok: false, formError: STATUS_ERROR };
   }

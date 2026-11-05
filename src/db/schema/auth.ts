@@ -1,6 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   index,
   integer,
   pgEnum,
@@ -11,24 +13,44 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+// Circular with ./clinic, which is safe: both sides only use the other inside
+// lazy references.
+import { clinics } from "./clinic";
 import { createdAt, updatedAt } from "./columns";
 
 // Tables managed by Better Auth. Property names must match Better Auth's field
 // names (see src/lib/auth.ts); column names follow the project's snake_case.
 
-export const userRole = pgEnum("user_role", ["admin"]);
+// admin: the owner of one clinic, sees only that clinic.
+// root: the platform operator, sees every clinic and has no clinic of its own.
+export const userRole = pgEnum("user_role", ["admin", "root"]);
 
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  emailVerified: boolean("email_verified").notNull().default(false),
-  image: text("image"),
-  role: userRole("role").notNull(),
-  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    email: text("email").notNull().unique(),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    image: text("image"),
+    role: userRole("role").notNull(),
+    // The clinic an admin belongs to. Empty for root.
+    clinicId: uuid("clinic_id").references(() => clinics.id, {
+      onDelete: "restrict",
+    }),
+    twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("users_clinic_id_idx").on(t.clinicId),
+    check(
+      "users_role_clinic_check",
+      // ::text because migration 0007 adds 'root' in the same transaction.
+      sql`(${t.role}::text = 'root') = (${t.clinicId} is null)`,
+    ),
+  ],
+);
 
 export const sessions = pgTable(
   "sessions",

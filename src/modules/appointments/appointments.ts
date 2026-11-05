@@ -12,6 +12,7 @@ import {
   serviceCategories,
   services,
 } from "@/db/schema";
+import { syncSessionInstallment } from "@/modules/finance/session-links";
 import { ANONYMIZED_NAME } from "@/modules/patients/patients";
 import { findBlocksAndHours } from "@/modules/schedule/schedule";
 import { formatLocal } from "@/modules/schedule/time";
@@ -27,8 +28,10 @@ import {
 } from "./fields";
 import { checkWarnings, type Warning } from "./rules";
 
-// Data functions for the admin agenda. Every write runs in one transaction
-// that takes, in this order: the agenda advisory lock, the patient row
+// Data functions for the admin agenda of one clinic: every function takes the
+// clinicId from the session and never reads or writes another clinic. Every
+// write runs in one transaction that takes, in this order: the clinic's
+// agenda advisory lock, the patient row
 // FOR SHARE, the appointment row FOR UPDATE (updates only), then reads the
 // service. Patient names and labels never go to audit_logs or into error
 // messages; audit `changes` hold ids, ISO instants, durations and codes only.
@@ -91,7 +94,8 @@ export type RescheduleInput = {
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Arbitrary constant: every agenda write serializes on it.
+// Arbitrary constant: every agenda write of a clinic serializes on it,
+// together with a hash of the clinic id.
 const AGENDA_LOCK = 7_204_512;
 
 const MINUTE = 60_000;
@@ -143,15 +147,21 @@ const period = (startsAt: Date, endsAt: Date) => ({
   durationMinutes: minutesBetween(startsAt, endsAt),
 });
 
-async function lockAgenda(tx: Tx) {
-  await tx.execute(sql`select pg_advisory_xact_lock(${AGENDA_LOCK})`);
+export async function lockAgenda(tx: Tx, clinicId: string) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(${AGENDA_LOCK}, hashtext(${clinicId}))`,
+  );
 }
 
-async function lockPatient(tx: Tx, patientId: string): Promise<Fail | null> {
+async function lockPatient(
+  tx: Tx,
+  clinicId: string,
+  patientId: string,
+): Promise<Fail | null> {
   const [patient] = await tx
     .select({ anonymizedAt: patients.anonymizedAt })
     .from(patients)
-    .where(eq(patients.id, patientId))
+    .where(and(eq(patients.id, patientId), eq(patients.clinicId, clinicId)))
     .for("share");
   if (!patient) return fieldFail("patientId", PATIENT_MISSING);
   if (patient.anonymizedAt) return formFail(ANONYMIZED);
@@ -161,6 +171,7 @@ async function lockPatient(tx: Tx, patientId: string): Promise<Fail | null> {
 // A service is bookable when it and its category are both active.
 async function readService(
   tx: Tx,
+  clinicId: string,
   serviceId: string,
 ): Promise<ServiceRow | undefined> {
   const [row] = await tx
@@ -175,7 +186,7 @@ async function readService(
     })
     .from(services)
     .innerJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
-    .where(eq(services.id, serviceId))
+    .where(and(eq(services.id, serviceId), eq(services.clinicId, clinicId)))
     .limit(1);
   return row;
 }
@@ -215,6 +226,7 @@ function occupiedRange(startsAt: Date, endsAt: Date, service: ServiceRow) {
 // message shows the other appointment's own times, never its patient.
 async function overlapRefusal(
   tx: Tx,
+  clinicId: string,
   range: { occupiedFrom: Date; occupiedUntil: Date },
   excludeId?: string,
 ): Promise<Fail | null> {
@@ -223,6 +235,7 @@ async function overlapRefusal(
     .from(appointments)
     .where(
       and(
+        eq(appointments.clinicId, clinicId),
         inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
         lt(appointments.occupiedFrom, range.occupiedUntil),
         gt(appointments.occupiedUntil, range.occupiedFrom),
@@ -241,12 +254,14 @@ async function overlapRefusal(
 // has passed.
 async function warningRefusal(
   tx: Tx,
+  clinicId: string,
   startsAt: Date,
   endsAt: Date,
   now: Date,
   acknowledged: boolean,
 ): Promise<{ fail: Fail | null; codes: Warning["code"][] }> {
   const { hours, blocks } = await findBlocksAndHours(
+    clinicId,
     { from: startsAt, to: endsAt },
     now,
     tx,
@@ -265,15 +280,20 @@ async function warningRefusal(
 // appointments, so past ones must stay correctable.
 async function lockAppointment(
   tx: Tx,
+  clinicId: string,
   id: string,
   options: { allowAnonymized?: boolean } = {},
 ) {
+  const sameClinic = and(
+    eq(appointments.id, id),
+    eq(appointments.clinicId, clinicId),
+  );
   const [ref] = await tx
     .select({ patientId: appointments.patientId })
     .from(appointments)
-    .where(eq(appointments.id, id));
+    .where(sameClinic);
   if (!ref) return { fail: formFail(NOT_FOUND) } as const;
-  const patientFail = await lockPatient(tx, ref.patientId);
+  const patientFail = await lockPatient(tx, clinicId, ref.patientId);
   const skip = options.allowAnonymized && patientFail?.formError === ANONYMIZED;
   if (patientFail && !skip) {
     return {
@@ -283,7 +303,7 @@ async function lockAppointment(
   const [current] = await tx
     .select()
     .from(appointments)
-    .where(eq(appointments.id, id))
+    .where(sameClinic)
     .for("update");
   if (!current) return { fail: formFail(NOT_FOUND) } as const;
   return { current } as const;
@@ -321,6 +341,7 @@ function replay(
 }
 
 export async function createAppointment(
+  clinicId: string,
   values: AppointmentFormValues,
   actorUserId: string,
   now: Date = new Date(),
@@ -336,28 +357,34 @@ export async function createAppointment(
   }
   try {
     return await db.transaction(async (tx): Promise<AppointmentResult> => {
-      await lockAgenda(tx);
+      await lockAgenda(tx, clinicId);
 
       const [existing] = await tx
         .select(REPLAY_COLUMNS)
         .from(appointments)
-        .where(eq(appointments.idempotencyKey, values.idempotencyKey))
+        .where(
+          and(
+            eq(appointments.idempotencyKey, values.idempotencyKey),
+            eq(appointments.clinicId, clinicId),
+          ),
+        )
         .limit(1);
       if (existing) return replay(existing, values);
 
-      const patientFail = await lockPatient(tx, values.patientId);
+      const patientFail = await lockPatient(tx, clinicId, values.patientId);
       if (patientFail) return patientFail;
 
-      const service = await readService(tx, values.serviceId);
+      const service = await readService(tx, clinicId, values.serviceId);
       const serviceFail = serviceRefusal(service, values.customLabel);
       if (serviceFail || !service) return serviceFail!;
 
       const occupied = occupiedRange(values.startsAt, values.endsAt, service);
-      const overlap = await overlapRefusal(tx, occupied);
+      const overlap = await overlapRefusal(tx, clinicId, occupied);
       if (overlap) return overlap;
 
       const warned = await warningRefusal(
         tx,
+        clinicId,
         values.startsAt,
         values.endsAt,
         now,
@@ -368,6 +395,7 @@ export async function createAppointment(
       const [row] = await tx
         .insert(appointments)
         .values({
+          clinicId,
           patientId: values.patientId,
           serviceId: service.id,
           serviceName: service.name,
@@ -384,6 +412,7 @@ export async function createAppointment(
         .returning({ id: appointments.id });
 
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "appointment.created",
@@ -404,7 +433,12 @@ export async function createAppointment(
       const [existing] = await db
         .select(REPLAY_COLUMNS)
         .from(appointments)
-        .where(eq(appointments.idempotencyKey, values.idempotencyKey))
+        .where(
+          and(
+            eq(appointments.idempotencyKey, values.idempotencyKey),
+            eq(appointments.clinicId, clinicId),
+          ),
+        )
         .limit(1);
       if (existing) return replay(existing, values);
     }
@@ -412,11 +446,133 @@ export async function createAppointment(
   }
 }
 
+export type SessionSlot = { startsAt: Date; endsAt: Date };
+
+export type SessionSlotProblem = {
+  index: number;
+  kind: "conflict" | "warning";
+  message: string;
+};
+
+export type SessionBatchResult =
+  | { ok: true; ids: string[] }
+  | { ok: false; formError?: string; problems?: SessionSlotProblem[] };
+
+// Creates the sessions of a package in one go, inside the caller's
+// transaction, which must already hold lockAgenda for the clinic. Checks
+// every slot first, against the agenda and against the other slots, and
+// inserts nothing when a slot conflicts, or when one falls outside business
+// hours, on a block or in the past and the admin has not acknowledged it.
+// Sessions are confirmed admin appointments, like the ones from the agenda.
+export async function insertSessionAppointments(
+  tx: Tx,
+  clinicId: string,
+  input: {
+    patientId: string;
+    serviceId: string;
+    slots: SessionSlot[];
+    acknowledgeWarnings: boolean;
+  },
+  actorUserId: string,
+  now: Date = new Date(),
+): Promise<SessionBatchResult> {
+  const patientFail = await lockPatient(tx, clinicId, input.patientId);
+  if (patientFail) {
+    return { ok: false, formError: patientFail.formError ?? PATIENT_MISSING };
+  }
+  const service = await readService(tx, clinicId, input.serviceId);
+  if (!service) return { ok: false, formError: SERVICE_MISSING };
+  if (service.isFlexible) {
+    return {
+      ok: false,
+      formError: "Este serviço não pode ser agendado em pacote.",
+    };
+  }
+
+  const ranges = input.slots.map((slot) =>
+    occupiedRange(slot.startsAt, slot.endsAt, service),
+  );
+  const problems: SessionSlotProblem[] = [];
+  for (const [index, slot] of input.slots.entries()) {
+    const range = ranges[index]!;
+    const clash = ranges.findIndex(
+      (other, j) =>
+        j < index &&
+        other.occupiedFrom < range.occupiedUntil &&
+        other.occupiedUntil > range.occupiedFrom,
+    );
+    if (clash >= 0) {
+      problems.push({
+        index,
+        kind: "conflict",
+        message: `Conflita com a sessão ${clash + 1} desta lista.`,
+      });
+      continue;
+    }
+    const overlap = await overlapRefusal(tx, clinicId, range);
+    if (overlap) {
+      problems.push({ index, kind: "conflict", message: overlap.formError! });
+      continue;
+    }
+    const warned = await warningRefusal(
+      tx,
+      clinicId,
+      slot.startsAt,
+      slot.endsAt,
+      now,
+      input.acknowledgeWarnings,
+    );
+    for (const warning of warned.fail?.warnings ?? []) {
+      problems.push({ index, kind: "warning", message: warning.message });
+    }
+  }
+  if (problems.length > 0) return { ok: false, problems };
+
+  const ids: string[] = [];
+  for (const [index, slot] of input.slots.entries()) {
+    const [row] = await tx
+      .insert(appointments)
+      .values({
+        clinicId,
+        patientId: input.patientId,
+        serviceId: service.id,
+        serviceName: service.name,
+        serviceDurationMinutes: service.durationMinutes,
+        customLabel: null,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        ...ranges[index]!,
+        status: "confirmed",
+        source: "admin",
+        confirmedAt: now,
+      })
+      .returning({ id: appointments.id });
+    ids.push(row!.id);
+    await tx.insert(auditLogs).values({
+      clinicId,
+      actorType: "admin",
+      actorUserId,
+      action: "appointment.created",
+      entityType: "appointment",
+      entityId: row!.id,
+      changes: {
+        patientId: input.patientId,
+        serviceId: service.id,
+        ...period(slot.startsAt, slot.endsAt),
+        status: "confirmed",
+        package: true,
+      },
+    });
+  }
+  return { ok: true, ids };
+}
+
 // Changes the service, label, start and duration. The patient and the
 // idempotency key in `values` are ignored. A change that touches the time
 // or the service recomputes the occupied range with the service's current
 // buffers.
 export async function updateAppointment(
+  clinicId: string,
   id: string,
   values: AppointmentFormValues,
   actorUserId: string,
@@ -428,13 +584,13 @@ export async function updateAppointment(
   }
   try {
     return await db.transaction(async (tx): Promise<AppointmentResult> => {
-      await lockAgenda(tx);
-      const locked = await lockAppointment(tx, id);
+      await lockAgenda(tx, clinicId);
+      const locked = await lockAppointment(tx, clinicId, id);
       if (locked.fail) return locked.fail;
       const { current } = locked;
       if (!isEditableStatus(current.status)) return formFail(NOT_EDITABLE);
 
-      const service = await readService(tx, values.serviceId);
+      const service = await readService(tx, clinicId, values.serviceId);
       const serviceFail = serviceRefusal(
         service,
         values.customLabel,
@@ -454,7 +610,7 @@ export async function updateAppointment(
       let occupied: { occupiedFrom: Date; occupiedUntil: Date } | undefined;
       if (serviceChanged || timeChanged) {
         occupied = occupiedRange(values.startsAt, values.endsAt, service);
-        const overlap = await overlapRefusal(tx, occupied, id);
+        const overlap = await overlapRefusal(tx, clinicId, occupied, id);
         if (overlap) return overlap;
       }
 
@@ -462,6 +618,7 @@ export async function updateAppointment(
       if (timeChanged) {
         const warned = await warningRefusal(
           tx,
+          clinicId,
           values.startsAt,
           values.endsAt,
           now,
@@ -486,7 +643,9 @@ export async function updateAppointment(
           endsAt: values.endsAt,
           ...occupied,
         })
-        .where(eq(appointments.id, id));
+        .where(
+          and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)),
+        );
 
       const serviceChanges = serviceChanged
         ? {
@@ -497,6 +656,7 @@ export async function updateAppointment(
         : {};
       const labelChanges = labelChanged ? { labelChanged: true } : {};
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: timeChanged ? "appointment.rescheduled" : "appointment.updated",
@@ -512,6 +672,7 @@ export async function updateAppointment(
             }
           : { ...serviceChanges, ...labelChanges },
       });
+      if (timeChanged) await syncSessionInstallment(tx, clinicId, id);
       return { ok: true, id };
     });
   } catch (error) {
@@ -522,6 +683,7 @@ export async function updateAppointment(
 // For drag and resize on the calendar: the same rules as an edit that keeps
 // the service and the label.
 export async function rescheduleAppointment(
+  clinicId: string,
   id: string,
   input: RescheduleInput,
   actorUserId: string,
@@ -530,13 +692,13 @@ export async function rescheduleAppointment(
   if (!UUID_PATTERN.test(id)) return formFail(NOT_FOUND);
   try {
     return await db.transaction(async (tx): Promise<AppointmentResult> => {
-      await lockAgenda(tx);
-      const locked = await lockAppointment(tx, id);
+      await lockAgenda(tx, clinicId);
+      const locked = await lockAppointment(tx, clinicId, id);
       if (locked.fail) return locked.fail;
       const { current } = locked;
       if (!isEditableStatus(current.status)) return formFail(NOT_EDITABLE);
 
-      const service = await readService(tx, current.serviceId);
+      const service = await readService(tx, clinicId, current.serviceId);
       if (!service) return formFail(NOT_FOUND);
 
       if (
@@ -547,11 +709,12 @@ export async function rescheduleAppointment(
       }
 
       const occupied = occupiedRange(input.startsAt, input.endsAt, service);
-      const overlap = await overlapRefusal(tx, occupied, id);
+      const overlap = await overlapRefusal(tx, clinicId, occupied, id);
       if (overlap) return overlap;
 
       const warned = await warningRefusal(
         tx,
+        clinicId,
         input.startsAt,
         input.endsAt,
         now,
@@ -562,8 +725,11 @@ export async function rescheduleAppointment(
       await tx
         .update(appointments)
         .set({ startsAt: input.startsAt, endsAt: input.endsAt, ...occupied })
-        .where(eq(appointments.id, id));
+        .where(
+          and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)),
+        );
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "appointment.rescheduled",
@@ -575,6 +741,7 @@ export async function rescheduleAppointment(
           ...(warned.codes.length > 0 ? { warnings: warned.codes } : {}),
         },
       });
+      await syncSessionInstallment(tx, clinicId, id);
       return { ok: true, id };
     });
   } catch (error) {
@@ -586,6 +753,7 @@ const isReason = (value: unknown): value is CancellationReason =>
   typeof value === "string" && Object.hasOwn(CANCELLATION_REASON_LABELS, value);
 
 export async function changeAppointmentStatus(
+  clinicId: string,
   id: string,
   input: { to: Status; reason?: CancellationReason },
   actorUserId: string,
@@ -600,8 +768,10 @@ export async function changeAppointmentStatus(
   }
   try {
     return await db.transaction(async (tx): Promise<AppointmentResult> => {
-      await lockAgenda(tx);
-      const locked = await lockAppointment(tx, id, { allowAnonymized: true });
+      await lockAgenda(tx, clinicId);
+      const locked = await lockAppointment(tx, clinicId, id, {
+        allowAnonymized: true,
+      });
       if (locked.fail) return locked.fail;
       const { current } = locked;
 
@@ -627,8 +797,11 @@ export async function changeAppointmentStatus(
               }
             : {}),
         })
-        .where(eq(appointments.id, id));
+        .where(
+          and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)),
+        );
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "appointment.status_changed",
@@ -640,6 +813,7 @@ export async function changeAppointmentStatus(
           ...(reason ? { reason } : {}),
         },
       });
+      await syncSessionInstallment(tx, clinicId, id);
       return { ok: true, id };
     });
   } catch (error) {
@@ -661,6 +835,7 @@ function displayName(patient: {
 }
 
 export async function getAppointment(
+  clinicId: string,
   id: string,
   now: Date = new Date(),
 ): Promise<AppointmentRecord | null> {
@@ -685,7 +860,7 @@ export async function getAppointment(
     .from(appointments)
     .innerJoin(patients, eq(appointments.patientId, patients.id))
     .innerJoin(services, eq(appointments.serviceId, services.id))
-    .where(eq(appointments.id, id))
+    .where(and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)))
     .limit(1);
   if (!row) return null;
   // Anonymized patients cannot be (re)scheduled, but their appointments
@@ -753,17 +928,21 @@ function toCalendarEvent(row: {
 }
 
 // Appointments that intersect [from, to), ordered by start.
-export async function listAppointmentsInRange(input: {
-  from: Date;
-  to: Date;
-  includeCancelled: boolean;
-}): Promise<CalendarEvent[]> {
+export async function listAppointmentsInRange(
+  clinicId: string,
+  input: {
+    from: Date;
+    to: Date;
+    includeCancelled: boolean;
+  },
+): Promise<CalendarEvent[]> {
   const rows = await db
     .select(calendarColumns)
     .from(appointments)
     .innerJoin(patients, eq(appointments.patientId, patients.id))
     .where(
       and(
+        eq(appointments.clinicId, clinicId),
         lt(appointments.startsAt, input.to),
         gt(appointments.endsAt, input.from),
         input.includeCancelled
@@ -777,12 +956,17 @@ export async function listAppointmentsInRange(input: {
 
 export type RequestedItem = CalendarEvent & { requiresApproval: boolean };
 
-const pendingFrom = (now: Date) =>
-  and(eq(appointments.status, "requested"), gte(appointments.startsAt, now));
+const pendingFrom = (clinicId: string, now: Date) =>
+  and(
+    eq(appointments.clinicId, clinicId),
+    eq(appointments.status, "requested"),
+    gte(appointments.startsAt, now),
+  );
 
 // Requested appointments that start at or after `now`, ordered by start:
 // the ones still waiting for the admin's confirmation.
 export async function listRequestedFrom(
+  clinicId: string,
   now: Date = new Date(),
 ): Promise<RequestedItem[]> {
   const rows = await db
@@ -790,7 +974,7 @@ export async function listRequestedFrom(
     .from(appointments)
     .innerJoin(patients, eq(appointments.patientId, patients.id))
     .innerJoin(services, eq(appointments.serviceId, services.id))
-    .where(pendingFrom(now))
+    .where(pendingFrom(clinicId, now))
     .orderBy(asc(appointments.startsAt), asc(appointments.id));
   return rows.map((row) => ({
     ...toCalendarEvent(row),
@@ -800,17 +984,19 @@ export async function listRequestedFrom(
 
 // How many of those there are, for the menu badge.
 export async function countRequestedFrom(
+  clinicId: string,
   now: Date = new Date(),
 ): Promise<number> {
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(appointments)
-    .where(pendingFrom(now));
+    .where(pendingFrom(clinicId, now));
   return row?.count ?? 0;
 }
 
 // The next and the latest appointments of a patient, every status included.
 export async function listPatientAppointments(
+  clinicId: string,
   patientId: string,
   now: Date = new Date(),
 ): Promise<{
@@ -832,6 +1018,7 @@ export async function listPatientAppointments(
       .from(appointments)
       .where(
         and(
+          eq(appointments.clinicId, clinicId),
           eq(appointments.patientId, patientId),
           gte(appointments.startsAt, now),
         ),
@@ -843,6 +1030,7 @@ export async function listPatientAppointments(
       .from(appointments)
       .where(
         and(
+          eq(appointments.clinicId, clinicId),
           eq(appointments.patientId, patientId),
           lt(appointments.startsAt, now),
         ),

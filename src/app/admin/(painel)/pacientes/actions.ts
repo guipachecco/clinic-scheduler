@@ -76,13 +76,13 @@ export async function searchPatientsAction(input: {
   after?: PatientCursor;
   includeAnonymized?: boolean;
 }): Promise<SearchResult> {
-  await requireAdmin();
+  const { clinicId } = await requireAdmin();
   const parsed = searchSchema.safeParse(input);
   if (!parsed.success) {
     return { items: [], error: "Busca inválida. Tente novamente." };
   }
   try {
-    return await searchPatients(parsed.data);
+    return await searchPatients(clinicId, parsed.data);
   } catch {
     return { items: [], error: "Não foi possível buscar. Tente novamente." };
   }
@@ -97,7 +97,11 @@ export async function createPatientAction(
 
   let result;
   try {
-    result = await createPatient(parsed.values, session.user.id);
+    result = await createPatient(
+      session.clinicId,
+      parsed.values,
+      session.user.id,
+    );
   } catch {
     return { ok: false, fieldErrors: {}, formError: GENERIC_ERROR };
   }
@@ -118,7 +122,12 @@ export async function updatePatientAction(
 
   let result;
   try {
-    result = await updatePatient(id, parsed.values, session.user.id);
+    result = await updatePatient(
+      session.clinicId,
+      id,
+      parsed.values,
+      session.user.id,
+    );
   } catch {
     return { ok: false, fieldErrors: {}, formError: GENERIC_ERROR };
   }
@@ -141,7 +150,7 @@ export async function anonymizePatientAction(
   }
   let result;
   try {
-    result = await anonymizePatient(id, session.user.id);
+    result = await anonymizePatient(session.clinicId, id, session.user.id);
   } catch {
     return {
       ok: false,

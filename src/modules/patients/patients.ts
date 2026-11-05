@@ -22,7 +22,9 @@ import {
   type PatientFormValues,
 } from "./fields";
 
-// Data functions for the patient registry. No patient data is ever logged,
+// Data functions for the patient registry of one clinic: every function takes
+// the clinicId from the session and stays inside that clinic, so the same
+// person may be registered in two clinics. No patient data is ever logged,
 // written to audit_logs.changes or put in an error message.
 
 export type ActionResult =
@@ -98,15 +100,17 @@ function rowValues(values: PatientFormValues) {
 // Looks for another patient that would clash with these values.
 async function findConflict(
   tx: Pick<Tx, "select">,
+  clinicId: string,
   values: PatientFormValues,
   excludeId?: string,
 ): Promise<ActionResult | null> {
   const notSelf = excludeId ? sql`${patients.id} <> ${excludeId}` : undefined;
+  const sameClinic = eq(patients.clinicId, clinicId);
   if (values.cpf) {
     const [row] = await tx
       .select({ id: patients.id })
       .from(patients)
-      .where(and(eq(patients.cpf, values.cpf), notSelf))
+      .where(and(sameClinic, eq(patients.cpf, values.cpf), notSelf))
       .limit(1);
     if (row) {
       return {
@@ -121,6 +125,7 @@ async function findConflict(
     .from(patients)
     .where(
       and(
+        sameClinic,
         eq(patients.phone, values.phone),
         eq(patients.nameNormalized, normalizeName(values.name)),
         notSelf,
@@ -141,6 +146,7 @@ async function findConflict(
 // the pre-check gives.
 async function conflictFromError(
   error: unknown,
+  clinicId: string,
   values: PatientFormValues,
   excludeId?: string,
 ): Promise<ActionResult | null> {
@@ -150,7 +156,7 @@ async function conflictFromError(
   ) {
     return null;
   }
-  const conflict = await findConflict(db, values, excludeId);
+  const conflict = await findConflict(db, clinicId, values, excludeId);
   if (conflict) return conflict;
   const constraint = findPgError(error)?.constraint;
   return {
@@ -163,18 +169,20 @@ async function conflictFromError(
 }
 
 export async function createPatient(
+  clinicId: string,
   values: PatientFormValues,
   actorUserId: string,
 ): Promise<ActionResult> {
   try {
     return await db.transaction(async (tx): Promise<ActionResult> => {
-      const conflict = await findConflict(tx, values);
+      const conflict = await findConflict(tx, clinicId, values);
       if (conflict) return conflict;
       const [row] = await tx
         .insert(patients)
-        .values(rowValues(values))
+        .values({ ...rowValues(values), clinicId })
         .returning({ id: patients.id });
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "patient.created",
@@ -184,7 +192,7 @@ export async function createPatient(
       return { ok: true, id: row!.id };
     });
   } catch (error) {
-    const conflict = await conflictFromError(error, values);
+    const conflict = await conflictFromError(error, clinicId, values);
     if (conflict) return conflict;
     throw error;
   }
@@ -193,6 +201,7 @@ export async function createPatient(
 // An update of a missing or anonymized patient returns
 // { ok: false, fieldErrors: {} } and writes nothing.
 export async function updatePatient(
+  clinicId: string,
   id: string,
   values: PatientFormValues,
   actorUserId: string,
@@ -203,12 +212,12 @@ export async function updatePatient(
       const [current] = await tx
         .select()
         .from(patients)
-        .where(eq(patients.id, id))
+        .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)))
         .for("update");
       if (!current || current.anonymizedAt) {
         return { ok: false, fieldErrors: {} };
       }
-      const conflict = await findConflict(tx, values, id);
+      const conflict = await findConflict(tx, clinicId, values, id);
       if (conflict) return conflict;
 
       const fields = FORM_KEYS.filter((key) => current[key] !== values[key]);
@@ -217,8 +226,9 @@ export async function updatePatient(
       await tx
         .update(patients)
         .set(rowValues(values))
-        .where(eq(patients.id, id));
+        .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)));
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "patient.updated",
@@ -229,7 +239,7 @@ export async function updatePatient(
       return { ok: true, id };
     });
   } catch (error) {
-    const conflict = await conflictFromError(error, values, id);
+    const conflict = await conflictFromError(error, clinicId, values, id);
     if (conflict) return conflict;
     throw error;
   }
@@ -237,7 +247,10 @@ export async function updatePatient(
 
 // Returns anonymized patients too (anonymizedAt set). Null for a missing
 // patient and for an id that is not a UUID.
-export async function getPatient(id: string): Promise<PatientRecord | null> {
+export async function getPatient(
+  clinicId: string,
+  id: string,
+): Promise<PatientRecord | null> {
   if (!UUID_PATTERN.test(id)) return null;
   const [row] = await db
     .select({
@@ -259,7 +272,7 @@ export async function getPatient(id: string): Promise<PatientRecord | null> {
       anonymizedAt: patients.anonymizedAt,
     })
     .from(patients)
-    .where(eq(patients.id, id))
+    .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)))
     .limit(1);
   return row ?? null;
 }
@@ -282,14 +295,17 @@ const SORT_KEY = sql`coalesce(${patients.nameNormalized}, ${normalizeName(ANONYM
 
 // Never logs the term. Digit terms (3+ digits, ignoring . - ( ) + and spaces)
 // match CPF and phones; anything else matches name and nickname.
-export async function searchPatients(input: {
-  term: string;
-  after?: PatientCursor;
-  includeAnonymized?: boolean;
-}): Promise<{ items: PatientListItem[]; next?: PatientCursor }> {
+export async function searchPatients(
+  clinicId: string,
+  input: {
+    term: string;
+    after?: PatientCursor;
+    includeAnonymized?: boolean;
+  },
+): Promise<{ items: PatientListItem[]; next?: PatientCursor }> {
   const term = input.term.trim();
   const digits = term.replace(/[.\-()+\s]/g, "");
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [eq(patients.clinicId, clinicId)];
 
   // Anonymized patients are hidden unless explicitly asked for.
   if (!input.includeAnonymized) conditions.push(isNull(patients.anonymizedAt));
@@ -353,6 +369,7 @@ export async function searchPatients(input: {
 }
 
 export async function anonymizePatient(
+  clinicId: string,
   id: string,
   actorUserId: string,
 ): Promise<
@@ -363,7 +380,7 @@ export async function anonymizePatient(
     const [current] = await tx
       .select({ id: patients.id, anonymizedAt: patients.anonymizedAt })
       .from(patients)
-      .where(eq(patients.id, id))
+      .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)))
       .for("update");
     if (!current || current.anonymizedAt) {
       return { ok: false, reason: "not_found" } as const;
@@ -400,8 +417,9 @@ export async function anonymizePatient(
         notes: null,
         anonymizedAt: new Date(),
       })
-      .where(eq(patients.id, id));
+      .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)));
     await tx.insert(auditLogs).values({
+      clinicId,
       actorType: "admin",
       actorUserId,
       action: "patient.anonymized",

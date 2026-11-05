@@ -8,8 +8,8 @@ import { ServiceForm } from "../service-form";
 export const metadata: Metadata = { title: "Novo serviço" };
 
 export default async function NewServicePage() {
-  await requireAdmin();
-  const catalog = await listCatalog();
+  const { clinicId } = await requireAdmin();
+  const catalog = await listCatalog(clinicId);
   const categories = catalog
     .filter((category) => category.isActive)
     .map(({ id, name, isActive }) => ({ id, name, isActive }));

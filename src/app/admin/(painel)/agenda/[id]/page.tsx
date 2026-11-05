@@ -7,10 +7,20 @@ import { Button } from "@/components/ui/button";
 import { getAppointment } from "@/modules/appointments/appointments";
 import { CANCELLATION_REASON_LABELS } from "@/modules/appointments/fields";
 import { requireAdmin } from "@/modules/auth/session";
-import { CLINIC_TIME_ZONE, formatLocal } from "@/modules/schedule/time";
+import {
+  findSessionInstallment,
+  listPaymentMethods,
+} from "@/modules/finance/sales";
+import {
+  CLINIC_TIME_ZONE,
+  formatLocal,
+  todayLocal,
+} from "@/modules/schedule/time";
 import { listActiveServices } from "@/modules/services/services";
 
 import { AppointmentForm, type ServiceOption } from "../appointment-form";
+import { money } from "../../financeiro/ui";
+import { PaymentForm } from "../../financeiro/vendas/[id]/sale-forms";
 import { StatusBadge } from "../status-badge";
 
 import { StatusActions } from "./status-actions";
@@ -25,10 +35,15 @@ export default async function AppointmentPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireAdmin();
+  const { clinicId } = await requireAdmin();
   const { id } = await params;
-  const appointment = await getAppointment(id);
+  const appointment = await getAppointment(clinicId, id);
   if (!appointment) notFound();
+  // A package session paid per session: its open installment, to receive now.
+  const [sessionInstallment, methods] = await Promise.all([
+    findSessionInstallment(clinicId, appointment.id),
+    listPaymentMethods(clinicId),
+  ]);
 
   const serviceText = appointment.customLabel
     ? `${appointment.customLabel} (${appointment.serviceName})`
@@ -36,7 +51,7 @@ export default async function AppointmentPage({
 
   let services: ServiceOption[] = [];
   if (appointment.editable) {
-    services = (await listActiveServices()).map(
+    services = (await listActiveServices(clinicId)).map(
       ({ id, name, categoryName, durationMinutes, isFlexible }) => ({
         id,
         name,
@@ -95,6 +110,35 @@ export default async function AppointmentPage({
           ) : null}
         </div>
       </header>
+
+      {sessionInstallment ? (
+        <section
+          aria-labelledby="pagamento"
+          className="grid gap-3 rounded-2xl border bg-card p-4"
+        >
+          <h2 id="pagamento" className="font-heading text-lg font-semibold">
+            Pagamento da sessão
+          </h2>
+          <p>
+            Falta receber {money(sessionInstallment.outstandingCents)}.{" "}
+            <Link
+              href={
+                `/admin/financeiro/vendas/${sessionInstallment.saleId}` as Route
+              }
+              className="underline underline-offset-2"
+            >
+              Ver a venda
+            </Link>
+          </p>
+          <PaymentForm
+            installmentId={sessionInstallment.installmentId}
+            outstandingCents={sessionInstallment.outstandingCents}
+            methods={methods}
+            today={todayLocal()}
+            label="Receber agora"
+          />
+        </section>
+      ) : null}
 
       <section aria-labelledby="status" className="grid gap-4">
         <h2 id="status" className="font-heading text-lg font-semibold">

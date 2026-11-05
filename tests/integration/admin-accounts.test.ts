@@ -33,6 +33,8 @@ afterAll(async () => {
 describe("createAdmin", () => {
   it("creates an account that can sign in with Better Auth", async () => {
     const { id } = await createAdmin({
+      role: "admin",
+      clinicSlug: "grais",
       email: "  Admin@Example.TEST ",
       name: "Administradora de Teste",
       password: PASSWORD,
@@ -58,13 +60,27 @@ describe("createAdmin", () => {
   });
 
   it("refuses a duplicate email or a short password", async () => {
-    await createAdmin({ email: EMAIL, name: "Teste", password: PASSWORD });
+    await createAdmin({
+      role: "admin",
+      clinicSlug: "grais",
+      email: EMAIL,
+      name: "Teste",
+      password: PASSWORD,
+    });
 
     await expect(
-      createAdmin({ email: EMAIL, name: "Teste", password: PASSWORD }),
+      createAdmin({
+        role: "admin",
+        clinicSlug: "grais",
+        email: EMAIL,
+        name: "Teste",
+        password: PASSWORD,
+      }),
     ).rejects.toThrow(AdminAccountError);
     await expect(
       createAdmin({
+        role: "admin",
+        clinicSlug: "grais",
         email: "outra@example.test",
         name: "Teste",
         password: "curta",
@@ -85,6 +101,8 @@ describe("createAdmin", () => {
 describe("resetAdminPassword", () => {
   it("replaces the password and ends existing sessions", async () => {
     const { id } = await createAdmin({
+      role: "admin",
+      clinicSlug: "grais",
       email: EMAIL,
       name: "Teste",
       password: PASSWORD,
@@ -116,6 +134,8 @@ describe("resetAdminPassword", () => {
 describe("resetAdminTwoFactor", () => {
   it("removes the authenticator and ends existing sessions", async () => {
     const { id } = await createAdmin({
+      role: "admin",
+      clinicSlug: "grais",
       email: EMAIL,
       name: "Teste",
       password: PASSWORD,

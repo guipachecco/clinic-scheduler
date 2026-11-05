@@ -14,8 +14,9 @@ import {
   type ServiceFormValues,
 } from "./fields";
 
-// Data functions for the services catalog. Nothing is ever deleted and the
-// panel never touches is_flexible. No field values go to audit_logs or into
+// Data functions for the services catalog of one clinic: every function takes
+// the clinicId from the session and never reads or writes another clinic.
+// Nothing is ever deleted and the panel never touches is_flexible. No field values go to audit_logs or into
 // error messages.
 
 export type ServiceResult =
@@ -122,6 +123,7 @@ function unexpected(error: unknown): Error {
 
 async function serviceNameTaken(
   tx: Pick<Tx, "select">,
+  clinicId: string,
   name: string,
   excludeId?: string,
 ) {
@@ -130,6 +132,7 @@ async function serviceNameTaken(
     .from(services)
     .where(
       and(
+        eq(services.clinicId, clinicId),
         sql`(${services.slug} = ${slugify(name)} or lower(${services.name}) = lower(${name}))`,
         excludeId ? sql`${services.id} <> ${excludeId}` : undefined,
       ),
@@ -140,6 +143,7 @@ async function serviceNameTaken(
 
 async function categoryNameTaken(
   tx: Pick<Tx, "select">,
+  clinicId: string,
   name: string,
   excludeId?: string,
 ) {
@@ -148,6 +152,7 @@ async function categoryNameTaken(
     .from(serviceCategories)
     .where(
       and(
+        eq(serviceCategories.clinicId, clinicId),
         sql`(${serviceCategories.slug} = ${slugify(name)} or lower(${serviceCategories.name}) = lower(${name}))`,
         excludeId ? sql`${serviceCategories.id} <> ${excludeId}` : undefined,
       ),
@@ -157,6 +162,7 @@ async function categoryNameTaken(
 }
 
 export async function createService(
+  clinicId: string,
   values: ServiceFormValues,
   actorUserId: string,
 ): Promise<ServiceResult> {
@@ -165,19 +171,25 @@ export async function createService(
       const [category] = await tx
         .select({ id: serviceCategories.id })
         .from(serviceCategories)
-        .where(eq(serviceCategories.id, values.categoryId))
+        .where(
+          and(
+            eq(serviceCategories.id, values.categoryId),
+            eq(serviceCategories.clinicId, clinicId),
+          ),
+        )
         .limit(1);
       if (!category) {
         return { ok: false, fieldErrors: { categoryId: CATEGORY_MISSING } };
       }
-      if (await serviceNameTaken(tx, values.name)) {
+      if (await serviceNameTaken(tx, clinicId, values.name)) {
         return nameFail(SERVICE_TAKEN);
       }
       const [row] = await tx
         .insert(services)
-        .values({ ...values, slug: slugify(values.name) })
+        .values({ ...values, clinicId, slug: slugify(values.name) })
         .returning({ id: services.id });
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "service.created",
@@ -187,7 +199,7 @@ export async function createService(
       return { ok: true, id: row!.id };
     });
   } catch (error) {
-    if (isUniqueViolation(error, "services_slug_unique")) {
+    if (isUniqueViolation(error, "services_clinic_slug_unique")) {
       return nameFail(SERVICE_TAKEN);
     }
     throw unexpected(error);
@@ -197,6 +209,7 @@ export async function createService(
 // A missing id returns { ok: false, fieldErrors: {} } and writes nothing.
 // The slug and is_flexible are never changed.
 export async function updateService(
+  clinicId: string,
   id: string,
   values: ServiceFormValues,
   actorUserId: string,
@@ -207,27 +220,36 @@ export async function updateService(
       const [current] = await tx
         .select()
         .from(services)
-        .where(eq(services.id, id))
+        .where(and(eq(services.id, id), eq(services.clinicId, clinicId)))
         .for("update");
       if (!current) return { ok: false, fieldErrors: {} };
 
       const [category] = await tx
         .select({ id: serviceCategories.id })
         .from(serviceCategories)
-        .where(eq(serviceCategories.id, values.categoryId))
+        .where(
+          and(
+            eq(serviceCategories.id, values.categoryId),
+            eq(serviceCategories.clinicId, clinicId),
+          ),
+        )
         .limit(1);
       if (!category) {
         return { ok: false, fieldErrors: { categoryId: CATEGORY_MISSING } };
       }
-      if (await serviceNameTaken(tx, values.name, id)) {
+      if (await serviceNameTaken(tx, clinicId, values.name, id)) {
         return nameFail(SERVICE_TAKEN);
       }
 
       const fields = SERVICE_KEYS.filter((key) => current[key] !== values[key]);
       if (fields.length === 0) return { ok: true, id };
 
-      await tx.update(services).set(values).where(eq(services.id, id));
+      await tx
+        .update(services)
+        .set(values)
+        .where(and(eq(services.id, id), eq(services.clinicId, clinicId)));
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "service.updated",
@@ -243,19 +265,21 @@ export async function updateService(
 }
 
 export async function createCategory(
+  clinicId: string,
   values: CategoryFormValues,
   actorUserId: string,
 ): Promise<ServiceResult> {
   try {
     return await db.transaction(async (tx): Promise<ServiceResult> => {
-      if (await categoryNameTaken(tx, values.name)) {
+      if (await categoryNameTaken(tx, clinicId, values.name)) {
         return nameFail(CATEGORY_TAKEN);
       }
       const [row] = await tx
         .insert(serviceCategories)
-        .values({ ...values, slug: slugify(values.name) })
+        .values({ ...values, clinicId, slug: slugify(values.name) })
         .returning({ id: serviceCategories.id });
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "service_category.created",
@@ -265,7 +289,7 @@ export async function createCategory(
       return { ok: true, id: row!.id };
     });
   } catch (error) {
-    if (isUniqueViolation(error, "service_categories_slug_unique")) {
+    if (isUniqueViolation(error, "service_categories_clinic_slug_unique")) {
       return nameFail(CATEGORY_TAKEN);
     }
     throw unexpected(error);
@@ -273,6 +297,7 @@ export async function createCategory(
 }
 
 export async function updateCategory(
+  clinicId: string,
   id: string,
   values: CategoryFormValues,
   actorUserId: string,
@@ -283,10 +308,15 @@ export async function updateCategory(
       const [current] = await tx
         .select()
         .from(serviceCategories)
-        .where(eq(serviceCategories.id, id))
+        .where(
+          and(
+            eq(serviceCategories.id, id),
+            eq(serviceCategories.clinicId, clinicId),
+          ),
+        )
         .for("update");
       if (!current) return { ok: false, fieldErrors: {} };
-      if (await categoryNameTaken(tx, values.name, id)) {
+      if (await categoryNameTaken(tx, clinicId, values.name, id)) {
         return nameFail(CATEGORY_TAKEN);
       }
 
@@ -298,8 +328,14 @@ export async function updateCategory(
       await tx
         .update(serviceCategories)
         .set(values)
-        .where(eq(serviceCategories.id, id));
+        .where(
+          and(
+            eq(serviceCategories.id, id),
+            eq(serviceCategories.clinicId, clinicId),
+          ),
+        );
       await tx.insert(auditLogs).values({
+        clinicId,
         actorType: "admin",
         actorUserId,
         action: "service_category.updated",
@@ -314,7 +350,10 @@ export async function updateCategory(
   }
 }
 
-export async function getService(id: string): Promise<ServiceRecord | null> {
+export async function getService(
+  clinicId: string,
+  id: string,
+): Promise<ServiceRecord | null> {
   if (!UUID_PATTERN.test(id)) return null;
   const [row] = await db
     .select({
@@ -336,17 +375,20 @@ export async function getService(id: string): Promise<ServiceRecord | null> {
       sortOrder: services.sortOrder,
     })
     .from(services)
-    .where(eq(services.id, id))
+    .where(and(eq(services.id, id), eq(services.clinicId, clinicId)))
     .limit(1);
   return row ?? null;
 }
 
 // Every category and service, inactive ones included, for the admin list.
-export async function listCatalog(): Promise<CatalogCategory[]> {
+export async function listCatalog(
+  clinicId: string,
+): Promise<CatalogCategory[]> {
   const [categories, rows] = await Promise.all([
     db
       .select()
       .from(serviceCategories)
+      .where(eq(serviceCategories.clinicId, clinicId))
       .orderBy(asc(serviceCategories.sortOrder), asc(serviceCategories.name)),
     db
       .select({
@@ -364,6 +406,7 @@ export async function listCatalog(): Promise<CatalogCategory[]> {
         sortOrder: services.sortOrder,
       })
       .from(services)
+      .where(eq(services.clinicId, clinicId))
       .orderBy(asc(services.sortOrder), asc(services.name)),
   ]);
   return categories.map((category) => ({
@@ -391,7 +434,9 @@ export async function listCatalog(): Promise<CatalogCategory[]> {
 }
 
 // Active services in active categories, for scheduling.
-export async function listActiveServices(): Promise<ActiveService[]> {
+export async function listActiveServices(
+  clinicId: string,
+): Promise<ActiveService[]> {
   return db
     .select({
       id: services.id,
@@ -405,7 +450,11 @@ export async function listActiveServices(): Promise<ActiveService[]> {
     .from(services)
     .innerJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
     .where(
-      and(eq(services.isActive, true), eq(serviceCategories.isActive, true)),
+      and(
+        eq(services.clinicId, clinicId),
+        eq(services.isActive, true),
+        eq(serviceCategories.isActive, true),
+      ),
     )
     .orderBy(
       asc(serviceCategories.sortOrder),

@@ -11,7 +11,8 @@ import {
 } from "../src/modules/auth/admin-accounts";
 
 const USAGE = `Uso:
-  pnpm admin create                  cria uma conta de administração
+  pnpm admin create                  cria a conta da dona de uma clínica
+  pnpm admin create-root             cria uma conta root, que vê todas as clínicas
   pnpm admin reset-password <email>  define uma nova senha e encerra as sessões
   pnpm admin reset-2fa <email>       remove o 2FA; o próximo login pede nova configuração`;
 
@@ -84,11 +85,17 @@ async function main() {
   const [command, emailArgument] = process.argv.slice(2);
 
   switch (command) {
-    case "create": {
+    case "create":
+    case "create-root": {
+      const role = command === "create-root" ? "root" : "admin";
+      const clinicSlug =
+        role === "admin"
+          ? await ask("Endereço da clínica (por exemplo, grais): ")
+          : undefined;
       const email = await ask("E-mail: ");
       const name = await ask("Nome: ");
       const password = await askNewPassword();
-      await createAdmin({ email, name, password });
+      await createAdmin({ role, clinicSlug, email, name, password });
       console.log(
         "Conta criada. No primeiro acesso a /admin, o painel pede a configuração do 2FA.",
       );

@@ -22,6 +22,8 @@ const FLEXIBLE_SERVICE = "Avaliação / encaixe";
 // Seeded by drizzle/0005_flexible_service_seed.sql.
 const FLEXIBLE_SERVICE_ID = "00000000-0000-4000-8000-000000000002";
 const FIXTURE_PATIENT_ID = "00000000-0000-4000-8000-0000000000a1";
+// The first clinic, created by drizzle/0007_multi_clinic.sql.
+const CLINIC_ID = "00000000-0000-4000-8000-000000000100";
 const FIXTURE_APPOINTMENT_ID = "00000000-0000-4000-8000-0000000000a2";
 
 // A fictitious confirmed appointment today at 10:00 (clinic time), straight
@@ -31,24 +33,29 @@ async function withFixtureAppointment(run: () => Promise<void>) {
   await client.connect();
   try {
     await client.query(
-      `INSERT INTO patients (id, name, name_normalized, phone)
-       VALUES ($1, 'Fixture de Teste', 'fixture de teste', '+5511900000001')`,
-      [FIXTURE_PATIENT_ID],
+      `INSERT INTO patients (id, clinic_id, name, name_normalized, phone)
+       VALUES ($1, $2, 'Fixture de Teste', 'fixture de teste', '+5511900000001')`,
+      [FIXTURE_PATIENT_ID, CLINIC_ID],
     );
     await client.query(
       `WITH slot AS (
          SELECT (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo')
                  + interval '10 hours') AT TIME ZONE 'America/Sao_Paulo' AS starts_at
        )
-       INSERT INTO appointments (id, patient_id, service_id, service_name,
+       INSERT INTO appointments (id, clinic_id, patient_id, service_id, service_name,
          service_duration_minutes, custom_label, starts_at, ends_at,
          occupied_from, occupied_until, status, source, confirmed_at)
-       SELECT $1, $2, $3, 'Avaliação / encaixe', 30, 'Encaixe (teste)',
+       SELECT $1, $4, $2, $3, 'Avaliação / encaixe', 30, 'Encaixe (teste)',
          starts_at, starts_at + interval '30 minutes',
          starts_at, starts_at + interval '30 minutes',
          'confirmed', 'admin', now()
        FROM slot`,
-      [FIXTURE_APPOINTMENT_ID, FIXTURE_PATIENT_ID, FLEXIBLE_SERVICE_ID],
+      [
+        FIXTURE_APPOINTMENT_ID,
+        FIXTURE_PATIENT_ID,
+        FLEXIBLE_SERVICE_ID,
+        CLINIC_ID,
+      ],
     );
     await run();
   } finally {
@@ -147,9 +154,9 @@ test.describe("agenda", () => {
     try {
       // Two fictitious requests for tomorrow, 09:00 and 10:00 clinic time.
       await client.query(
-        `INSERT INTO patients (id, name, name_normalized, phone)
-         VALUES ($1, 'Pedido de Teste', 'pedido de teste', '+5511900000003')`,
-        [PATIENT_ID],
+        `INSERT INTO patients (id, clinic_id, name, name_normalized, phone)
+         VALUES ($1, $2, 'Pedido de Teste', 'pedido de teste', '+5511900000003')`,
+        [PATIENT_ID, CLINIC_ID],
       );
       for (const [id, hour] of [
         [CONFIRM_ID, 9],
@@ -158,12 +165,12 @@ test.describe("agenda", () => {
         const start = tomorrow.set({ hour }).toUTC().toISO();
         const end = tomorrow.set({ hour, minute: 30 }).toUTC().toISO();
         await client.query(
-          `INSERT INTO appointments (id, patient_id, service_id, service_name,
+          `INSERT INTO appointments (id, clinic_id, patient_id, service_id, service_name,
              service_duration_minutes, custom_label, starts_at, ends_at,
              occupied_from, occupied_until, status, source)
-           VALUES ($1, $2, $3, 'Avaliação / encaixe', 30, 'Encaixe (teste)',
+           VALUES ($1, $6, $2, $3, 'Avaliação / encaixe', 30, 'Encaixe (teste)',
              $4, $5, $4, $5, 'requested', 'online')`,
-          [id, PATIENT_ID, FLEXIBLE_SERVICE_ID, start, end],
+          [id, PATIENT_ID, FLEXIBLE_SERVICE_ID, start, end, CLINIC_ID],
         );
       }
 
@@ -395,8 +402,8 @@ test.describe("agenda", () => {
     test.beforeAll(async () => {
       // Monday to Saturday, 08:00-12:00 and 13:00-18:00; Sunday closed.
       await sql(
-        `INSERT INTO business_hours (weekday, start_time, end_time)
-         SELECT d, t.s::time, t.e::time
+        `INSERT INTO business_hours (clinic_id, weekday, start_time, end_time)
+         SELECT '00000000-0000-4000-8000-000000000100', d, t.s::time, t.e::time
          FROM generate_series(1, 6) AS d,
               (VALUES ('08:00', '12:00'), ('13:00', '18:00')) AS t(s, e)`,
       );
@@ -548,15 +555,15 @@ test.describe("agenda", () => {
 
     test("a drop on another appointment is refused and goes back", async () => {
       await sql(
-        `INSERT INTO patients (id, name, name_normalized, phone)
-         VALUES ($1, 'Fixture de Bloqueio', 'fixture de bloqueio', '+5511900000002')`,
-        [BLOCKER_PATIENT_ID],
+        `INSERT INTO patients (id, clinic_id, name, name_normalized, phone)
+         VALUES ($1, $2, 'Fixture de Bloqueio', 'fixture de bloqueio', '+5511900000002')`,
+        [BLOCKER_PATIENT_ID, CLINIC_ID],
       );
       await sql(
-        `INSERT INTO appointments (id, patient_id, service_id, service_name,
+        `INSERT INTO appointments (id, clinic_id, patient_id, service_id, service_name,
            service_duration_minutes, custom_label, starts_at, ends_at,
            occupied_from, occupied_until, status, source, confirmed_at)
-         VALUES ($1, $2, $3, 'Avaliação / encaixe', 30, 'Encaixe (teste)',
+         VALUES ($1, $6, $2, $3, 'Avaliação / encaixe', 30, 'Encaixe (teste)',
            $4, $5, $4, $5, 'confirmed', 'admin', now())`,
         [
           BLOCKER_APPOINTMENT_ID,
@@ -564,6 +571,7 @@ test.describe("agenda", () => {
           FLEXIBLE_SERVICE_ID,
           target.set({ hour: 15, minute: 0 }).toUTC().toISO(),
           target.set({ hour: 15, minute: 30 }).toUTC().toISO(),
+          CLINIC_ID,
         ],
       );
       await showTargetWeek();

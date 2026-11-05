@@ -65,7 +65,11 @@ export async function createServiceAction(
 
   let result;
   try {
-    result = await createService(parsed.data, session.user.id);
+    result = await createService(
+      session.clinicId,
+      parsed.data,
+      session.user.id,
+    );
   } catch {
     return failure(GENERIC_ERROR);
   }
@@ -86,7 +90,12 @@ export async function updateServiceAction(
 
   let result;
   try {
-    result = await updateService(id, parsed.data, session.user.id);
+    result = await updateService(
+      session.clinicId,
+      id,
+      parsed.data,
+      session.user.id,
+    );
   } catch {
     return failure(GENERIC_ERROR);
   }
@@ -108,7 +117,11 @@ export async function createCategoryAction(
 
   let result;
   try {
-    result = await createCategory(parsed.data, session.user.id);
+    result = await createCategory(
+      session.clinicId,
+      parsed.data,
+      session.user.id,
+    );
   } catch {
     return failure(GENERIC_ERROR);
   }
@@ -130,7 +143,12 @@ export async function updateCategoryAction(
 
   let result;
   try {
-    result = await updateCategory(id, parsed.data, session.user.id);
+    result = await updateCategory(
+      session.clinicId,
+      id,
+      parsed.data,
+      session.user.id,
+    );
   } catch {
     return failure(GENERIC_ERROR);
   }

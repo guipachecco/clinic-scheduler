@@ -34,8 +34,8 @@ function Badge({ children }: { children: React.ReactNode }) {
 }
 
 export default async function ServicesPage() {
-  await requireAdmin();
-  const catalog = await listCatalog();
+  const { clinicId } = await requireAdmin();
+  const catalog = await listCatalog(clinicId);
 
   return (
     <div className="grid max-w-3xl gap-8">

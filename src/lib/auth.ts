@@ -51,6 +51,8 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       role: { type: "string", required: true, input: false },
+      // The admin's clinic; empty for root (see src/modules/auth/session.ts).
+      clinicId: { type: "string", required: false, input: false },
     },
   },
   // Sessions end 12 hours after sign-in, whatever the activity.

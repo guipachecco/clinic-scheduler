@@ -9,6 +9,8 @@ import {
   services,
 } from "@/db/schema";
 
+import { CLINIC } from "../helpers/clinic";
+
 // Every record here is fictitious and exists only during the test.
 
 type NewAppointment = typeof appointments.$inferInsert;
@@ -29,6 +31,7 @@ function appointment(extra: Partial<NewAppointment> = {}): NewAppointment {
   const startsAt = new Date("2030-03-04T13:00Z");
   const endsAt = new Date(startsAt.getTime() + 60 * 60_000);
   return {
+    clinicId: CLINIC,
     patientId,
     serviceId,
     serviceName: "Serviço fictício",
@@ -57,11 +60,16 @@ beforeEach(async () => {
   );
   const [category] = await db
     .insert(serviceCategories)
-    .values({ name: "Categoria fictícia", slug: "categoria-ficticia" })
+    .values({
+      clinicId: CLINIC,
+      name: "Categoria fictícia",
+      slug: "categoria-ficticia",
+    })
     .returning();
   const [service] = await db
     .insert(services)
     .values({
+      clinicId: CLINIC,
       categoryId: category!.id,
       name: "Serviço fictício",
       slug: "servico-ficticio",
@@ -71,6 +79,7 @@ beforeEach(async () => {
   const [patient] = await db
     .insert(patients)
     .values({
+      clinicId: CLINIC,
       name: "Paciente Fictício",
       nameNormalized: "paciente ficticio",
       phone: "+5500000000000",
@@ -110,11 +119,11 @@ describe("appointment label and cancellation reason", () => {
 
   it("accepts a null label, a 60-char label and a listed reason", async () => {
     await db.insert(appointments).values(appointment());
-    await db.execute(sql`truncate table appointments`);
+    await db.execute(sql`truncate table appointments cascade`);
     await db
       .insert(appointments)
       .values(appointment({ customLabel: "a".repeat(60) }));
-    await db.execute(sql`truncate table appointments`);
+    await db.execute(sql`truncate table appointments cascade`);
     await db
       .insert(appointments)
       .values(appointment(cancelled("patient_request")));

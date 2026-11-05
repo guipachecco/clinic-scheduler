@@ -42,11 +42,14 @@ const UUID_PATTERN =
 
 // `paciente` (an opaque id, from the patient record) preselects the patient
 // when it exists and is not anonymized. The name is resolved here.
-async function initialPatient(paciente: string | string[] | undefined) {
+async function initialPatient(
+  clinicId: string,
+  paciente: string | string[] | undefined,
+) {
   if (typeof paciente !== "string" || !UUID_PATTERN.test(paciente)) {
     return null;
   }
-  const patient = await getPatient(paciente);
+  const patient = await getPatient(clinicId, paciente);
   if (!patient || patient.anonymizedAt) return null;
   return { id: patient.id, name: patient.name };
 }
@@ -73,12 +76,12 @@ export default async function NewAppointmentPage({
     paciente?: string | string[];
   }>;
 }) {
-  await requireAdmin();
+  const { clinicId } = await requireAdmin();
   const [{ inicio, paciente }, services] = await Promise.all([
     searchParams,
-    listActiveServices(),
+    listActiveServices(clinicId),
   ]);
-  const patient = await initialPatient(paciente);
+  const patient = await initialPatient(clinicId, paciente);
 
   return (
     <div className="grid max-w-3xl gap-6">

@@ -49,17 +49,17 @@ const isActive = (status: string) =>
   (ACTIVE_APPOINTMENT_STATUSES as readonly string[]).includes(status);
 
 export default async function AgendaPage() {
-  await requireAdmin();
+  const { clinicId } = await requireAdmin();
   const now = new Date();
   const today = todayLocal();
   const { startsAt, endsAt } = localDayRange(today, today);
   const [days, slotStepMinutes, services, requested, todayEvents] =
     await Promise.all([
-      getBusinessHours(),
-      getSlotStepMinutes(),
-      listActiveServices(),
-      listRequestedFrom(now),
-      listAppointmentsInRange({
+      getBusinessHours(clinicId),
+      getSlotStepMinutes(clinicId),
+      listActiveServices(clinicId),
+      listRequestedFrom(clinicId, now),
+      listAppointmentsInRange(clinicId, {
         from: startsAt,
         to: endsAt,
         includeCancelled: false,

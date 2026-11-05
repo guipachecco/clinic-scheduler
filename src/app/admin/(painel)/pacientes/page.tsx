@@ -10,8 +10,8 @@ import { PatientSearch } from "./patient-search";
 export const metadata: Metadata = { title: "Pacientes" };
 
 export default async function PatientsPage() {
-  await requireAdmin();
-  const { items, next } = await searchPatients({ term: "" });
+  const { clinicId } = await requireAdmin();
+  const { items, next } = await searchPatients(clinicId, { term: "" });
 
   return (
     <div className="grid gap-6">

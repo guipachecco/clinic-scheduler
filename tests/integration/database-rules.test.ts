@@ -2,7 +2,9 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { db, pool } from "@/db/client";
-import { clinicSettings, patients } from "@/db/schema";
+import { clinics, patients, users } from "@/db/schema";
+
+import { CLINIC } from "../helpers/clinic";
 
 afterAll(async () => {
   await pool.end();
@@ -17,25 +19,54 @@ async function failure(promise: Promise<unknown>) {
   throw new Error("expected the query to fail");
 }
 
-describe("clinic settings", () => {
-  it("starts with a single row, online booking off and no content", async () => {
-    const rows = await db.select().from(clinicSettings);
+describe("clinics", () => {
+  it("starts with the first clinic, online booking off and no content", async () => {
+    const rows = await db.select().from(clinics).where(eq(clinics.id, CLINIC));
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      id: 1,
+      slug: "grais",
+      isActive: true,
       onlineBookingEnabled: false,
       timezone: "America/Sao_Paulo",
-      clinicName: null,
       professionalName: null,
       whatsappPhone: null,
       address: null,
     });
   });
 
-  it("does not accept a second row", async () => {
+  it("does not accept a repeated or malformed address", async () => {
     expect(
-      await failure(db.insert(clinicSettings).values({ id: 2 })),
-    ).toContain("clinic_settings_singleton_check");
+      await failure(db.insert(clinics).values({ slug: "grais", name: "X" })),
+    ).toContain("clinics_slug_unique");
+    expect(
+      await failure(
+        db.insert(clinics).values({ slug: "Com Espaço", name: "X" }),
+      ),
+    ).toContain("clinics_slug_check");
+  });
+});
+
+describe("users", () => {
+  it("requires a clinic for admin and none for root", async () => {
+    expect(
+      await failure(
+        db.insert(users).values({
+          name: "A",
+          email: "sem-clinica@example.com",
+          role: "admin",
+        }),
+      ),
+    ).toContain("users_role_clinic_check");
+    expect(
+      await failure(
+        db.insert(users).values({
+          name: "R",
+          email: "root-com-clinica@example.com",
+          role: "root",
+          clinicId: CLINIC,
+        }),
+      ),
+    ).toContain("users_role_clinic_check");
   });
 });
 
@@ -44,6 +75,7 @@ describe("patients", () => {
     expect(
       await failure(
         db.insert(patients).values({
+          clinicId: CLINIC,
           name: "Paciente Fictício",
           nameNormalized: "paciente ficticio",
           phone: "(11) 0000-0000",
@@ -56,6 +88,7 @@ describe("patients", () => {
     const [patient] = await db
       .insert(patients)
       .values({
+        clinicId: CLINIC,
         name: "Paciente Fictício",
         nameNormalized: "paciente ficticio",
         phone: "+5500000000001",
