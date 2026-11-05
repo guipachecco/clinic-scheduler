@@ -2,7 +2,7 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic } from "@/db/client";
 import { auditLogs, clinics } from "@/db/schema";
 
 import { type Palette, palettesForClinic, resolvePalette } from "./palettes";
@@ -24,18 +24,20 @@ export type ClinicBranding = {
 export async function getClinicBranding(
   clinicId: string,
 ): Promise<ClinicBranding | null> {
-  const [row] = await db
-    .select({
-      slug: clinics.slug,
-      name: clinics.name,
-      displayName: clinics.displayName,
-      areaLabel: clinics.areaLabel,
-      theme: clinics.theme,
-      ownerPhotoMediaId: clinics.ownerPhotoMediaId,
-    })
-    .from(clinics)
-    .where(eq(clinics.id, clinicId))
-    .limit(1);
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        slug: clinics.slug,
+        name: clinics.name,
+        displayName: clinics.displayName,
+        areaLabel: clinics.areaLabel,
+        theme: clinics.theme,
+        ownerPhotoMediaId: clinics.ownerPhotoMediaId,
+      })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId))
+      .limit(1),
+  );
   if (!row) return null;
   return {
     clinicId,
@@ -54,7 +56,7 @@ export async function setClinicPalette(
   paletteId: string,
   actorUserId: string,
 ): Promise<{ ok: true } | { ok: false; formError: string }> {
-  return db.transaction(async (tx) => {
+  return inClinic(clinicId, async (tx) => {
     const [row] = await tx
       .select({ slug: clinics.slug, theme: clinics.theme })
       .from(clinics)
@@ -88,7 +90,7 @@ export async function updateBrandingText(
   values: { displayName: string | null; areaLabel: string | null },
   actorUserId: string,
 ): Promise<{ ok: true }> {
-  await db.transaction(async (tx) => {
+  await inClinic(clinicId, async (tx) => {
     await tx
       .update(clinics)
       .set({ displayName: values.displayName, areaLabel: values.areaLabel })

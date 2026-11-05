@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { db, pool } from "@/db/client";
+import { db, endPools } from "@/db/client";
 import { auditLogs, clinics, media, users } from "@/db/schema";
 import {
   getClinicMedia,
@@ -43,7 +43,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
+  await endPools();
 });
 
 describe("owner photo", () => {

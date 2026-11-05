@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, desc, eq, gt, gte, inArray, lt, ne, sql } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic, type Tx } from "@/db/client";
 import { isAppointmentOverlapError, isUniqueViolation } from "@/db/errors";
 import {
   ACTIVE_APPOINTMENT_STATUSES,
@@ -114,7 +114,6 @@ const REASON_REQUIRED = "Escolha o motivo do cancelamento.";
 const ALREADY_SUBMITTED =
   "Este formulário já foi enviado. Recarregue a página para criar outro agendamento.";
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Fail = Extract<AppointmentResult, { ok: false }>;
 
 type ServiceRow = {
@@ -356,7 +355,7 @@ export async function createAppointment(
     return formFail("Recarregue a página e tente de novo.");
   }
   try {
-    return await db.transaction(async (tx): Promise<AppointmentResult> => {
+    return await inClinic(clinicId, async (tx): Promise<AppointmentResult> => {
       await lockAgenda(tx, clinicId);
 
       const [existing] = await tx
@@ -430,16 +429,18 @@ export async function createAppointment(
     });
   } catch (error) {
     if (isUniqueViolation(error, "appointments_idempotency_key_unique")) {
-      const [existing] = await db
-        .select(REPLAY_COLUMNS)
-        .from(appointments)
-        .where(
-          and(
-            eq(appointments.idempotencyKey, values.idempotencyKey),
-            eq(appointments.clinicId, clinicId),
-          ),
-        )
-        .limit(1);
+      const [existing] = await inClinic(clinicId, (tx) =>
+        tx
+          .select(REPLAY_COLUMNS)
+          .from(appointments)
+          .where(
+            and(
+              eq(appointments.idempotencyKey, values.idempotencyKey),
+              eq(appointments.clinicId, clinicId),
+            ),
+          )
+          .limit(1),
+      );
       if (existing) return replay(existing, values);
     }
     return backstop(error);
@@ -583,7 +584,7 @@ export async function updateAppointment(
     return fieldFail("serviceId", SERVICE_MISSING);
   }
   try {
-    return await db.transaction(async (tx): Promise<AppointmentResult> => {
+    return await inClinic(clinicId, async (tx): Promise<AppointmentResult> => {
       await lockAgenda(tx, clinicId);
       const locked = await lockAppointment(tx, clinicId, id);
       if (locked.fail) return locked.fail;
@@ -691,7 +692,7 @@ export async function rescheduleAppointment(
 ): Promise<AppointmentResult> {
   if (!UUID_PATTERN.test(id)) return formFail(NOT_FOUND);
   try {
-    return await db.transaction(async (tx): Promise<AppointmentResult> => {
+    return await inClinic(clinicId, async (tx): Promise<AppointmentResult> => {
       await lockAgenda(tx, clinicId);
       const locked = await lockAppointment(tx, clinicId, id);
       if (locked.fail) return locked.fail;
@@ -767,7 +768,7 @@ export async function changeAppointmentStatus(
     return fieldFail("reason", REASON_REQUIRED);
   }
   try {
-    return await db.transaction(async (tx): Promise<AppointmentResult> => {
+    return await inClinic(clinicId, async (tx): Promise<AppointmentResult> => {
       await lockAgenda(tx, clinicId);
       const locked = await lockAppointment(tx, clinicId, id, {
         allowAnonymized: true,
@@ -840,28 +841,30 @@ export async function getAppointment(
   now: Date = new Date(),
 ): Promise<AppointmentRecord | null> {
   if (!UUID_PATTERN.test(id)) return null;
-  const [row] = await db
-    .select({
-      id: appointments.id,
-      patientId: appointments.patientId,
-      patientName: patients.name,
-      anonymizedAt: patients.anonymizedAt,
-      serviceId: appointments.serviceId,
-      serviceName: appointments.serviceName,
-      isFlexible: services.isFlexible,
-      customLabel: appointments.customLabel,
-      startsAt: appointments.startsAt,
-      endsAt: appointments.endsAt,
-      status: appointments.status,
-      source: appointments.source,
-      cancellationReason: appointments.cancellationReason,
-      confirmedAt: appointments.confirmedAt,
-    })
-    .from(appointments)
-    .innerJoin(patients, eq(appointments.patientId, patients.id))
-    .innerJoin(services, eq(appointments.serviceId, services.id))
-    .where(and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)))
-    .limit(1);
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: appointments.id,
+        patientId: appointments.patientId,
+        patientName: patients.name,
+        anonymizedAt: patients.anonymizedAt,
+        serviceId: appointments.serviceId,
+        serviceName: appointments.serviceName,
+        isFlexible: services.isFlexible,
+        customLabel: appointments.customLabel,
+        startsAt: appointments.startsAt,
+        endsAt: appointments.endsAt,
+        status: appointments.status,
+        source: appointments.source,
+        cancellationReason: appointments.cancellationReason,
+        confirmedAt: appointments.confirmedAt,
+      })
+      .from(appointments)
+      .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .innerJoin(services, eq(appointments.serviceId, services.id))
+      .where(and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)))
+      .limit(1),
+  );
   if (!row) return null;
   // Anonymized patients cannot be (re)scheduled, but their appointments
   // still take status corrections.
@@ -936,21 +939,23 @@ export async function listAppointmentsInRange(
     includeCancelled: boolean;
   },
 ): Promise<CalendarEvent[]> {
-  const rows = await db
-    .select(calendarColumns)
-    .from(appointments)
-    .innerJoin(patients, eq(appointments.patientId, patients.id))
-    .where(
-      and(
-        eq(appointments.clinicId, clinicId),
-        lt(appointments.startsAt, input.to),
-        gt(appointments.endsAt, input.from),
-        input.includeCancelled
-          ? undefined
-          : ne(appointments.status, "cancelled"),
-      ),
-    )
-    .orderBy(asc(appointments.startsAt), asc(appointments.id));
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select(calendarColumns)
+      .from(appointments)
+      .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .where(
+        and(
+          eq(appointments.clinicId, clinicId),
+          lt(appointments.startsAt, input.to),
+          gt(appointments.endsAt, input.from),
+          input.includeCancelled
+            ? undefined
+            : ne(appointments.status, "cancelled"),
+        ),
+      )
+      .orderBy(asc(appointments.startsAt), asc(appointments.id)),
+  );
   return rows.map(toCalendarEvent);
 }
 
@@ -969,13 +974,18 @@ export async function listRequestedFrom(
   clinicId: string,
   now: Date = new Date(),
 ): Promise<RequestedItem[]> {
-  const rows = await db
-    .select({ ...calendarColumns, requiresApproval: services.requiresApproval })
-    .from(appointments)
-    .innerJoin(patients, eq(appointments.patientId, patients.id))
-    .innerJoin(services, eq(appointments.serviceId, services.id))
-    .where(pendingFrom(clinicId, now))
-    .orderBy(asc(appointments.startsAt), asc(appointments.id));
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        ...calendarColumns,
+        requiresApproval: services.requiresApproval,
+      })
+      .from(appointments)
+      .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .innerJoin(services, eq(appointments.serviceId, services.id))
+      .where(pendingFrom(clinicId, now))
+      .orderBy(asc(appointments.startsAt), asc(appointments.id)),
+  );
   return rows.map((row) => ({
     ...toCalendarEvent(row),
     requiresApproval: row.requiresApproval,
@@ -987,10 +997,12 @@ export async function countRequestedFrom(
   clinicId: string,
   now: Date = new Date(),
 ): Promise<number> {
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(appointments)
-    .where(pendingFrom(clinicId, now));
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(appointments)
+      .where(pendingFrom(clinicId, now)),
+  );
   return row?.count ?? 0;
 }
 
@@ -1012,31 +1024,34 @@ export async function listPatientAppointments(
     customLabel: appointments.customLabel,
     status: appointments.status,
   };
-  const [upcoming, past] = await Promise.all([
-    db
-      .select(columns)
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.clinicId, clinicId),
-          eq(appointments.patientId, patientId),
-          gte(appointments.startsAt, now),
-        ),
-      )
-      .orderBy(asc(appointments.startsAt), asc(appointments.id))
-      .limit(PATIENT_LIST_LIMIT),
-    db
-      .select(columns)
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.clinicId, clinicId),
-          eq(appointments.patientId, patientId),
-          lt(appointments.startsAt, now),
-        ),
-      )
-      .orderBy(desc(appointments.startsAt), desc(appointments.id))
-      .limit(PATIENT_LIST_LIMIT),
-  ]);
+  // One transaction runs one query at a time: each is awaited in turn.
+  const [upcoming, past] = await inClinic(clinicId, async (tx) =>
+    Promise.all([
+      await tx
+        .select(columns)
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.clinicId, clinicId),
+            eq(appointments.patientId, patientId),
+            gte(appointments.startsAt, now),
+          ),
+        )
+        .orderBy(asc(appointments.startsAt), asc(appointments.id))
+        .limit(PATIENT_LIST_LIMIT),
+      await tx
+        .select(columns)
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.clinicId, clinicId),
+            eq(appointments.patientId, patientId),
+            lt(appointments.startsAt, now),
+          ),
+        )
+        .orderBy(desc(appointments.startsAt), desc(appointments.id))
+        .limit(PATIENT_LIST_LIMIT),
+    ]),
+  );
   return { upcoming, past };
 }

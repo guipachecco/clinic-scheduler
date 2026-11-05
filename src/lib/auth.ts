@@ -3,7 +3,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { twoFactor } from "better-auth/plugins/two-factor";
 
-import { db } from "@/db/client";
+import { authDb } from "@/db/client";
 import {
   accounts,
   rateLimits,
@@ -26,7 +26,7 @@ export const auth = betterAuth({
   appName: APP_NAME,
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  database: drizzleAdapter(db, {
+  database: drizzleAdapter(authDb, {
     provider: "pg",
     schema: {
       user: users,

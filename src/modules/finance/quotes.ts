@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic, type Tx } from "@/db/client";
 import {
   auditLogs,
   installments,
@@ -69,8 +69,6 @@ const QUOTE_NUMBER_LOCK = 7_204_514;
 const NOT_FOUND = "Orçamento não encontrado.";
 const PATIENT_MISSING = "Escolha um paciente cadastrado.";
 const SERVICE_MISSING = "Um dos serviços não existe mais.";
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 const fail = (formError: string): QuoteResult => ({ ok: false, formError });
 
@@ -139,7 +137,7 @@ export async function createQuote(
   actorUserId: string,
 ): Promise<QuoteResult> {
   try {
-    return await db.transaction(async (tx): Promise<QuoteResult> => {
+    return await inClinic(clinicId, async (tx): Promise<QuoteResult> => {
       if (!(await checkPatient(tx, clinicId, values.patientId))) {
         return { ok: false, fieldErrors: { patientId: PATIENT_MISSING } };
       }
@@ -203,7 +201,7 @@ export async function updateQuote(
 ): Promise<QuoteResult> {
   if (!UUID_PATTERN.test(id)) return fail(NOT_FOUND);
   try {
-    return await db.transaction(async (tx): Promise<QuoteResult> => {
+    return await inClinic(clinicId, async (tx): Promise<QuoteResult> => {
       const quote = await lockQuote(tx, clinicId, id);
       if (!quote) return fail(NOT_FOUND);
       if (quote.status !== "draft") {
@@ -261,7 +259,7 @@ export async function setQuoteStatus(
   now: Date = new Date(),
 ): Promise<QuoteResult> {
   if (!UUID_PATTERN.test(id)) return fail(NOT_FOUND);
-  return db.transaction(async (tx): Promise<QuoteResult> => {
+  return inClinic(clinicId, async (tx): Promise<QuoteResult> => {
     const quote = await lockQuote(tx, clinicId, id);
     if (!quote) return fail(NOT_FOUND);
     if (!TRANSITIONS[to]!.includes(quote.status)) {
@@ -325,7 +323,7 @@ export async function approveQuote(
 ): Promise<QuoteResult & { saleId?: string }> {
   if (!UUID_PATTERN.test(id)) return fail(NOT_FOUND);
   try {
-    return await db.transaction(async (tx) => {
+    return await inClinic(clinicId, async (tx) => {
       const quote = await lockQuote(tx, clinicId, id);
       if (!quote) return fail(NOT_FOUND);
       if (quote.status !== "draft" && quote.status !== "sent") {
@@ -508,19 +506,21 @@ export async function listQuotes(
   clinicId: string,
   input: { today: string; status?: QuoteStatus; patientId?: string },
 ): Promise<QuoteListItem[]> {
-  const rows = await db
-    .select({ ...listColumns, itemsTotal })
-    .from(quotes)
-    .innerJoin(patients, eq(quotes.patientId, patients.id))
-    .where(
-      and(
-        eq(quotes.clinicId, clinicId),
-        input.status ? eq(quotes.status, input.status) : undefined,
-        input.patientId ? eq(quotes.patientId, input.patientId) : undefined,
-      ),
-    )
-    .orderBy(desc(quotes.number))
-    .limit(200);
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ ...listColumns, itemsTotal })
+      .from(quotes)
+      .innerJoin(patients, eq(quotes.patientId, patients.id))
+      .where(
+        and(
+          eq(quotes.clinicId, clinicId),
+          input.status ? eq(quotes.status, input.status) : undefined,
+          input.patientId ? eq(quotes.patientId, input.patientId) : undefined,
+        ),
+      )
+      .orderBy(desc(quotes.number))
+      .limit(200),
+  );
   return rows.map((row) => ({
     id: row.id,
     number: row.number,
@@ -540,24 +540,28 @@ export async function getQuote(
   today: string,
 ): Promise<QuoteDetail | null> {
   if (!UUID_PATTERN.test(id)) return null;
-  const [row] = await db
-    .select({
-      ...listColumns,
-      notes: quotes.notes,
-      sentAt: quotes.sentAt,
-      saleId: sales.id,
-    })
-    .from(quotes)
-    .innerJoin(patients, eq(quotes.patientId, patients.id))
-    .leftJoin(sales, eq(sales.quoteId, quotes.id))
-    .where(and(eq(quotes.id, id), eq(quotes.clinicId, clinicId)))
-    .limit(1);
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        ...listColumns,
+        notes: quotes.notes,
+        sentAt: quotes.sentAt,
+        saleId: sales.id,
+      })
+      .from(quotes)
+      .innerJoin(patients, eq(quotes.patientId, patients.id))
+      .leftJoin(sales, eq(sales.quoteId, quotes.id))
+      .where(and(eq(quotes.id, id), eq(quotes.clinicId, clinicId)))
+      .limit(1),
+  );
   if (!row) return null;
-  const items = await db
-    .select()
-    .from(quoteItems)
-    .where(eq(quoteItems.quoteId, id))
-    .orderBy(asc(quoteItems.sortOrder));
+  const items = await inClinic(clinicId, (tx) =>
+    tx
+      .select()
+      .from(quoteItems)
+      .where(eq(quoteItems.quoteId, id))
+      .orderBy(asc(quoteItems.sortOrder)),
+  );
   const totals = quoteTotals(items, row.discountCents);
   return {
     id: row.id,

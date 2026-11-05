@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { DateTime } from "luxon";
 
-import type { db } from "@/db/client";
+import type { Tx } from "@/db/client";
 import {
   appointments,
   installments,
@@ -24,8 +24,6 @@ import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 // - Requested, confirmed or completed: the installment follows the date. A
 //   session without an installment takes the next free one of the item:
 //   first a paid one without a session, then the lowest open number.
-
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // Statuses that use up a session of the package.
 export const SESSION_COUNTING_STATUSES = [

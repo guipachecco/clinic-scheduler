@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { db, pool } from "@/db/client";
+import { db, endPools } from "@/db/client";
 import { clinics, users } from "@/db/schema";
 import {
   getClinicBranding,
@@ -34,7 +34,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
+  await endPools();
 });
 
 describe("clinic branding", () => {

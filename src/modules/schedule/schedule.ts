@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, eq, gt, gte, inArray, lt, sql } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic, type Tx } from "@/db/client";
 import {
   ACTIVE_APPOINTMENT_STATUSES,
   appointments,
@@ -52,8 +52,6 @@ async function lockClinic(tx: Tx, key: number, clinicId: string) {
   );
 }
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
 // Never lets driver details (which can echo values) out of this module.
 function unexpected(message: string, error: unknown): Error {
   return new Error(message, { cause: error });
@@ -75,8 +73,9 @@ function emptyWeek(): DayHours[] {
 
 async function readWeek(
   clinicId: string,
-  executor: Pick<Tx, "select"> = db,
+  executor?: Pick<Tx, "select">,
 ): Promise<DayHours[]> {
+  if (!executor) return inClinic(clinicId, (tx) => readWeek(clinicId, tx));
   const rows = await executor
     .select()
     .from(businessHours)
@@ -109,7 +108,7 @@ export async function saveBusinessHours(
   actorUserId: string,
 ): Promise<{ ok: true }> {
   try {
-    await db.transaction(async (tx) => {
+    await inClinic(clinicId, async (tx) => {
       await lockClinic(tx, HOURS_LOCK, clinicId);
       const before = await readWeek(clinicId, tx);
       const after = emptyWeek();
@@ -169,11 +168,13 @@ export async function listUpcomingBlocks(
   clinicId: string,
   now: Date = new Date(),
 ): Promise<TimeBlockItem[]> {
-  const rows = await db
-    .select(blockColumns)
-    .from(timeBlocks)
-    .where(and(eq(timeBlocks.clinicId, clinicId), gt(timeBlocks.endsAt, now)))
-    .orderBy(asc(timeBlocks.startsAt), asc(timeBlocks.id));
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select(blockColumns)
+      .from(timeBlocks)
+      .where(and(eq(timeBlocks.clinicId, clinicId), gt(timeBlocks.endsAt, now)))
+      .orderBy(asc(timeBlocks.startsAt), asc(timeBlocks.id)),
+  );
   return rows.map((row) => ({ ...row, deletable: row.startsAt > now }));
 }
 
@@ -185,7 +186,7 @@ export async function createTimeBlock(
   actorUserId: string,
 ): Promise<{ ok: true; id: string; conflicts: string[] }> {
   try {
-    return await db.transaction(async (tx) => {
+    return await inClinic(clinicId, async (tx) => {
       const [row] = await tx
         .insert(timeBlocks)
         .values({ ...values, clinicId, createdByUserId: actorUserId })
@@ -237,7 +238,7 @@ export async function deleteTimeBlock(
 > {
   if (!UUID_PATTERN.test(id)) return { ok: false, reason: "not_found" };
   try {
-    return await db.transaction(async (tx) => {
+    return await inClinic(clinicId, async (tx) => {
       const [current] = await tx
         .select({ startsAt: timeBlocks.startsAt })
         .from(timeBlocks)
@@ -273,7 +274,7 @@ export async function addNationalHolidays(
   actorUserId: string,
 ): Promise<{ ok: true; created: number }> {
   try {
-    return await db.transaction(async (tx) => {
+    return await inClinic(clinicId, async (tx) => {
       await lockClinic(tx, HOLIDAYS_LOCK, clinicId);
       let created = 0;
       for (const holiday of nationalHolidays(year)) {
@@ -328,8 +329,13 @@ export async function findBlocksAndHours(
     to: Date;
   },
   now: Date = new Date(),
-  executor: Pick<Tx, "select"> = db,
+  executor?: Pick<Tx, "select">,
 ): Promise<{ blocks: TimeBlockItem[]; hours: DayHours[] }> {
+  if (!executor) {
+    return inClinic(clinicId, (tx) =>
+      findBlocksAndHours(clinicId, range, now, tx),
+    );
+  }
   const rows = await executor
     .select(blockColumns)
     .from(timeBlocks)
@@ -352,10 +358,12 @@ const DEFAULT_SLOT_STEP_MINUTES = 30;
 // The agenda grid step (clinics.slot_step_minutes). The default covers a
 // clinic id that no longer exists.
 export async function getSlotStepMinutes(clinicId: string): Promise<number> {
-  const [row] = await db
-    .select({ slotStepMinutes: clinics.slotStepMinutes })
-    .from(clinics)
-    .where(eq(clinics.id, clinicId))
-    .limit(1);
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ slotStepMinutes: clinics.slotStepMinutes })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId))
+      .limit(1),
+  );
   return row?.slotStepMinutes ?? DEFAULT_SLOT_STEP_MINUTES;
 }

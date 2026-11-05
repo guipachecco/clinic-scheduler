@@ -1,8 +1,8 @@
-import { sql } from "drizzle-orm";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { eq, sql } from "drizzle-orm";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { db, pool } from "@/db/client";
-import { appointments, users } from "@/db/schema";
+import { currentDbUser, db, endPools, inClinic, type Tx } from "@/db/client";
+import { appointments, patients, users } from "@/db/schema";
 import {
   createAppointment,
   getAppointment,
@@ -29,6 +29,24 @@ import {
 } from "@/modules/schedule/schedule";
 
 import { CLINIC, otherClinic } from "../helpers/clinic";
+
+// Every inClinic call the modules make also records the database user its
+// transaction runs as.
+const seenDbUsers = vi.hoisted(() => [] as string[]);
+vi.mock("@/db/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/db/client")>();
+  return {
+    ...actual,
+    inClinic: <T>(clinicId: string, fn: (tx: Tx) => Promise<T>) =>
+      actual.inClinic(clinicId, async (tx) => {
+        const result = await tx.execute<{ current_user: string }>(
+          sql`select current_user`,
+        );
+        seenDbUsers.push(result.rows[0]!.current_user);
+        return fn(tx);
+      }),
+  };
+});
 
 // Every record here is fictitious and exists only during the test. Two
 // clinics, A (the first clinic) and B, share the database; each one must only
@@ -142,7 +160,29 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
+  await endPools();
+});
+
+describe("database user", () => {
+  it("module calls run as app_panel", async () => {
+    expect(await currentDbUser(CLINIC)).toBe("app_panel");
+
+    seenDbUsers.length = 0;
+    await patientIn(CLINIC, actorA, "Hana Fictícia");
+    await searchPatients(CLINIC, { term: "hana" });
+    await listCatalog(CLINIC);
+    await getBusinessHours(CLINIC);
+    expect(seenDbUsers.length).toBeGreaterThanOrEqual(4);
+    expect(new Set(seenDbUsers)).toEqual(new Set(["app_panel"]));
+  });
+
+  it("a module cannot read another clinic even with a forged id filter", async () => {
+    await patientIn(clinicB, actorB, "Iris Fictícia");
+    const rows = await inClinic(CLINIC, (tx) =>
+      tx.select().from(patients).where(eq(patients.clinicId, clinicB)),
+    );
+    expect(rows).toEqual([]);
+  });
 });
 
 describe("patients", () => {

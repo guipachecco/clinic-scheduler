@@ -49,6 +49,16 @@ export function inClinic<T>(
   return withClinic(panelDb, clinicId, fn);
 }
 
+// The PostgreSQL user the panel's transactions run as (checked by the tests).
+export async function currentDbUser(clinicId: string): Promise<string> {
+  return inClinic(clinicId, async (tx) => {
+    const result = await tx.execute<{ current_user: string }>(
+      sql`select current_user`,
+    );
+    return result.rows[0]!.current_user;
+  });
+}
+
 export async function endPools() {
   await Promise.all(
     [pool, authPool, panelPool, clientPool, platformPool].map((p) => p.end()),

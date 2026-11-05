@@ -2,7 +2,7 @@ import "server-only";
 
 import { asc, eq } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic, platformDb } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import {
   auditLogs,
@@ -22,7 +22,8 @@ import { CLINIC_BRANDING, resolvePalette } from "@/modules/branding/palettes";
 import type { ClinicFormValues } from "./fields";
 
 // Data functions for the clinics themselves. Only root creates or changes
-// clinics; every other module receives a clinicId and stays inside it.
+// clinics (as app_platform); every other module receives a clinicId and stays
+// inside it (as app_panel, through inClinic).
 
 export type ClinicSummary = {
   id: string;
@@ -49,18 +50,17 @@ const summaryColumns = {
 
 export async function getClinic(id: string): Promise<ClinicSummary | null> {
   if (!UUID_PATTERN.test(id)) return null;
-  const [row] = await db
-    .select(summaryColumns)
-    .from(clinics)
-    .where(eq(clinics.id, id))
-    .limit(1);
+  const [row] = await inClinic(id, (tx) =>
+    tx.select(summaryColumns).from(clinics).where(eq(clinics.id, id)).limit(1),
+  );
   return row ?? null;
 }
 
 export async function getClinicBySlug(
   slug: string,
 ): Promise<ClinicSummary | null> {
-  const [row] = await db
+  // The slug is all there is before the clinic is known: app_platform.
+  const [row] = await platformDb
     .select(summaryColumns)
     .from(clinics)
     .where(eq(clinics.slug, slug))
@@ -69,7 +69,10 @@ export async function getClinicBySlug(
 }
 
 export async function listClinics(): Promise<ClinicSummary[]> {
-  return db.select(summaryColumns).from(clinics).orderBy(asc(clinics.name));
+  return platformDb
+    .select(summaryColumns)
+    .from(clinics)
+    .orderBy(asc(clinics.name));
 }
 
 // Creates the clinic with what every clinic needs to start: the "Outros"
@@ -81,7 +84,7 @@ export async function createClinic(
   actorUserId: string,
 ): Promise<ClinicResult> {
   try {
-    return await db.transaction(async (tx): Promise<ClinicResult> => {
+    return await platformDb.transaction(async (tx): Promise<ClinicResult> => {
       const [taken] = await tx
         .select({ id: clinics.id })
         .from(clinics)
@@ -164,7 +167,7 @@ export async function setClinicActive(
   actorUserId: string,
 ): Promise<{ ok: boolean }> {
   if (!UUID_PATTERN.test(id)) return { ok: false };
-  return db.transaction(async (tx) => {
+  return platformDb.transaction(async (tx) => {
     const updated = await tx
       .update(clinics)
       .set({ isActive })

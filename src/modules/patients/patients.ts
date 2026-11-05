@@ -12,7 +12,7 @@ import {
   type SQL,
 } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic, type Tx } from "@/db/client";
 import { findPgError, isUniqueViolation } from "@/db/errors";
 import { appointments, auditLogs, patients } from "@/db/schema";
 
@@ -91,8 +91,6 @@ const FORM_KEYS = [
   "notes",
 ] as const satisfies readonly (keyof PatientFormValues)[];
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
 function rowValues(values: PatientFormValues) {
   return { ...values, nameNormalized: normalizeName(values.name) };
 }
@@ -156,7 +154,9 @@ async function conflictFromError(
   ) {
     return null;
   }
-  const conflict = await findConflict(db, clinicId, values, excludeId);
+  const conflict = await inClinic(clinicId, (tx) =>
+    findConflict(tx, clinicId, values, excludeId),
+  );
   if (conflict) return conflict;
   const constraint = findPgError(error)?.constraint;
   return {
@@ -174,7 +174,7 @@ export async function createPatient(
   actorUserId: string,
 ): Promise<ActionResult> {
   try {
-    return await db.transaction(async (tx): Promise<ActionResult> => {
+    return await inClinic(clinicId, async (tx): Promise<ActionResult> => {
       const conflict = await findConflict(tx, clinicId, values);
       if (conflict) return conflict;
       const [row] = await tx
@@ -208,7 +208,7 @@ export async function updatePatient(
 ): Promise<ActionResult> {
   if (!UUID_PATTERN.test(id)) return { ok: false, fieldErrors: {} };
   try {
-    return await db.transaction(async (tx): Promise<ActionResult> => {
+    return await inClinic(clinicId, async (tx): Promise<ActionResult> => {
       const [current] = await tx
         .select()
         .from(patients)
@@ -252,28 +252,30 @@ export async function getPatient(
   id: string,
 ): Promise<PatientRecord | null> {
   if (!UUID_PATTERN.test(id)) return null;
-  const [row] = await db
-    .select({
-      id: patients.id,
-      name: patients.name,
-      nickname: patients.nickname,
-      cpf: patients.cpf,
-      rg: patients.rg,
-      phone: patients.phone,
-      landlinePhone: patients.landlinePhone,
-      email: patients.email,
-      birthDate: patients.birthDate,
-      gender: patients.gender,
-      referralSource: patients.referralSource,
-      referredBy: patients.referredBy,
-      notes: patients.notes,
-      createdAt: patients.createdAt,
-      updatedAt: patients.updatedAt,
-      anonymizedAt: patients.anonymizedAt,
-    })
-    .from(patients)
-    .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)))
-    .limit(1);
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: patients.id,
+        name: patients.name,
+        nickname: patients.nickname,
+        cpf: patients.cpf,
+        rg: patients.rg,
+        phone: patients.phone,
+        landlinePhone: patients.landlinePhone,
+        email: patients.email,
+        birthDate: patients.birthDate,
+        gender: patients.gender,
+        referralSource: patients.referralSource,
+        referredBy: patients.referredBy,
+        notes: patients.notes,
+        createdAt: patients.createdAt,
+        updatedAt: patients.updatedAt,
+        anonymizedAt: patients.anonymizedAt,
+      })
+      .from(patients)
+      .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)))
+      .limit(1),
+  );
   return row ?? null;
 }
 
@@ -335,20 +337,22 @@ export async function searchPatients(
     );
   }
 
-  const rows = await db
-    .select({
-      id: patients.id,
-      name: patients.name,
-      sortKey: sql<string>`${SORT_KEY}`,
-      nickname: patients.nickname,
-      phone: patients.phone,
-      birthDate: patients.birthDate,
-      anonymizedAt: patients.anonymizedAt,
-    })
-    .from(patients)
-    .where(and(...conditions))
-    .orderBy(asc(SORT_KEY), asc(patients.id))
-    .limit(PAGE_SIZE + 1);
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: patients.id,
+        name: patients.name,
+        sortKey: sql<string>`${SORT_KEY}`,
+        nickname: patients.nickname,
+        phone: patients.phone,
+        birthDate: patients.birthDate,
+        anonymizedAt: patients.anonymizedAt,
+      })
+      .from(patients)
+      .where(and(...conditions))
+      .orderBy(asc(SORT_KEY), asc(patients.id))
+      .limit(PAGE_SIZE + 1),
+  );
 
   const page = rows.slice(0, PAGE_SIZE);
   const last = page[page.length - 1];
@@ -376,7 +380,7 @@ export async function anonymizePatient(
   { ok: true } | { ok: false; reason: "not_found" | "has_future_appointments" }
 > {
   if (!UUID_PATTERN.test(id)) return { ok: false, reason: "not_found" };
-  return db.transaction(async (tx) => {
+  return inClinic(clinicId, async (tx) => {
     const [current] = await tx
       .select({ id: patients.id, anonymizedAt: patients.anonymizedAt })
       .from(patients)

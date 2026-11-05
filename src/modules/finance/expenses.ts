@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic } from "@/db/client";
 import {
   auditLogs,
   expenseCategories,
@@ -34,16 +34,18 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function listExpenseCategories(clinicId: string) {
-  return db
-    .select({ id: expenseCategories.id, name: expenseCategories.name })
-    .from(expenseCategories)
-    .where(
-      and(
-        eq(expenseCategories.clinicId, clinicId),
-        eq(expenseCategories.isActive, true),
-      ),
-    )
-    .orderBy(asc(expenseCategories.sortOrder), asc(expenseCategories.name));
+  return inClinic(clinicId, (tx) =>
+    tx
+      .select({ id: expenseCategories.id, name: expenseCategories.name })
+      .from(expenseCategories)
+      .where(
+        and(
+          eq(expenseCategories.clinicId, clinicId),
+          eq(expenseCategories.isActive, true),
+        ),
+      )
+      .orderBy(asc(expenseCategories.sortOrder), asc(expenseCategories.name)),
+  );
 }
 
 export async function createExpense(
@@ -51,7 +53,7 @@ export async function createExpense(
   values: ExpenseValues,
   actorUserId: string,
 ): Promise<ExpenseResult> {
-  return db.transaction(async (tx): Promise<ExpenseResult> => {
+  return inClinic(clinicId, async (tx): Promise<ExpenseResult> => {
     const [category] = await tx
       .select({ id: expenseCategories.id })
       .from(expenseCategories)
@@ -114,7 +116,7 @@ export async function cancelExpense(
   if (!UUID_PATTERN.test(id)) {
     return { ok: false, formError: "Despesa não encontrada." };
   }
-  return db.transaction(async (tx): Promise<ExpenseResult> => {
+  return inClinic(clinicId, async (tx): Promise<ExpenseResult> => {
     const [current] = await tx
       .select({ cancelledAt: expenses.cancelledAt })
       .from(expenses)
@@ -149,26 +151,34 @@ export async function listExpenses(
   clinicId: string,
   range: { from: string; to: string },
 ): Promise<ExpenseItem[]> {
-  return db
-    .select({
-      id: expenses.id,
-      spentOn: expenses.spentOn,
-      amountCents: expenses.amountCents,
-      categoryName: expenseCategories.name,
-      methodName: paymentMethods.name,
-      description: expenses.description,
-      cancelledAt: expenses.cancelledAt,
-      cancellationReason: expenses.cancellationReason,
-    })
-    .from(expenses)
-    .innerJoin(expenseCategories, eq(expenses.categoryId, expenseCategories.id))
-    .innerJoin(paymentMethods, eq(expenses.paymentMethodId, paymentMethods.id))
-    .where(
-      and(
-        eq(expenses.clinicId, clinicId),
-        gte(expenses.spentOn, range.from),
-        lt(expenses.spentOn, range.to),
-      ),
-    )
-    .orderBy(desc(expenses.spentOn), desc(expenses.createdAt));
+  return inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: expenses.id,
+        spentOn: expenses.spentOn,
+        amountCents: expenses.amountCents,
+        categoryName: expenseCategories.name,
+        methodName: paymentMethods.name,
+        description: expenses.description,
+        cancelledAt: expenses.cancelledAt,
+        cancellationReason: expenses.cancellationReason,
+      })
+      .from(expenses)
+      .innerJoin(
+        expenseCategories,
+        eq(expenses.categoryId, expenseCategories.id),
+      )
+      .innerJoin(
+        paymentMethods,
+        eq(expenses.paymentMethodId, paymentMethods.id),
+      )
+      .where(
+        and(
+          eq(expenses.clinicId, clinicId),
+          gte(expenses.spentOn, range.from),
+          lt(expenses.spentOn, range.to),
+        ),
+      )
+      .orderBy(desc(expenses.spentOn), desc(expenses.createdAt)),
+  );
 }
