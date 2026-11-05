@@ -84,6 +84,7 @@ export default async function PanelLayout({
               { href: "/admin/servicos", label: "Serviços", icon: "services" },
               { href: "/admin/expediente", label: "Expediente", icon: "clock" },
               { href: "/admin/financeiro", label: "Financeiro", icon: "money" },
+              { href: "/admin/aparencia", label: "Aparência", icon: "brush" },
             ]}
           />
         </div>

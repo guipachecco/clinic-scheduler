@@ -27,4 +27,3 @@ A clínica nasce com a categoria "Outros" e o serviço flexível "Avaliação / 
 ## O que ainda é igual para todas
 
 - **Fuso horário:** todas usam `America/Sao_Paulo` (constante em `src/modules/schedule/time.ts`). A coluna `clinics.timezone` existe, mas ainda não é lida.
-- **Identidade visual do painel e das telas de login:** continua a da Grais. O painel mostra o nome da clínica aberta, mas as cores e o símbolo são os mesmos para todas.

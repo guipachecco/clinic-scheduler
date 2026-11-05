@@ -21,6 +21,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   typedRoutes: true,
+  // The owner photo (up to 2 MB, checked in saveOwnerPhoto) travels in a Server Action.
+  experimental: { serverActions: { bodySizeLimit: "3mb" } },
   turbopack: {
     rules: {
       "*.css": {

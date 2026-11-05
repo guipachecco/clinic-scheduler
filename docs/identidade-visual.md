@@ -35,3 +35,14 @@ O sistema deve parecer da clínica, não um software genérico: profissional, or
 - Tokens de status, que entram com a agenda.
 - Fotos no site público, que dependem da autorização de imagem da paciente que aparece em duas delas.
 - Versão vetorial (SVG) dos logos. Os PNG atuais têm fundo sólido; um SVG com fundo transparente deixaria o logo nítido em qualquer cor de fundo.
+
+## Identidade de cada clínica
+
+Cada clínica tem a própria paleta, nome de exibição, área e foto da dona. A Grais mantém a marca (logo e cores acima); as demais usam um monograma e o nome em letra de destaque.
+
+- **Catálogo:** `src/modules/branding/palettes.ts`. Cada paleta traz os tokens do tema claro e do escuro. `CLINIC_BRANDING` liga o endereço (`slug`) da clínica às paletas que ela pode escolher, ao nome e à área iniciais.
+- **Escolha da clínica:** tela **Aparência** do painel (`/admin/aparencia`): paleta, nome e área, e foto (JPEG, PNG ou WebP até 2 MB, reduzida a 800 px e sem metadados). A Grais mostra "Marca própria" no lugar das paletas.
+- **Nova paleta:** crie-a em `palettes.ts` (pelas cores principais, com `fromTones`) e acrescente o id à lista da clínica em `CLINIC_BRANDING`.
+- **Nova clínica:** acrescente uma entrada em `CLINIC_BRANDING` com o `slug` dela. Sem entrada, a clínica usa a paleta neutra e as demais do catálogo.
+- **Contraste:** o teste `src/modules/branding/palettes.test.ts` confere o contraste de texto e fundo de toda paleta nos dois temas. Ele roda com `corepack pnpm test` e quebra se uma paleta nova ficar ilegível.
+- **Telas sem clínica** (login e verificação em duas etapas): usam a paleta neutra `painel`.

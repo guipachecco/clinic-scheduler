@@ -60,6 +60,15 @@ test.describe("branding", () => {
     await client.connect();
     try {
       const slugs = CLINICS.map((c) => c.slug);
+      // The photo column points at media, so it goes first.
+      await client.query(
+        `UPDATE clinics SET owner_photo_media_id = NULL WHERE slug = ANY($1)`,
+        [slugs],
+      );
+      await client.query(
+        `DELETE FROM media WHERE clinic_id IN (SELECT id FROM clinics WHERE slug = ANY($1))`,
+        [slugs],
+      );
       await client.query(
         `DELETE FROM audit_logs WHERE clinic_id IN (SELECT id FROM clinics WHERE slug = ANY($1))`,
         [slugs],
@@ -115,6 +124,58 @@ test.describe("branding", () => {
     await expect(
       page.locator('aside img[alt=""]:visible').first(),
     ).toBeVisible();
+  });
+
+  test("the owner switches Karina to Marinho e coral", async () => {
+    await openClinic("Karina Manicure");
+    await page.goto("/admin/aparencia");
+    const card = page.getByRole("button", { name: /Marinho e coral/ });
+    await card.click();
+    await expect(card).toHaveAttribute("aria-pressed", "true");
+    await page.reload();
+    expect(await brandToken(page)).toBe("#22315a");
+    await expect(
+      page.getByRole("button", { name: /Marinho e coral/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("changes the area label", async () => {
+    await page.goto("/admin/aparencia");
+    await page.getByLabel("Área", { exact: true }).fill("Unhas e cuidados");
+    await page.getByRole("button", { name: "Salvar nome e área" }).click();
+    await expect(page.locator("aside")).toContainText("Unhas e cuidados");
+  });
+
+  test("uploads and removes the photo", async () => {
+    await page.goto("/admin/aparencia");
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==",
+      "base64",
+    );
+    await page.getByLabel("Escolher foto").setInputFiles({
+      name: "foto.png",
+      mimeType: "image/png",
+      buffer: png,
+    });
+    await expect(page.locator('aside img[src^="/admin/foto/"]')).toBeVisible();
+    await page.getByRole("button", { name: "Remover foto" }).click();
+    await expect(page.locator('aside img[src^="/admin/foto/"]')).toHaveCount(0);
+    await expect(
+      page.locator("aside span[aria-hidden]").filter({ hasText: /^R$/ }),
+    ).toBeVisible();
+  });
+
+  test("Grais shows Marca própria", async () => {
+    await page.goto("/admin/clinicas");
+    await page
+      .getByRole("listitem")
+      .filter({ hasText: "/grais" })
+      .getByRole("button", { name: "Abrir painel" })
+      .click();
+    await expect(page).toHaveURL(/\/admin$/);
+    await page.goto("/admin/aparencia");
+    await expect(page.getByText("Marca própria")).toBeVisible();
+    await expect(page.getByLabel("Área", { exact: true })).toHaveCount(0);
   });
 
   test("no sideways scroll at 360 px", async () => {
