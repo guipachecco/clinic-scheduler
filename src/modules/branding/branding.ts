@@ -22,8 +22,6 @@ export type ClinicBranding = {
   ownerPhotoMediaId: string | null;
 };
 
-const GRAIS_SLUG = "grais";
-
 export async function getClinicBranding(
   clinicId: string,
 ): Promise<ClinicBranding | null> {
@@ -48,7 +46,7 @@ export async function getClinicBranding(
     areaLabel: row.areaLabel,
     palette: resolvePalette(row.slug, row.theme.paletteId),
     offered: palettesForClinic(row.slug),
-    usesBrandImages: row.slug === GRAIS_SLUG,
+    usesBrandImages: false,
     ownerPhotoMediaId: row.ownerPhotoMediaId,
   };
 }

@@ -21,6 +21,7 @@ export type Palette = {
 
 export const GRAIS_PALETTE_ID = "grais";
 export const NEUTRAL_PALETTE_ID = "painel";
+export const ZEMANA_PALETTE_ID = "zemana";
 
 const INK = "#1c1a22";
 const WHITE = "#ffffff";
@@ -114,7 +115,41 @@ const GRAIS: Palette = {
   },
 };
 
+// The Zemana brand: purple, yellow and pink from the identity manual.
+const ZEMANA: Palette = {
+  id: ZEMANA_PALETTE_ID,
+  name: "Zemana",
+  description: "Identidade Zemana: roxo profundo, amarelo e rosa.",
+  light: {
+    primary: "#2a0081",
+    "primary-pressed": "#1d005c",
+    "primary-foreground": "#ffffff",
+    highlight: "#f5c700",
+    "highlight-foreground": "#2a0081",
+    brand: "#2a0081",
+    "brand-foreground": "#ffffff",
+    "brand-muted": "#1d005c",
+    "brand-accent": "#ffd3f0",
+    "brand-accent-foreground": "#2a0081",
+    ring: "#2a0081",
+  },
+  dark: {
+    primary: "#d4c2ff",
+    "primary-pressed": "#bfa5ff",
+    "primary-foreground": "#0b0b10",
+    highlight: "#f5c700",
+    "highlight-foreground": "#2a0081",
+    brand: "#14033a",
+    "brand-foreground": "#f2f0f5",
+    "brand-muted": "#1d0a52",
+    "brand-accent": "#ffd3f0",
+    "brand-accent-foreground": "#2a0081",
+    ring: "#d4c2ff",
+  },
+};
+
 const LIST: Palette[] = [
+  ZEMANA,
   GRAIS,
   fromTones(
     "karol-vinho",
@@ -283,50 +318,47 @@ export const PALETTES: Record<string, Palette> = Object.fromEntries(
   LIST.map((palette) => [palette.id, palette]),
 );
 
+const OFFERED = [ZEMANA_PALETTE_ID];
+
 export const CLINIC_BRANDING: Record<
   string,
   { palettes: string[]; displayName: string | null; areaLabel: string | null }
 > = {
   "karol-pacheco": {
-    palettes: ["karol-vinho", "karol-preto-ouro", "karol-rose"],
+    palettes: OFFERED,
     displayName: "Karol Pacheco",
     areaLabel: "Estética",
   },
   "sirlei-massoterapia": {
-    palettes: ["sirlei-salvia", "sirlei-argila", "sirlei-grafite"],
+    palettes: OFFERED,
     displayName: "Sirlei",
     areaLabel: "Massoterapia",
   },
   "karina-manicure": {
-    palettes: ["karina-rosa", "karina-marinho-coral", "karina-ameixa"],
+    palettes: OFFERED,
     displayName: "Karina",
     areaLabel: "Manicure",
   },
   grais: {
-    palettes: [GRAIS_PALETTE_ID],
+    palettes: OFFERED,
     displayName: null,
     areaLabel: null,
   },
 };
 
-/** Palettes a clinic may choose from; unknown clinics get the neutral one first. */
+/** Every clinic uses the Zemana brand; the older palettes are kept but not offered. */
 export function palettesForClinic(slug: string): Palette[] {
-  const branding = CLINIC_BRANDING[slug];
-  if (branding) return branding.palettes.map((id) => PALETTES[id]);
-  const neutral = PALETTES[NEUTRAL_PALETTE_ID];
-  const rest = Object.values(PALETTES).filter(
-    (p) => p.id !== NEUTRAL_PALETTE_ID && p.id !== GRAIS_PALETTE_ID,
-  );
-  return [neutral, ...rest];
+  void slug;
+  return [PALETTES[ZEMANA_PALETTE_ID]];
 }
 
-/** The stored palette if the clinic offers it, otherwise its first one. */
+/** Always the Zemana palette, whatever a clinic stored before. */
 export function resolvePalette(
   slug: string,
   stored: string | undefined,
 ): Palette {
-  const offered = palettesForClinic(slug);
-  return offered.find((p) => p.id === stored) ?? offered[0];
+  void stored;
+  return palettesForClinic(slug)[0];
 }
 
 function block(tokens: Record<TokenName, string>): string {

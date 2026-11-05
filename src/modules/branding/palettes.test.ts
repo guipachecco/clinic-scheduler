@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { contrastRatio } from "./contrast";
@@ -7,6 +10,7 @@ import {
   paletteCss,
   PALETTES,
   palettesForClinic,
+  type TokenName,
   resolvePalette,
 } from "./palettes";
 
@@ -46,7 +50,7 @@ describe("palettes", () => {
     }
   });
 
-  it("grais is today's globals.css", () => {
+  it("the grais entry still exists unchanged (not offered)", () => {
     const g = PALETTES.grais;
     expect(g.light.primary).toBe("#00357a");
     expect(g.light.highlight).toBe("#ffde59");
@@ -80,26 +84,56 @@ describe("palettes", () => {
     });
   });
 
-  it("each clinic sees its three palettes", () => {
-    expect(palettesForClinic("karina-manicure").map((p) => p.id)).toEqual([
-      "karina-rosa",
-      "karina-marinho-coral",
-      "karina-ameixa",
-    ]);
-    expect(palettesForClinic("grais").map((p) => p.id)).toEqual(["grais"]);
-    const unknown = palettesForClinic("nova");
-    expect(unknown[0].id).toBe("painel");
-    expect(unknown).toHaveLength(10);
+  it("zemana matches the manual", () => {
+    const z = PALETTES.zemana;
+    expect(z.light.primary).toBe("#2a0081");
+    expect(z.light.brand).toBe("#2a0081");
+    expect(z.light.ring).toBe("#2a0081");
+    expect(z.light.highlight).toBe("#f5c700");
+    expect(z.light["highlight-foreground"]).toBe("#2a0081");
+    expect(z.light["brand-accent"]).toBe("#ffd3f0");
+    expect(z.light["brand-accent-foreground"]).toBe("#2a0081");
+    expect(z.dark.highlight).toBe("#f5c700");
   });
 
-  it("resolvePalette never borrows another clinic's palette", () => {
-    expect(resolvePalette("karina-manicure", "karol-vinho").id).toBe(
-      "karina-rosa",
+  it("every clinic sees only zemana", () => {
+    for (const slug of ["grais", "karina-manicure", "nova"]) {
+      expect(palettesForClinic(slug).map((p) => p.id)).toEqual(["zemana"]);
+    }
+  });
+
+  it("resolvePalette always returns zemana", () => {
+    expect(resolvePalette("karina-manicure", "karina-rosa").id).toBe("zemana");
+    expect(resolvePalette("x", undefined).id).toBe("zemana");
+  });
+
+  it("globals.css identity tokens equal the zemana palette", () => {
+    const css = readFileSync(
+      join(process.cwd(), "src/app/globals.css"),
+      "utf8",
     );
-    expect(resolvePalette("sirlei-massoterapia", "sirlei-argila").id).toBe(
-      "sirlei-argila",
-    );
-    expect(resolvePalette("x", undefined).id).toBe("painel");
+    const blockOf = (selector: RegExp) => {
+      const m = css.match(selector);
+      if (!m) throw new Error(`block not found: ${selector}`);
+      return m[1];
+    };
+    const blocks = {
+      light: blockOf(/^:root\s*\{([^}]*)\}/m),
+      dark: blockOf(/^\.dark\s*\{([^}]*)\}/m),
+    };
+    const names = Object.keys(PALETTES.zemana.light) as TokenName[];
+    expect(names).toHaveLength(11);
+    for (const theme of ["light", "dark"] as const) {
+      for (const name of names) {
+        const m = blocks[theme].match(
+          new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6});`),
+        );
+        expect(m, `${theme} --${name} missing`).not.toBeNull();
+        expect(m![1].toLowerCase(), `${theme} --${name}`).toBe(
+          PALETTES.zemana[theme][name],
+        );
+      }
+    }
   });
 
   it("initials", () => {

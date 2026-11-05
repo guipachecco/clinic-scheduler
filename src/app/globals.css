@@ -3,10 +3,11 @@
 /* Dark theme follows the .dark class on <html>, set from the theme cookie. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* The clinic's approved visual identity: navy primary, yellow highlight (never
-   used as text on light backgrounds), neutral lilac-tinted surfaces. The dark
-   theme uses the brand's black and cyan version. `brand` is the surface behind
-   the logo (sidebar, sign-in screens). */
+/* The Zemana identity: deep purple primary, yellow highlight (never used as
+   text on light backgrounds), pink accent, neutral lilac-tinted surfaces. The
+   dark theme lifts the purple to a light lilac on near-black surfaces. `brand`
+   is the surface behind the logo (sidebar, sign-in screens). The identity
+   tokens must equal PALETTES.zemana (checked by palettes.test.ts). */
 
 @theme inline {
   --color-background: var(--background);
@@ -48,8 +49,7 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --font-sans: "Figtree Variable", system-ui, sans-serif;
-  --font-heading: "Archivo Variable", system-ui, sans-serif;
-  --font-wordmark: "Fraunces Variable", Georgia, serif;
+  --font-heading: "Bricolage Grotesque Variable", system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -64,21 +64,21 @@
   --card-foreground: #1c1a22;
   --popover: #ffffff;
   --popover-foreground: #1c1a22;
-  --primary: #00357a;
-  --primary-pressed: #00245a;
+  --primary: #2a0081;
+  --primary-pressed: #1d005c;
   --primary-foreground: #ffffff;
   --secondary: #eeebf0;
-  --secondary-foreground: #00357a;
+  --secondary-foreground: #2a0081;
   --muted: #eeebf0;
   --muted-foreground: #5e5868;
   --accent: #eeebf0;
   --accent-foreground: #1c1a22;
-  --highlight: #ffde59;
-  --highlight-foreground: #00357a;
+  --highlight: #f5c700;
+  --highlight-foreground: #2a0081;
   --status-requested: #fff4c2;
   --status-requested-foreground: #5c4700;
   --status-requested-border: #c9a400;
-  --status-confirmed: #00357a;
+  --status-confirmed: #2a0081;
   --status-confirmed-foreground: #ffffff;
   --status-completed: #e1f2e8;
   --status-completed-foreground: #1b5e38;
@@ -88,14 +88,14 @@
   --status-cancelled-foreground: #5e5868;
   --destructive: #b3261e;
   --destructive-foreground: #ffffff;
-  --brand: #00357a;
+  --brand: #2a0081;
   --brand-foreground: #ffffff;
-  --brand-muted: #002a63;
-  --brand-accent: #99f0ff;
-  --brand-accent-foreground: #00357a;
+  --brand-muted: #1d005c;
+  --brand-accent: #ffd3f0;
+  --brand-accent-foreground: #2a0081;
   --border: #e4dfe8;
   --input: #c9c2cf;
-  --ring: #00357a;
+  --ring: #2a0081;
 }
 
 .dark {
@@ -106,21 +106,21 @@
   --card-foreground: #f2f0f5;
   --popover: #16151c;
   --popover-foreground: #f2f0f5;
-  --primary: #99f0ff;
-  --primary-pressed: #6fe3f7;
+  --primary: #d4c2ff;
+  --primary-pressed: #bfa5ff;
   --primary-foreground: #0b0b10;
   --secondary: #23212b;
-  --secondary-foreground: #99f0ff;
+  --secondary-foreground: #d4c2ff;
   --muted: #23212b;
   --muted-foreground: #aaa4b5;
   --accent: #23212b;
   --accent-foreground: #f2f0f5;
-  --highlight: #ffde59;
-  --highlight-foreground: #00357a;
+  --highlight: #f5c700;
+  --highlight-foreground: #2a0081;
   --status-requested: #3a3000;
   --status-requested-foreground: #ffde59;
   --status-requested-border: #ffde59;
-  --status-confirmed: #99f0ff;
+  --status-confirmed: #d4c2ff;
   --status-confirmed-foreground: #0b0b10;
   --status-completed: #12301f;
   --status-completed-foreground: #8fe3b0;
@@ -130,14 +130,14 @@
   --status-cancelled-foreground: #aaa4b5;
   --destructive: #f0625a;
   --destructive-foreground: #0b0b10;
-  --brand: #000000;
+  --brand: #14033a;
   --brand-foreground: #f2f0f5;
-  --brand-muted: #16151c;
-  --brand-accent: #99f0ff;
-  --brand-accent-foreground: #00357a;
+  --brand-muted: #1d0a52;
+  --brand-accent: #ffd3f0;
+  --brand-accent-foreground: #2a0081;
   --border: #2a2833;
   --input: #4a4655;
-  --ring: #99f0ff;
+  --ring: #d4c2ff;
 }
 
 @layer base {

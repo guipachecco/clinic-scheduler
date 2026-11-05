@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 
-import "@fontsource-variable/archivo";
+import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/figtree";
-import "@fontsource-variable/fraunces";
 import "./globals.css";
 
 import { getTheme } from "@/lib/theme-server";

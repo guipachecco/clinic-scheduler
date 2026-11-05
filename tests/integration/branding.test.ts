@@ -1,7 +1,8 @@
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, pool } from "@/db/client";
-import { users } from "@/db/schema";
+import { clinics, users } from "@/db/schema";
 import {
   getClinicBranding,
   setClinicPalette,
@@ -37,37 +38,39 @@ afterAll(async () => {
 });
 
 describe("clinic branding", () => {
-  it("a new catalog clinic starts with its first palette and names", async () => {
-    const branding = await getClinicBranding(karina);
-    expect(branding?.palette.id).toBe("karina-rosa");
-    expect(branding?.displayName).toBe("Karina");
-    expect(branding?.areaLabel).toBe("Manicure");
-    expect(branding?.usesBrandImages).toBe(false);
+  it("every clinic resolves to zemana", async () => {
+    for (const id of [karina, sirlei, nova, CLINIC]) {
+      const branding = await getClinicBranding(id);
+      expect(branding?.palette.id).toBe("zemana");
+      expect(branding?.usesBrandImages).toBe(false);
+    }
   });
 
-  it("an unknown clinic starts neutral", async () => {
-    const branding = await getClinicBranding(nova);
-    expect(branding?.palette.id).toBe("painel");
-    expect(branding?.displayName).toBe("Clínica Nova");
-    expect(branding?.areaLabel).toBeNull();
+  it("keeps display names and area labels", async () => {
+    const k = await getClinicBranding(karina);
+    expect(k?.displayName).toBe("Karina");
+    expect(k?.areaLabel).toBe("Manicure");
+    const n = await getClinicBranding(nova);
+    expect(n?.displayName).toBe("Clínica Nova");
+    expect(n?.areaLabel).toBeNull();
   });
 
-  it("refuses a palette of another clinic", async () => {
-    const result = await setClinicPalette(karina, "karol-vinho", actor);
+  it("refuses any palette other than zemana", async () => {
+    const result = await setClinicPalette(karina, "karina-rosa", actor);
     expect(result.ok).toBe(false);
-    expect((await getClinicBranding(karina))?.palette.id).toBe("karina-rosa");
   });
 
-  it("changing one clinic never changes another", async () => {
-    const result = await setClinicPalette(sirlei, "sirlei-argila", actor);
-    expect(result).toEqual({ ok: true });
-    expect((await getClinicBranding(sirlei))?.palette.id).toBe("sirlei-argila");
-    expect((await getClinicBranding(karina))?.palette.id).toBe("karina-rosa");
+  it("accepts zemana", async () => {
+    expect(await setClinicPalette(sirlei, "zemana", actor)).toEqual({
+      ok: true,
+    });
   });
 
-  it("grais keeps its brand", async () => {
-    const branding = await getClinicBranding(CLINIC);
-    expect(branding?.palette.id).toBe("grais");
-    expect(branding?.usesBrandImages).toBe(true);
+  it("a stored legacy palette resolves to zemana", async () => {
+    await db
+      .update(clinics)
+      .set({ theme: { paletteId: "karina-rosa" } })
+      .where(eq(clinics.id, karina));
+    expect((await getClinicBranding(karina))?.palette.id).toBe("zemana");
   });
 });
