@@ -1,7 +1,8 @@
 import { eq, inArray, like, or, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { asClient, clientDb, db, endPools } from "@/db/client";
+import { asClient, clientDb } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { findPgError } from "@/db/errors";
 import {
   appointments,
@@ -279,6 +280,30 @@ describe("client access", () => {
     expect(
       await clientDb.select({ id: appointments.id }).from(appointments),
     ).toEqual([]);
+  });
+
+  it("client cannot read the owner's columns of her appointments", async () => {
+    for (const column of [
+      "cancellation_reason",
+      "custom_label",
+      "manage_token_hash",
+      "idempotency_key",
+      "cancelled_by",
+    ]) {
+      const code = await pgErrorCode(
+        asClient(ctx("ana", patientAna), (tx) =>
+          tx.execute(sql`select ${sql.identifier(column)} from appointments`),
+        ),
+      );
+      expect(code, column).toBe("42501");
+    }
+    // select * needs every column.
+    const all = await pgErrorCode(
+      asClient(ctx("ana", patientAna), (tx) =>
+        tx.execute(sql`select * from appointments`),
+      ),
+    );
+    expect(all).toBe("42501");
   });
 
   it("client is denied finance tables", async () => {

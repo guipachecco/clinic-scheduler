@@ -1,7 +1,8 @@
 import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { db, endPools, inClinic } from "@/db/client";
+import { inClinic } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { findPgError } from "@/db/errors";
 import {
   appointments,
@@ -98,19 +99,22 @@ async function createAppointment(patientId: string) {
 async function scenario(onlineName = ONLINE_NAME) {
   const existingId = await createExisting();
   const oldAppointment = await createAppointment(existingId);
-  const userId = await createUser(`cliente-${appointmentDay}`);
+  const local = `cliente-${appointmentDay}`;
+  const onlineEmail = `${local}${DOMAIN}`;
+  const userId = await createUser(local);
   const provisionalId = await registerClientPatient({
     clinicId,
     userId,
     name: onlineName,
     phone: PHONE,
-    email: null,
+    email: onlineEmail,
   });
   const onlineAppointment = await createAppointment(provisionalId);
   return {
     existingId,
     provisionalId,
     userId,
+    onlineEmail,
     oldAppointment,
     onlineAppointment,
   };
@@ -213,7 +217,7 @@ afterAll(async () => {
 
 describe("pending links", () => {
   it("lists the provisional record and the patient it matched", async () => {
-    const { existingId, provisionalId } = await scenario();
+    const { existingId, provisionalId, onlineEmail } = await scenario();
     const list = await listPendingLinks(clinicId);
     expect(list).toEqual([
       {
@@ -222,10 +226,26 @@ describe("pending links", () => {
         existingId,
         existingName: EXISTING_NAME,
         existingHasAccount: false,
+        onlineEmail,
         createdAt: expect.any(Date),
       },
     ]);
     expect(await listPendingLinks(secondClinicId)).toEqual([]);
+  });
+
+  it("skips a pair whose existing patient was anonymized", async () => {
+    const s = await scenario();
+    expect(await listPendingLinks(clinicId)).toHaveLength(1);
+    await db
+      .update(patients)
+      .set({
+        anonymizedAt: new Date(),
+        phone: null,
+        email: null,
+        nameNormalized: null,
+      })
+      .where(eq(patients.id, s.existingId));
+    expect(await listPendingLinks(clinicId)).toEqual([]);
   });
 
   it("confirm merges appointments and links the account", async () => {

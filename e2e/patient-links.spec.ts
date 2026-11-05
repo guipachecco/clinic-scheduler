@@ -46,9 +46,9 @@ test("the owner confirms an online signup is the same person", async ({
   );
   const [provisional] = await query<{ id: string }>(
     `INSERT INTO patients (clinic_id, user_id, name, name_normalized, phone,
-       pending_link_patient_id)
-     VALUES ($1, $2, $3, lower($3), $4, $5) RETURNING id`,
-    [clinic!.id, user!.id, ONLINE, PHONE, existing!.id],
+       email, pending_link_patient_id)
+     VALUES ($1, $2, $3, lower($3), $4, $5, $6) RETURNING id`,
+    [clinic!.id, user!.id, ONLINE, PHONE, EMAIL, existing!.id],
   );
 
   await signInWithFreshTwoFactor(page, TEST_ADMIN_PATIENT_LINKS);
@@ -57,6 +57,10 @@ test("the owner confirms an online signup is the same person", async ({
   );
   await expect(notice).toBeVisible();
   await expect(page.getByRole("link", { name: EXISTING })).toBeVisible();
+  // The online account's e-mail helps her decide.
+  await expect(
+    page.getByText(`E-mail da conta online: ${EMAIL}`),
+  ).toBeVisible();
 
   // The same notice on the existing record.
   await page.getByRole("link", { name: EXISTING }).click();

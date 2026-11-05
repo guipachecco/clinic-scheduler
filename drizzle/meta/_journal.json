@@ -113,6 +113,13 @@
       "when": 1793916444802,
       "tag": "0015_panel_link_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793918148420,
+      "tag": "0016_client_appointment_columns",
+      "breakpoints": true
     }
   ]
 }

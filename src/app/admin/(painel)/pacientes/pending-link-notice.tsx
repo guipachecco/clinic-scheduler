@@ -69,6 +69,14 @@ export function PendingLinkNotice({
             ver a ficha nova
           </Link>
         </li>
+        {link.onlineEmail ? (
+          <li>
+            E-mail da conta online:{" "}
+            <span className="font-medium text-foreground">
+              {link.onlineEmail}
+            </span>
+          </li>
+        ) : null}
         {link.existingHasAccount ? (
           <li>Esta ficha já está ligada a outra conta online.</li>
         ) : null}

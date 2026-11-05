@@ -21,6 +21,10 @@ export type PendingLink = {
   // The existing record is already tied to another client account: it cannot
   // take this one too (one account per patient row).
   existingHasAccount: boolean;
+  // The e-mail of the online account, to help the owner decide. Read from
+  // the provisional record (registerClientPatient copies the account's
+  // e-mail there): app_panel has no access to the accounts table.
+  onlineEmail: string | null;
   createdAt: Date;
 };
 
@@ -30,7 +34,8 @@ const UUID_PATTERN =
 const existing = aliasedTable(patients, "existing");
 
 // Pending provisional records of the clinic, oldest first. An anonymized
-// provisional record is no longer a signup to decide on.
+// provisional record is no longer a signup to decide on, and an anonymized
+// existing record has nothing left to match (confirmLink refuses it).
 export async function listPendingLinks(
   clinicId: string,
 ): Promise<PendingLink[]> {
@@ -39,6 +44,7 @@ export async function listPendingLinks(
       .select({
         provisionalId: patients.id,
         provisionalName: patients.name,
+        onlineEmail: patients.email,
         existingId: existing.id,
         existingName: existing.name,
         existingUserId: existing.userId,
@@ -57,6 +63,7 @@ export async function listPendingLinks(
           eq(patients.clinicId, clinicId),
           isNotNull(patients.pendingLinkPatientId),
           isNull(patients.anonymizedAt),
+          isNull(existing.anonymizedAt),
         ),
       )
       .orderBy(asc(patients.createdAt), asc(patients.id)),
