@@ -11,11 +11,17 @@ const valid = {
   DATABASE_URL_PLATFORM: "postgres://app_platform:d@db.example.com:5432/app",
   BETTER_AUTH_SECRET: "a".repeat(32),
   BETTER_AUTH_URL: "https://clinica.example.com",
+  RESEND_API_KEY: "re_chave_ficticia",
+  EMAIL_FROM: "Zemana <nao-responda@example.com>",
 };
 
 describe("parseServerEnv", () => {
   it("accepts a complete configuration and applies defaults", () => {
-    expect(parseServerEnv(valid)).toEqual({ ...valid, LOG_LEVEL: "info" });
+    expect(parseServerEnv(valid)).toEqual({
+      ...valid,
+      LOG_LEVEL: "info",
+      EMAIL_OUTBOX_DIR: ".emails",
+    });
   });
 
   it("lists every missing variable without echoing values", () => {

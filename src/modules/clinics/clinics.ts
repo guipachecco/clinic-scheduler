@@ -19,7 +19,11 @@ import {
 
 import { CLINIC_BRANDING, resolvePalette } from "@/modules/branding/palettes";
 
-import type { ClinicFormValues } from "./fields";
+import {
+  RESERVED_SLUG_ERROR,
+  RESERVED_SLUGS,
+  type ClinicFormValues,
+} from "./fields";
 
 // Data functions for the clinics themselves. Only root creates or changes
 // clinics (as app_platform); every other module receives a clinicId and stays
@@ -83,6 +87,10 @@ export async function createClinic(
   values: ClinicFormValues,
   actorUserId: string,
 ): Promise<ClinicResult> {
+  // Also checked by the form schema; repeated here for every other caller.
+  if (RESERVED_SLUGS.has(values.slug)) {
+    return { ok: false, fieldErrors: { slug: RESERVED_SLUG_ERROR } };
+  }
   try {
     return await platformDb.transaction(async (tx): Promise<ClinicResult> => {
       const [taken] = await tx

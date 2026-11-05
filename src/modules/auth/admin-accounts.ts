@@ -20,13 +20,13 @@ import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./password-policy";
 
 export class AdminAccountError extends Error {}
 
-const emailSchema = z
+export const emailSchema = z
   .string()
   .trim()
   .toLowerCase()
   .pipe(z.email({ error: "E-mail inválido." }));
 
-const passwordSchema = z
+export const passwordSchema = z
   .string()
   .min(
     MIN_PASSWORD_LENGTH,
@@ -71,7 +71,8 @@ async function findUserIdByEmail(tx: Tx, email: string) {
   return user.id;
 }
 
-async function hashPassword(password: string) {
+// Also used for client accounts (src/modules/clients/accounts.ts).
+export async function hashPassword(password: string) {
   const context = await auth.$context;
   return context.password.hash(password);
 }

@@ -1,3 +1,6 @@
+import { tmpdir } from "node:os";
+import path from "node:path";
+
 import { defineConfig, devices } from "@playwright/test";
 
 import { devRoleUrls, roleUrlEnv } from "./tests/helpers/roles";
@@ -11,6 +14,13 @@ export const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL ??
   "postgres://clinic:clinic@localhost:5432/clinic_scheduler_e2e_test";
 
+// E-mails the site sends during the tests (no RESEND_API_KEY): the tests read
+// the links from here.
+export const E2E_EMAIL_OUTBOX_DIR = path.join(
+  tmpdir(),
+  "clinic-scheduler-e2e-emails",
+);
+
 // Values for automated tests only. Real secrets never go in the repository.
 export const E2E_SERVER_ENV = {
   DATABASE_URL: E2E_DATABASE_URL,
@@ -18,6 +28,7 @@ export const E2E_SERVER_ENV = {
   BETTER_AUTH_SECRET: "segredo-apenas-para-testes-e2e-0123456789abcdef",
   BETTER_AUTH_URL: BASE_URL,
   LOG_LEVEL: "warn",
+  EMAIL_OUTBOX_DIR: E2E_EMAIL_OUTBOX_DIR,
   NEXT_TELEMETRY_DISABLED: "1",
 };
 

@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "vitest/config";
@@ -39,6 +41,8 @@ export default defineConfig({
       BETTER_AUTH_SECRET: "segredo-apenas-para-testes-automatizados-0123456789",
       BETTER_AUTH_URL: "http://localhost:3000",
       LOG_LEVEL: "warn",
+      // Without RESEND_API_KEY the e-mails the tests send are written here.
+      EMAIL_OUTBOX_DIR: path.join(tmpdir(), "clinic-scheduler-test-emails"),
     },
     projects: [
       {

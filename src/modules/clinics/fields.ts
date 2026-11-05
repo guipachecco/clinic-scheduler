@@ -4,19 +4,22 @@ import * as z from "zod";
 
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
-// Paths the app already uses, which a clinic slug must not take over.
-export const RESERVED_SLUGS = new Set([
+// Paths the app already uses, which a clinic slug must not take over: the
+// client area lives at /<slug>.
+export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "admin",
   "api",
-  "_next",
-  "agendar",
   "entrar",
-  "favicon.ico",
+  "marca",
+  "_next",
   "icon.png",
   "apple-icon.png",
+  "favicon.ico",
   "robots.txt",
   "sitemap.xml",
 ]);
+
+export const RESERVED_SLUG_ERROR = "Esse endereço é reservado pelo sistema";
 
 export const clinicFormSchema = z.object({
   name: z
@@ -34,7 +37,7 @@ export const clinicFormSchema = z.object({
       SLUG_PATTERN,
       "Use só letras minúsculas, números e hífen entre palavras.",
     )
-    .refine((slug) => !RESERVED_SLUGS.has(slug), "Este endereço é reservado."),
+    .refine((slug) => !RESERVED_SLUGS.has(slug), RESERVED_SLUG_ERROR),
 });
 
 export type ClinicFormInput = z.input<typeof clinicFormSchema>;

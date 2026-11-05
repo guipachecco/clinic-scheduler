@@ -85,6 +85,13 @@
       "when": 1793908228750,
       "tag": "0011_db_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793910818940,
+      "tag": "0012_client_accounts",
+      "breakpoints": true
     }
   ]
 }

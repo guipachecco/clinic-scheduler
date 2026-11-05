@@ -23,7 +23,9 @@ import { createdAt, updatedAt } from "./columns";
 
 // admin: the owner of one clinic, sees only that clinic.
 // root: the platform operator, sees every clinic and has no clinic of its own.
-export const userRole = pgEnum("user_role", ["admin", "root"]);
+// client: someone who books online. Belongs to no clinic: the link to each
+// clinic is a patients row (patients.user_id).
+export const userRole = pgEnum("user_role", ["admin", "root", "client"]);
 
 export const users = pgTable(
   "users",
@@ -34,7 +36,7 @@ export const users = pgTable(
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
     role: userRole("role").notNull(),
-    // The clinic an admin belongs to. Empty for root.
+    // The clinic an admin belongs to. Empty for root and client.
     clinicId: uuid("clinic_id").references(() => clinics.id, {
       onDelete: "restrict",
     }),
@@ -46,8 +48,9 @@ export const users = pgTable(
     index("users_clinic_id_idx").on(t.clinicId),
     check(
       "users_role_clinic_check",
-      // ::text because migration 0007 adds 'root' in the same transaction.
-      sql`(${t.role}::text = 'root') = (${t.clinicId} is null)`,
+      // Only an admin has a clinic. ::text because the migrations add 'root'
+      // (0007) and 'client' (0012) in the same transaction that uses them.
+      sql`(${t.role}::text = 'admin') = (${t.clinicId} is not null)`,
     ),
   ],
 );

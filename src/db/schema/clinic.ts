@@ -405,16 +405,31 @@ export const patients = pgTable(
     referredBy: text("referred_by"),
     notes: text("notes"),
     anonymizedAt: timestamp("anonymized_at", { withTimezone: true }),
+    // The client account that books online as this patient (one per clinic).
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    // On a provisional record from an online signup: the existing patient
+    // whose phone it matched, until the owner says whether it is the same
+    // person. Same clinic only (composite reference).
+    pendingLinkPatientId: uuid("pending_link_patient_id"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     unique("patients_clinic_id_id_unique").on(t.clinicId, t.id),
-    uniqueIndex("patients_phone_name_idx").on(
-      t.clinicId,
-      t.phone,
-      t.nameNormalized,
-    ),
+    foreignKey({
+      name: "patients_pending_link_fk",
+      columns: [t.clinicId, t.pendingLinkPatientId],
+      foreignColumns: [t.clinicId, t.id],
+    }).onDelete("restrict"),
+    uniqueIndex("patients_user_id_idx")
+      .on(t.clinicId, t.userId)
+      .where(sql`${t.userId} is not null`),
+    // A provisional record may repeat the name and phone it matched.
+    uniqueIndex("patients_phone_name_idx")
+      .on(t.clinicId, t.phone, t.nameNormalized)
+      .where(sql`${t.pendingLinkPatientId} is null`),
     uniqueIndex("patients_cpf_idx")
       .on(t.clinicId, t.cpf)
       .where(sql`${t.cpf} is not null`),
