@@ -98,7 +98,14 @@ export function PanelNav({ items }: { items: NavItem[] }) {
                 </svg>
                 {item.label}
                 {badge > 0 ? (
-                  <span className="ml-auto inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-highlight-foreground px-1.5 text-xs font-bold text-highlight">
+                  <span
+                    className={cn(
+                      "ml-auto inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full px-1.5 text-xs font-bold",
+                      active
+                        ? "bg-highlight-foreground text-highlight"
+                        : "bg-highlight text-highlight-foreground",
+                    )}
+                  >
                     <span aria-hidden="true">{badge}</span>
                     <span className="sr-only">
                       , {badge} {item.badgeLabel}

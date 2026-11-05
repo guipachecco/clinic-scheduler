@@ -57,7 +57,7 @@ Escolhas feitas durante a implementação que não estavam detalhadas no [planej
 
 - Node.js 24 LTS na CI; o projeto aceita a partir da 22.12.
 - Projeto em ESM (`"type": "module"`) e ESLint 10, já que o ESLint 9 deixou de receber suporte.
-- Fontes Archivo (títulos) e Figtree (texto) vindas dos pacotes `@fontsource-variable`, servidas pelo próprio app: nenhuma requisição externa no site e nenhum download no build.
+- Fontes Bricolage Grotesque (títulos) e Figtree (texto) vindas dos pacotes `@fontsource-variable`, servidas pelo próprio app: nenhuma requisição externa no site e nenhum download no build.
 - Dependabot espera 3 dias antes de sugerir uma versão recém-publicada, o que evita a maioria dos pacotes comprometidos e retirados logo após a publicação. Alertas e correções de segurança dependem das configurações do repositório no GitHub e não esperam esse prazo.
 
 ### Identidade visual

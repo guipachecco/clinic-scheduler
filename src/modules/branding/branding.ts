@@ -18,7 +18,6 @@ export type ClinicBranding = {
   areaLabel: string | null;
   palette: Palette;
   offered: Palette[];
-  usesBrandImages: boolean;
   ownerPhotoMediaId: string | null;
 };
 
@@ -46,7 +45,6 @@ export async function getClinicBranding(
     areaLabel: row.areaLabel,
     palette: resolvePalette(row.slug, row.theme.paletteId),
     offered: palettesForClinic(row.slug),
-    usesBrandImages: false,
     ownerPhotoMediaId: row.ownerPhotoMediaId,
   };
 }

@@ -118,8 +118,8 @@
   --highlight: #f5c700;
   --highlight-foreground: #2a0081;
   --status-requested: #3a3000;
-  --status-requested-foreground: #ffde59;
-  --status-requested-border: #ffde59;
+  --status-requested-foreground: #f5c700;
+  --status-requested-border: #f5c700;
   --status-confirmed: #b7e7fc;
   --status-confirmed-foreground: #0b0b10;
   --status-completed: #12301f;

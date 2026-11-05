@@ -318,11 +318,15 @@ export const PALETTES: Record<string, Palette> = Object.fromEntries(
   LIST.map((palette) => [palette.id, palette]),
 );
 
-const OFFERED = [ZEMANA_PALETTE_ID];
+const OFFERED: readonly string[] = Object.freeze([ZEMANA_PALETTE_ID]);
 
 export const CLINIC_BRANDING: Record<
   string,
-  { palettes: string[]; displayName: string | null; areaLabel: string | null }
+  {
+    palettes: readonly string[];
+    displayName: string | null;
+    areaLabel: string | null;
+  }
 > = {
   "karol-pacheco": {
     palettes: OFFERED,

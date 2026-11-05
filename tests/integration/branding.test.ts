@@ -42,7 +42,6 @@ describe("clinic branding", () => {
     for (const id of [karina, sirlei, nova, CLINIC]) {
       const branding = await getClinicBranding(id);
       expect(branding?.palette.id).toBe("zemana");
-      expect(branding?.usesBrandImages).toBe(false);
     }
   });
 

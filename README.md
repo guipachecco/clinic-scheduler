@@ -16,7 +16,7 @@ O que já funciona: login do painel com verificação em duas etapas obrigatóri
 
 ## Tecnologias
 
-Next.js 16 (App Router) com TypeScript estrito, PostgreSQL 17 com Drizzle ORM, Better Auth (login e 2FA), Tailwind CSS e shadcn/ui (com as fontes Archivo e Figtree empacotadas pelo próprio app), Zod e React Hook Form, Luxon (datas no fuso da clínica), Vitest e Playwright, pnpm, ESLint, Prettier, GitHub Actions e Dependabot. Os motivos de cada escolha estão no [planejamento](docs/planejamento-etapa-1.md#stack).
+Next.js 16 (App Router) com TypeScript estrito, PostgreSQL 17 com Drizzle ORM, Better Auth (login e 2FA), Tailwind CSS e shadcn/ui (com as fontes Bricolage Grotesque e Figtree empacotadas pelo próprio app), Zod e React Hook Form, Luxon (datas no fuso da clínica), Vitest e Playwright, pnpm, ESLint, Prettier, GitHub Actions e Dependabot. Os motivos de cada escolha estão no [planejamento](docs/planejamento-etapa-1.md#stack).
 
 ## Pré-requisitos
 
