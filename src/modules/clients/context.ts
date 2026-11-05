@@ -57,12 +57,31 @@ export type ClientContext = {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Stands for "nobody" in client_context: no patients row has it as user_id
+// (user ids are random UUIDs), so only the clinic comes back.
+const NO_USER = "00000000-0000-0000-0000-000000000000";
+
 // Null when the slug is not an active clinic.
 export async function getClientContext(
   slug: string,
   userId: string,
 ): Promise<ClientContext | null> {
-  if (!UUID.test(userId)) return null;
+  if (!UUID.test(userId) || userId === NO_USER) return null;
+  return readContext(slug, userId);
+}
+
+// The public face of an active clinic, for visitors who are not signed in
+// (the clinic link's pages). Null when the slug is not an active clinic.
+export async function getPublicClinic(
+  slug: string,
+): Promise<PublicClinic | null> {
+  return (await readContext(slug, NO_USER))?.clinic ?? null;
+}
+
+async function readContext(
+  slug: string,
+  userId: string,
+): Promise<ClientContext | null> {
   return clientDb.transaction(async (tx) => {
     const result = await tx.execute<{
       clinic_id: string;

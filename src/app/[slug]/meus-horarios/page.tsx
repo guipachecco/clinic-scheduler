@@ -1,0 +1,118 @@
+import { DateTime } from "luxon";
+import type { Metadata } from "next";
+import Link from "next/link";
+
+import { Button } from "@/components/ui/button";
+import type { Status } from "@/modules/appointments/fields";
+import {
+  listMyAppointments,
+  type MyAppointment,
+} from "@/modules/booking/booking";
+import { requireClient } from "@/modules/clients/session";
+
+import { clinicName, PageTitle, whatsappUrl } from "../ui";
+
+export const metadata: Metadata = { title: "Meus horários" };
+
+// What she sees of each status. The owner's cancellations read "Desmarcado".
+const STATUS_TEXT: Record<Status, string> = {
+  requested: "Aguardando confirmação",
+  confirmed: "Confirmado",
+  cancelled: "Desmarcado",
+  completed: "Realizado",
+  no_show: "Não compareceu",
+};
+
+// Her appointments in this clinic only: upcoming first, then past ones. No
+// cancel or reschedule control: only the owner does that.
+export default async function MyAppointmentsPage({
+  params,
+}: PageProps<"/[slug]/meus-horarios">) {
+  const { slug } = await params;
+  const { ctx, clinic } = await requireClient(slug, `/${slug}/meus-horarios`);
+  const { upcoming, past } = await listMyAppointments(ctx);
+  const name = clinicName(clinic);
+
+  return (
+    <>
+      <PageTitle>Meus horários</PageTitle>
+      <section aria-labelledby="proximos" className="grid gap-3">
+        <h2 id="proximos" className="font-heading text-lg font-semibold">
+          Próximos horários
+        </h2>
+        {upcoming.length === 0 ? (
+          <p className="text-muted-foreground">Nenhum horário marcado.</p>
+        ) : (
+          <AppointmentList items={upcoming} timezone={clinic.timezone} />
+        )}
+        <Button asChild size="lg" variant="outline">
+          <Link href={`/${clinic.slug}/marcar`}>Marcar outro horário</Link>
+        </Button>
+      </section>
+
+      <div className="grid gap-2 rounded-2xl border bg-card p-4">
+        <p>Para desmarcar ou mudar, fale com {name}</p>
+        {clinic.whatsappPhone ? (
+          <a
+            href={whatsappUrl(clinic.whatsappPhone)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-primary underline underline-offset-4"
+          >
+            Falar no WhatsApp
+          </a>
+        ) : null}
+      </div>
+
+      {past.length > 0 ? (
+        <section aria-labelledby="anteriores" className="grid gap-3">
+          <h2 id="anteriores" className="font-heading text-lg font-semibold">
+            Horários anteriores
+          </h2>
+          <AppointmentList items={past} timezone={clinic.timezone} />
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+function AppointmentList({
+  items,
+  timezone,
+}: {
+  items: MyAppointment[];
+  timezone: string;
+}) {
+  return (
+    <ul className="grid gap-2">
+      {items.map((item) => {
+        const start = DateTime.fromJSDate(item.startsAt, {
+          zone: timezone,
+        }).setLocale("pt-BR");
+        return (
+          <li
+            key={item.id}
+            className="grid gap-0.5 rounded-2xl border bg-card px-4 py-3"
+          >
+            <span className="font-semibold break-words">
+              {item.serviceName}
+            </span>
+            <span className="text-sm">
+              {start.toFormat("cccc, d 'de' LLLL")}, às{" "}
+              {start.toFormat("HH:mm")}
+            </span>
+            <span
+              className={
+                item.status === "cancelled"
+                  ? "text-sm font-semibold text-destructive"
+                  : "text-sm text-muted-foreground"
+              }
+            >
+              {STATUS_TEXT[item.status]}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

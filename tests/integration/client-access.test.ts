@@ -15,6 +15,7 @@ import {
 } from "@/db/schema";
 import {
   getClientContext,
+  getPublicClinic,
   registerClientPatient,
 } from "@/modules/clients/context";
 import { normalizeName } from "@/modules/patients/fields";
@@ -609,6 +610,15 @@ describe("client access", () => {
       null,
     );
     expect(await getClientContext("grais", "nao-e-um-id")).toBe(null);
+    // Signed-out visitors: only the clinic's public columns, never a record.
+    expect(await getPublicClinic(SLUG_B)).toMatchObject({
+      id: clinicB,
+      slug: SLUG_B,
+    });
+    expect(await getPublicClinic("clinica-que-nao-existe")).toBe(null);
+    expect(
+      await getClientContext("grais", "00000000-0000-0000-0000-000000000000"),
+    ).toBe(null);
 
     await db
       .update(clinics)
@@ -616,6 +626,7 @@ describe("client access", () => {
       .where(eq(clinics.id, clinicB));
     try {
       expect(await getClientContext(SLUG_B, user.carla)).toBe(null);
+      expect(await getPublicClinic(SLUG_B)).toBe(null);
     } finally {
       await db
         .update(clinics)

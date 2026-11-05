@@ -423,7 +423,8 @@ test.describe("agenda", () => {
       ]);
       await sql("DELETE FROM services WHERE name = $1", [SERVICE]);
       await sql("DELETE FROM service_categories WHERE name = $1", [CATEGORY]);
-      await sql("DELETE FROM business_hours");
+      // Only this clinic's: the client-area clinics keep theirs.
+      await sql("DELETE FROM business_hours WHERE clinic_id = $1", [CLINIC_ID]);
     });
 
     test("sets up a fictitious patient and service", async () => {

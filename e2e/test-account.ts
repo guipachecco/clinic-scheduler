@@ -68,3 +68,13 @@ export const TEST_ROOT_BRANDING = {
   name: "Root de Identidade",
   password: "senha-de-teste-identidade-bem-longa",
 };
+
+// Owner of the client-area suite's clinic (see CLIENT_AREA in
+// e2e/client-area-fixtures.ts): checks the online booking in the agenda.
+export const TEST_ADMIN_CLIENT_AREA = {
+  role: "admin" as const,
+  clinicSlug: "clinica-cliente-a",
+  email: "dona-area-cliente@example.test",
+  name: "Dona da Área da Cliente",
+  password: "senha-de-teste-area-cliente-bem-longa",
+};

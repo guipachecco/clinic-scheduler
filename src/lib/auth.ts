@@ -1,4 +1,9 @@
 import { betterAuth } from "better-auth";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { twoFactor } from "better-auth/plugins/two-factor";
@@ -43,6 +48,18 @@ async function sessionSecondsFor(userId: string) {
     ? CLIENT_SESSION_SECONDS
     : PANEL_SESSION_SECONDS;
 }
+
+// Only the panel uses two-factor authentication. A client session (or any
+// other non-panel role) gets not-found on every /two-factor/* path, so a
+// client can never turn it on. Signing in to the panel with a code has no
+// session yet (only the two-factor cookie) and passes through.
+const blockTwoFactorOutsidePanel = createAuthMiddleware(async (ctx) => {
+  if (!ctx.path.startsWith("/two-factor/")) return;
+  const session = await getSessionFromCtx(ctx);
+  if (!session) return;
+  const role = (session.user as { role?: unknown }).role;
+  if (role !== "admin" && role !== "root") throw new APIError("NOT_FOUND");
+});
 
 // Better Auth paths for the e-mail links: 3 requests per minute per IP.
 const EMAIL_LINK_LIMIT = { window: 60, max: 3 };
@@ -92,6 +109,7 @@ export const auth = betterAuth({
     expiresIn: CLIENT_SESSION_SECONDS,
     disableSessionRefresh: true,
   },
+  hooks: { before: blockTwoFactorOutsidePanel },
   databaseHooks: {
     session: {
       create: {

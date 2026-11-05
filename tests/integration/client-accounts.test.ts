@@ -279,6 +279,58 @@ describe("sessions and e-mails", () => {
   });
 });
 
+describe("two-factor authentication", () => {
+  // The session cookie of a fresh sign-in, as a request Cookie header.
+  async function sessionHeaders(email: string) {
+    const { headers } = await auth.api.signInEmail({
+      body: { email, password: PASSWORD },
+      returnHeaders: true,
+    });
+    const cookie = (headers.getSetCookie?.() ?? [headers.get("set-cookie")!])
+      .map((value) => value.split(";")[0])
+      .join("; ");
+    return new Headers({ cookie });
+  }
+
+  it("a client cannot turn on 2FA", async () => {
+    const client = await signup("dois-fatores");
+    if (!client.ok) throw new Error("signup failed");
+    const headers = await sessionHeaders(`dois-fatores${DOMAIN}`);
+
+    await expect(
+      auth.api.enableTwoFactor({ body: { password: PASSWORD }, headers }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      auth.api.verifyTOTP({ body: { code: "123456" }, headers }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+
+    const [user] = await db
+      .select({ twoFactorEnabled: users.twoFactorEnabled })
+      .from(users)
+      .where(eq(users.id, client.userId));
+    expect(user?.twoFactorEnabled).toBe(false);
+  });
+
+  it("an admin still sets up 2FA", async () => {
+    await createAdmin({
+      role: "admin",
+      clinicSlug: "grais",
+      email: `dona-2fa${DOMAIN}`,
+      name: "Dona de Teste",
+      password: PASSWORD,
+    });
+    const headers = await sessionHeaders(`dona-2fa${DOMAIN}`);
+    const result = await auth.api.enableTwoFactor({
+      body: { password: PASSWORD },
+      headers,
+    });
+    expect(result).toMatchObject({
+      method: "totp",
+      totpURI: expect.stringContaining("otpauth://"),
+    });
+  });
+});
+
 describe("database rules", () => {
   it("users check rejects client with clinic", async () => {
     let code: string | undefined;

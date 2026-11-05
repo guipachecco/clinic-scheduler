@@ -83,11 +83,27 @@ export async function sendVerificationEmail({
   });
 }
 
-export async function sendResetPasswordEmail({
-  user,
-  url,
-  token,
-}: AuthEmailInput) {
+// Better Auth awaits this before it answers, so the answer would take longer
+// when an e-mail really goes out (the clinic lookup and the Resend call) than
+// for an unknown address. Inside a request the work runs after the response
+// instead; outside one (scripts, tests) it is awaited as before. next/server
+// is loaded lazily: plain Node (scripts/admin.ts, the e2e setup) cannot
+// resolve it, and there it is not needed.
+export async function sendResetPasswordEmail(input: AuthEmailInput) {
+  const task = () =>
+    deliverResetPasswordEmail(input).catch((error: unknown) => {
+      logger.error("password reset e-mail failed", { error });
+    });
+  try {
+    const { after } = await import("next/server");
+    // Throws outside a request.
+    after(task);
+  } catch {
+    await task();
+  }
+}
+
+async function deliverResetPasswordEmail({ user, url, token }: AuthEmailInput) {
   // Panel accounts change their password with `pnpm admin`, never by e-mail.
   if (user.role !== "client") return;
   const clinic = await clinicPageFromCallback(callbackOf(url));
