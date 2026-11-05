@@ -71,6 +71,13 @@
       "when": 1793838035766,
       "tag": "0009_finance",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793843542626,
+      "tag": "0010_clinic_branding",
+      "breakpoints": true
     }
   ]
 }

@@ -17,6 +17,8 @@ import {
   services,
 } from "@/db/schema";
 
+import { CLINIC_BRANDING, resolvePalette } from "@/modules/branding/palettes";
+
 import type { ClinicFormValues } from "./fields";
 
 // Data functions for the clinics themselves. Only root creates or changes
@@ -89,7 +91,13 @@ export async function createClinic(
 
       const [clinic] = await tx
         .insert(clinics)
-        .values({ name: values.name, slug: values.slug })
+        .values({
+          name: values.name,
+          slug: values.slug,
+          theme: { paletteId: resolvePalette(values.slug, undefined).id },
+          displayName: CLINIC_BRANDING[values.slug]?.displayName ?? null,
+          areaLabel: CLINIC_BRANDING[values.slug]?.areaLabel ?? null,
+        })
         .returning({ id: clinics.id });
       const clinicId = clinic!.id;
 

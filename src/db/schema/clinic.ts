@@ -129,6 +129,7 @@ export const media = pgTable(
 
 export type ClinicTheme = {
   primaryColor?: string;
+  paletteId?: string;
 };
 
 // The clinic that existed before multi-clinic support (migration 0007).
@@ -157,6 +158,14 @@ export const clinics = pgTable(
     logoMediaId: uuid("logo_media_id").references((): AnyPgColumn => media.id, {
       onDelete: "set null",
     }),
+    // Short name and area shown in the panel (e.g. "Karina" / "Manicure");
+    // the display name falls back to `name` when empty.
+    displayName: text("display_name"),
+    areaLabel: text("area_label"),
+    ownerPhotoMediaId: uuid("owner_photo_media_id").references(
+      (): AnyPgColumn => media.id,
+      { onDelete: "set null" },
+    ),
     theme: jsonb("theme").$type<ClinicTheme>().notNull().default({}),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     minAdvanceMinutes: integer("min_advance_minutes").notNull().default(120),
@@ -177,6 +186,14 @@ export const clinics = pgTable(
   (t) => [
     check("clinics_slug_check", sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check("clinics_name_check", sql`char_length(${t.name}) between 1 and 100`),
+    check(
+      "clinics_display_name_check",
+      sql`${t.displayName} is null or char_length(${t.displayName}) between 1 and 40`,
+    ),
+    check(
+      "clinics_area_label_check",
+      sql`${t.areaLabel} is null or char_length(${t.areaLabel}) between 1 and 40`,
+    ),
     check("clinics_min_advance_check", sql`${t.minAdvanceMinutes} >= 0`),
     check(
       "clinics_max_advance_check",
