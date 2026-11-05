@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { db } from "@/db/owner";
 import { clinics, GRAIS_CLINIC_ID } from "@/db/schema";
 
 // The clinic every integration test works in: the one migration 0007 creates

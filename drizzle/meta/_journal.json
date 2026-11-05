@@ -78,6 +78,48 @@
       "when": 1793843542626,
       "tag": "0010_clinic_branding",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793908228750,
+      "tag": "0011_db_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793910818940,
+      "tag": "0012_client_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793912004505,
+      "tag": "0013_client_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793912798070,
+      "tag": "0014_client_booking_guards",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1793916444802,
+      "tag": "0015_panel_link_audit",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1793918148420,
+      "tag": "0016_client_appointment_columns",
+      "breakpoints": true
     }
   ]
 }

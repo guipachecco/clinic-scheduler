@@ -2,7 +2,7 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic } from "@/db/client";
 import { ANONYMIZED_NAME } from "@/modules/patients/patients";
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 
@@ -44,16 +44,17 @@ export async function listCash(
   clinicId: string,
   range: { from: string; to: string },
 ): Promise<CashEntry[]> {
-  const result = await db.execute<{
-    kind: CashEntry["kind"];
-    id: string;
-    date: string;
-    amount_cents: number;
-    method_name: string;
-    label: string;
-    sale_id: string | null;
-    backdated: boolean;
-  }>(sql`
+  const result = await inClinic(clinicId, (tx) =>
+    tx.execute<{
+      kind: CashEntry["kind"];
+      id: string;
+      date: string;
+      amount_cents: number;
+      method_name: string;
+      label: string;
+      sale_id: string | null;
+      backdated: boolean;
+    }>(sql`
     select * from (
       select 'payment' as kind, p.id, p.paid_on::text as date,
         p.amount_cents, m.name as method_name,
@@ -100,7 +101,8 @@ export async function listCash(
         and (e.cancelled_at at time zone ${tz})::date < ${range.to}::date
     ) entries
     order by date, kind, id
-  `);
+  `),
+  );
   return result.rows.map((row) => ({
     kind: row.kind,
     id: row.id,
@@ -119,17 +121,18 @@ export async function listReceivables(
   clinicId: string,
   today: string,
 ): Promise<Receivable[]> {
-  const result = await db.execute<{
-    installment_id: string;
-    sale_id: string;
-    patient_id: string;
-    patient_name: string;
-    anonymized: boolean;
-    number: number;
-    due_date: string | null;
-    amount_cents: number;
-    paid_cents: number;
-  }>(sql`
+  const result = await inClinic(clinicId, (tx) =>
+    tx.execute<{
+      installment_id: string;
+      sale_id: string;
+      patient_id: string;
+      patient_name: string;
+      anonymized: boolean;
+      number: number;
+      due_date: string | null;
+      amount_cents: number;
+      paid_cents: number;
+    }>(sql`
     select i.id as installment_id, i.sale_id, s.patient_id,
       pt.name as patient_name, pt.anonymized_at is not null as anonymized,
       i.number, i.due_date::text as due_date, i.amount_cents,
@@ -141,7 +144,8 @@ export async function listReceivables(
     where i.clinic_id = ${clinicId}
       and i.cancelled_at is null and s.cancelled_at is null
     order by i.due_date nulls last, pt.name, i.number
-  `);
+  `),
+  );
   return result.rows
     .filter((row) => row.paid_cents < row.amount_cents)
     .map((row) => ({

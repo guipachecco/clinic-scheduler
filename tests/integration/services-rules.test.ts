@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { db, pool } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import {
   FLEXIBLE_SERVICE_SLUG,
   OTHER_CATEGORY_SLUG,
@@ -15,7 +15,7 @@ import {
 import { createClinic } from "@/modules/clinics/clinics";
 
 afterAll(async () => {
-  await pool.end();
+  await endPools();
 });
 
 describe("migrations", () => {

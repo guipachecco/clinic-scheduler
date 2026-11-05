@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import * as z from "zod";
 
-import { db } from "@/db/client";
+import { platformDb, type Tx } from "@/db/client";
 import {
   accounts,
   auditLogs,
@@ -15,17 +15,18 @@ import { auth } from "@/lib/auth";
 import { MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH } from "./password-policy";
 
 // Panel accounts are managed from the terminal (scripts/admin.ts) because the
-// site has no public sign-up. Every change is recorded in audit_logs.
+// site has no public sign-up. Every change is recorded in audit_logs. Runs as
+// app_platform, which sees every account and clinic.
 
 export class AdminAccountError extends Error {}
 
-const emailSchema = z
+export const emailSchema = z
   .string()
   .trim()
   .toLowerCase()
   .pipe(z.email({ error: "E-mail inválido." }));
 
-const passwordSchema = z
+export const passwordSchema = z
   .string()
   .min(
     MIN_PASSWORD_LENGTH,
@@ -59,9 +60,7 @@ function parse<T>(schema: z.ZodType<T>, input: unknown): T {
   return result.data;
 }
 
-type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-async function findUserIdByEmail(tx: Transaction, email: string) {
+async function findUserIdByEmail(tx: Tx, email: string) {
   const [user] = await tx
     .select({ id: users.id })
     .from(users)
@@ -72,7 +71,8 @@ async function findUserIdByEmail(tx: Transaction, email: string) {
   return user.id;
 }
 
-async function hashPassword(password: string) {
+// Also used for client accounts (src/modules/clients/accounts.ts).
+export async function hashPassword(password: string) {
   const context = await auth.$context;
   return context.password.hash(password);
 }
@@ -96,7 +96,7 @@ export async function createAdmin(input: {
   }
   const passwordHash = await hashPassword(password);
 
-  return db.transaction(async (tx) => {
+  return platformDb.transaction(async (tx) => {
     let clinicId: string | null = null;
     if (clinicSlug) {
       const [clinic] = await tx
@@ -152,7 +152,7 @@ export async function resetAdminPassword(input: {
   );
   const passwordHash = await hashPassword(password);
 
-  await db.transaction(async (tx) => {
+  await platformDb.transaction(async (tx) => {
     const userId = await findUserIdByEmail(tx, email);
     const updated = await tx
       .update(accounts)
@@ -184,7 +184,7 @@ export async function resetAdminPassword(input: {
 export async function resetAdminTwoFactor(input: { email: string }) {
   const { email } = parse(z.object({ email: emailSchema }), input);
 
-  await db.transaction(async (tx) => {
+  await platformDb.transaction(async (tx) => {
     const userId = await findUserIdByEmail(tx, email);
     await tx.delete(twoFactors).where(eq(twoFactors.userId, userId));
     await tx

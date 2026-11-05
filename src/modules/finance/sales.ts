@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic, type Tx } from "@/db/client";
 import { isAppointmentOverlapError } from "@/db/errors";
 import {
   appointments,
@@ -138,7 +138,6 @@ const UUID_PATTERN =
 const SALE_NOT_FOUND = "Venda não encontrada.";
 const SALE_CANCELLED = "Esta venda foi cancelada.";
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Executor = Pick<Tx, "select">;
 
 const fail = (formError: string): SaleResult => ({ ok: false, formError });
@@ -212,86 +211,99 @@ export async function getSale(
   today: string,
 ): Promise<SaleDetail | null> {
   if (!UUID_PATTERN.test(id)) return null;
-  const [sale] = await db
-    .select({
-      id: sales.id,
-      quoteId: sales.quoteId,
-      quoteNumber: quotes.number,
-      patientId: sales.patientId,
-      patientName: patients.name,
-      anonymizedAt: patients.anonymizedAt,
-      paymentPlan: sales.paymentPlan,
-      totalCents: sales.totalCents,
-      cancelledAt: sales.cancelledAt,
-      cancellationReason: sales.cancellationReason,
-      createdAt: sales.createdAt,
-    })
-    .from(sales)
-    .innerJoin(quotes, eq(sales.quoteId, quotes.id))
-    .innerJoin(patients, eq(sales.patientId, patients.id))
-    .where(and(eq(sales.id, id), eq(sales.clinicId, clinicId)))
-    .limit(1);
+  const [sale] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: sales.id,
+        quoteId: sales.quoteId,
+        quoteNumber: quotes.number,
+        patientId: sales.patientId,
+        patientName: patients.name,
+        anonymizedAt: patients.anonymizedAt,
+        paymentPlan: sales.paymentPlan,
+        totalCents: sales.totalCents,
+        cancelledAt: sales.cancelledAt,
+        cancellationReason: sales.cancellationReason,
+        createdAt: sales.createdAt,
+      })
+      .from(sales)
+      .innerJoin(quotes, eq(sales.quoteId, quotes.id))
+      .innerJoin(patients, eq(sales.patientId, patients.id))
+      .where(and(eq(sales.id, id), eq(sales.clinicId, clinicId)))
+      .limit(1),
+  );
   if (!sale) return null;
 
-  const [items, sessions, parts, paid, revisions] = await Promise.all([
-    db
-      .select()
-      .from(saleItems)
-      .where(eq(saleItems.saleId, id))
-      .orderBy(asc(saleItems.sortOrder)),
-    db
-      .select({
-        saleItemId: saleSessions.saleItemId,
-        id: appointments.id,
-        startsAt: appointments.startsAt,
-        status: appointments.status,
-      })
-      .from(saleSessions)
-      .innerJoin(saleItems, eq(saleSessions.saleItemId, saleItems.id))
-      .innerJoin(appointments, eq(saleSessions.appointmentId, appointments.id))
-      .where(eq(saleItems.saleId, id))
-      .orderBy(asc(appointments.startsAt)),
-    db
-      .select({
-        id: installments.id,
-        number: installments.number,
-        amountCents: installments.amountCents,
-        dueDate: installments.dueDate,
-        cancelledAt: installments.cancelledAt,
-        saleItemId: installments.saleItemId,
-        paidCents: paidOf(),
-        sessionStartsAt: appointments.startsAt,
-      })
-      .from(installments)
-      .leftJoin(appointments, eq(installments.appointmentId, appointments.id))
-      .where(eq(installments.saleId, id))
-      .orderBy(asc(installments.number)),
-    db
-      .select({
-        id: payments.id,
-        installmentNumber: installments.number,
-        paidOn: payments.paidOn,
-        amountCents: payments.amountCents,
-        methodName: paymentMethods.name,
-        notes: payments.notes,
-        createdAt: payments.createdAt,
-        reversedAt: payments.reversedAt,
-        reversalReason: payments.reversalReason,
-      })
-      .from(payments)
-      .innerJoin(installments, eq(payments.installmentId, installments.id))
-      .innerJoin(
-        paymentMethods,
-        eq(payments.paymentMethodId, paymentMethods.id),
-      )
-      .where(eq(installments.saleId, id))
-      .orderBy(desc(payments.paidOn), desc(payments.createdAt)),
-    db
-      .select()
-      .from(saleRevisions)
-      .where(eq(saleRevisions.saleId, id))
-      .orderBy(asc(saleRevisions.createdAt)),
-  ]);
+  // One transaction runs one query at a time: each is awaited in turn.
+  const [items, sessions, parts, paid, revisions] = await inClinic(
+    clinicId,
+    async (tx) =>
+      Promise.all([
+        await tx
+          .select()
+          .from(saleItems)
+          .where(eq(saleItems.saleId, id))
+          .orderBy(asc(saleItems.sortOrder)),
+        await tx
+          .select({
+            saleItemId: saleSessions.saleItemId,
+            id: appointments.id,
+            startsAt: appointments.startsAt,
+            status: appointments.status,
+          })
+          .from(saleSessions)
+          .innerJoin(saleItems, eq(saleSessions.saleItemId, saleItems.id))
+          .innerJoin(
+            appointments,
+            eq(saleSessions.appointmentId, appointments.id),
+          )
+          .where(eq(saleItems.saleId, id))
+          .orderBy(asc(appointments.startsAt)),
+        await tx
+          .select({
+            id: installments.id,
+            number: installments.number,
+            amountCents: installments.amountCents,
+            dueDate: installments.dueDate,
+            cancelledAt: installments.cancelledAt,
+            saleItemId: installments.saleItemId,
+            paidCents: paidOf(),
+            sessionStartsAt: appointments.startsAt,
+          })
+          .from(installments)
+          .leftJoin(
+            appointments,
+            eq(installments.appointmentId, appointments.id),
+          )
+          .where(eq(installments.saleId, id))
+          .orderBy(asc(installments.number)),
+        await tx
+          .select({
+            id: payments.id,
+            installmentNumber: installments.number,
+            paidOn: payments.paidOn,
+            amountCents: payments.amountCents,
+            methodName: paymentMethods.name,
+            notes: payments.notes,
+            createdAt: payments.createdAt,
+            reversedAt: payments.reversedAt,
+            reversalReason: payments.reversalReason,
+          })
+          .from(payments)
+          .innerJoin(installments, eq(payments.installmentId, installments.id))
+          .innerJoin(
+            paymentMethods,
+            eq(payments.paymentMethodId, paymentMethods.id),
+          )
+          .where(eq(installments.saleId, id))
+          .orderBy(desc(payments.paidOn), desc(payments.createdAt)),
+        await tx
+          .select()
+          .from(saleRevisions)
+          .where(eq(saleRevisions.saleId, id))
+          .orderBy(asc(saleRevisions.createdAt)),
+      ]),
+  );
 
   const cancelled = sale.cancelledAt !== null;
   const installmentsOut = parts.map((part) => ({
@@ -383,31 +395,33 @@ export async function listSales(
       where p.installment_id = i.id and p.reversed_at is null), 0)))
     from installments i
     where i.sale_id = "sales"."id" and i.cancelled_at is null), 0)::int`;
-  const rows = await db
-    .select({
-      id: sales.id,
-      quoteNumber: quotes.number,
-      patientId: sales.patientId,
-      patientName: patients.name,
-      anonymizedAt: patients.anonymizedAt,
-      paymentPlan: sales.paymentPlan,
-      totalCents: sales.totalCents,
-      cancelledAt: sales.cancelledAt,
-      createdAt: sales.createdAt,
-      paidCents: paidSql,
-      owedCents: owedSql,
-    })
-    .from(sales)
-    .innerJoin(quotes, eq(sales.quoteId, quotes.id))
-    .innerJoin(patients, eq(sales.patientId, patients.id))
-    .where(
-      and(
-        eq(sales.clinicId, clinicId),
-        input.patientId ? eq(sales.patientId, input.patientId) : undefined,
-      ),
-    )
-    .orderBy(desc(sales.createdAt))
-    .limit(200);
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: sales.id,
+        quoteNumber: quotes.number,
+        patientId: sales.patientId,
+        patientName: patients.name,
+        anonymizedAt: patients.anonymizedAt,
+        paymentPlan: sales.paymentPlan,
+        totalCents: sales.totalCents,
+        cancelledAt: sales.cancelledAt,
+        createdAt: sales.createdAt,
+        paidCents: paidSql,
+        owedCents: owedSql,
+      })
+      .from(sales)
+      .innerJoin(quotes, eq(sales.quoteId, quotes.id))
+      .innerJoin(patients, eq(sales.patientId, patients.id))
+      .where(
+        and(
+          eq(sales.clinicId, clinicId),
+          input.patientId ? eq(sales.patientId, input.patientId) : undefined,
+        ),
+      )
+      .orderBy(desc(sales.createdAt))
+      .limit(200),
+  );
   return rows.map((row) => ({
     id: row.id,
     quoteNumber: row.quoteNumber,
@@ -423,16 +437,18 @@ export async function listSales(
 }
 
 export async function listPaymentMethods(clinicId: string) {
-  return db
-    .select({ id: paymentMethods.id, name: paymentMethods.name })
-    .from(paymentMethods)
-    .where(
-      and(
-        eq(paymentMethods.clinicId, clinicId),
-        eq(paymentMethods.isActive, true),
-      ),
-    )
-    .orderBy(asc(paymentMethods.sortOrder), asc(paymentMethods.name));
+  return inClinic(clinicId, (tx) =>
+    tx
+      .select({ id: paymentMethods.id, name: paymentMethods.name })
+      .from(paymentMethods)
+      .where(
+        and(
+          eq(paymentMethods.clinicId, clinicId),
+          eq(paymentMethods.isActive, true),
+        ),
+      )
+      .orderBy(asc(paymentMethods.sortOrder), asc(paymentMethods.name)),
+  );
 }
 
 // The open installment of a package session, for "Receber agora" on the
@@ -446,24 +462,26 @@ export async function findSessionInstallment(
   outstandingCents: number;
 } | null> {
   if (!UUID_PATTERN.test(appointmentId)) return null;
-  const [row] = await db
-    .select({
-      installmentId: installments.id,
-      saleId: installments.saleId,
-      amountCents: installments.amountCents,
-      paidCents: paidOf(),
-    })
-    .from(installments)
-    .innerJoin(sales, eq(installments.saleId, sales.id))
-    .where(
-      and(
-        eq(installments.clinicId, clinicId),
-        eq(installments.appointmentId, appointmentId),
-        isNull(installments.cancelledAt),
-        isNull(sales.cancelledAt),
-      ),
-    )
-    .limit(1);
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        installmentId: installments.id,
+        saleId: installments.saleId,
+        amountCents: installments.amountCents,
+        paidCents: paidOf(),
+      })
+      .from(installments)
+      .innerJoin(sales, eq(installments.saleId, sales.id))
+      .where(
+        and(
+          eq(installments.clinicId, clinicId),
+          eq(installments.appointmentId, appointmentId),
+          isNull(installments.cancelledAt),
+          isNull(sales.cancelledAt),
+        ),
+      )
+      .limit(1),
+  );
   if (!row || row.paidCents >= row.amountCents) return null;
   return {
     installmentId: row.installmentId,
@@ -480,7 +498,7 @@ export async function receivePayment(
   actorUserId: string,
 ): Promise<SaleResult> {
   try {
-    return await db.transaction(async (tx): Promise<SaleResult> => {
+    return await inClinic(clinicId, async (tx): Promise<SaleResult> => {
       const [part] = await tx
         .select({
           id: installments.id,
@@ -578,7 +596,7 @@ export async function reversePayment(
   now: Date = new Date(),
 ): Promise<SaleResult> {
   if (!UUID_PATTERN.test(paymentId)) return fail("Pagamento não encontrado.");
-  return db.transaction(async (tx): Promise<SaleResult> => {
+  return inClinic(clinicId, async (tx): Promise<SaleResult> => {
     const [payment] = await tx
       .select({
         id: payments.id,
@@ -628,7 +646,7 @@ export async function cancelSale(
 ): Promise<SaleResult> {
   if (!UUID_PATTERN.test(saleId)) return fail(SALE_NOT_FOUND);
   try {
-    return await db.transaction(async (tx): Promise<SaleResult> => {
+    return await inClinic(clinicId, async (tx): Promise<SaleResult> => {
       if (input.cancelFutureSessions) await lockAgenda(tx, clinicId);
       const sale = await lockSale(tx, clinicId, saleId);
       if (!sale) return fail(SALE_NOT_FOUND);
@@ -728,7 +746,7 @@ export async function scheduleSessions(
   now: Date = new Date(),
 ): Promise<SaleResult> {
   try {
-    return await db.transaction(async (tx): Promise<SaleResult> => {
+    return await inClinic(clinicId, async (tx): Promise<SaleResult> => {
       await lockAgenda(tx, clinicId);
       const [item] = await tx
         .select({
@@ -882,7 +900,7 @@ export async function reviseSale(
 ): Promise<SaleResult> {
   if (!UUID_PATTERN.test(saleId)) return fail(SALE_NOT_FOUND);
   try {
-    return await db.transaction(async (tx): Promise<SaleResult> => {
+    return await inClinic(clinicId, async (tx): Promise<SaleResult> => {
       const sale = await lockSale(tx, clinicId, saleId);
       if (!sale) return fail(SALE_NOT_FOUND);
       if (sale.cancelledAt) return fail(SALE_CANCELLED);

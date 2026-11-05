@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import { db, pool } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import {
   appointments,
   businessHours,
@@ -194,7 +194,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
+  await endPools();
 });
 
 describe("quotes", () => {

@@ -47,3 +47,6 @@ next-env.d.ts
 
 # Visual brainstorming screens (local only)
 .superpowers/
+
+# E-mails written locally when RESEND_API_KEY is not set
+/.emails/

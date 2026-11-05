@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, eq, sql } from "drizzle-orm";
 
-import { db } from "@/db/client";
+import { inClinic, type Tx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import { auditLogs, serviceCategories, services } from "@/db/schema";
 
@@ -109,8 +109,6 @@ const CATEGORY_KEYS = [
   "sortOrder",
 ] as const satisfies readonly (keyof CategoryFormValues)[];
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
 const nameFail = (message: string): ServiceResult => ({
   ok: false,
   fieldErrors: { name: message },
@@ -167,7 +165,7 @@ export async function createService(
   actorUserId: string,
 ): Promise<ServiceResult> {
   try {
-    return await db.transaction(async (tx): Promise<ServiceResult> => {
+    return await inClinic(clinicId, async (tx): Promise<ServiceResult> => {
       const [category] = await tx
         .select({ id: serviceCategories.id })
         .from(serviceCategories)
@@ -216,7 +214,7 @@ export async function updateService(
 ): Promise<ServiceResult> {
   if (!UUID_PATTERN.test(id)) return { ok: false, fieldErrors: {} };
   try {
-    return await db.transaction(async (tx): Promise<ServiceResult> => {
+    return await inClinic(clinicId, async (tx): Promise<ServiceResult> => {
       const [current] = await tx
         .select()
         .from(services)
@@ -270,7 +268,7 @@ export async function createCategory(
   actorUserId: string,
 ): Promise<ServiceResult> {
   try {
-    return await db.transaction(async (tx): Promise<ServiceResult> => {
+    return await inClinic(clinicId, async (tx): Promise<ServiceResult> => {
       if (await categoryNameTaken(tx, clinicId, values.name)) {
         return nameFail(CATEGORY_TAKEN);
       }
@@ -304,7 +302,7 @@ export async function updateCategory(
 ): Promise<ServiceResult> {
   if (!UUID_PATTERN.test(id)) return { ok: false, fieldErrors: {} };
   try {
-    return await db.transaction(async (tx): Promise<ServiceResult> => {
+    return await inClinic(clinicId, async (tx): Promise<ServiceResult> => {
       const [current] = await tx
         .select()
         .from(serviceCategories)
@@ -355,28 +353,30 @@ export async function getService(
   id: string,
 ): Promise<ServiceRecord | null> {
   if (!UUID_PATTERN.test(id)) return null;
-  const [row] = await db
-    .select({
-      id: services.id,
-      categoryId: services.categoryId,
-      name: services.name,
-      slug: services.slug,
-      description: services.description,
-      durationMinutes: services.durationMinutes,
-      bufferBeforeMinutes: services.bufferBeforeMinutes,
-      bufferAfterMinutes: services.bufferAfterMinutes,
-      priceCents: services.priceCents,
-      priceDisplay: services.priceDisplay,
-      requiresApproval: services.requiresApproval,
-      onlineBookingEnabled: services.onlineBookingEnabled,
-      preparationInstructions: services.preparationInstructions,
-      isFlexible: services.isFlexible,
-      isActive: services.isActive,
-      sortOrder: services.sortOrder,
-    })
-    .from(services)
-    .where(and(eq(services.id, id), eq(services.clinicId, clinicId)))
-    .limit(1);
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: services.id,
+        categoryId: services.categoryId,
+        name: services.name,
+        slug: services.slug,
+        description: services.description,
+        durationMinutes: services.durationMinutes,
+        bufferBeforeMinutes: services.bufferBeforeMinutes,
+        bufferAfterMinutes: services.bufferAfterMinutes,
+        priceCents: services.priceCents,
+        priceDisplay: services.priceDisplay,
+        requiresApproval: services.requiresApproval,
+        onlineBookingEnabled: services.onlineBookingEnabled,
+        preparationInstructions: services.preparationInstructions,
+        isFlexible: services.isFlexible,
+        isActive: services.isActive,
+        sortOrder: services.sortOrder,
+      })
+      .from(services)
+      .where(and(eq(services.id, id), eq(services.clinicId, clinicId)))
+      .limit(1),
+  );
   return row ?? null;
 }
 
@@ -384,31 +384,34 @@ export async function getService(
 export async function listCatalog(
   clinicId: string,
 ): Promise<CatalogCategory[]> {
-  const [categories, rows] = await Promise.all([
-    db
-      .select()
-      .from(serviceCategories)
-      .where(eq(serviceCategories.clinicId, clinicId))
-      .orderBy(asc(serviceCategories.sortOrder), asc(serviceCategories.name)),
-    db
-      .select({
-        id: services.id,
-        categoryId: services.categoryId,
-        name: services.name,
-        slug: services.slug,
-        durationMinutes: services.durationMinutes,
-        bufferBeforeMinutes: services.bufferBeforeMinutes,
-        bufferAfterMinutes: services.bufferAfterMinutes,
-        priceCents: services.priceCents,
-        priceDisplay: services.priceDisplay,
-        isFlexible: services.isFlexible,
-        isActive: services.isActive,
-        sortOrder: services.sortOrder,
-      })
-      .from(services)
-      .where(eq(services.clinicId, clinicId))
-      .orderBy(asc(services.sortOrder), asc(services.name)),
-  ]);
+  // One transaction runs one query at a time: each is awaited in turn.
+  const [categories, rows] = await inClinic(clinicId, async (tx) =>
+    Promise.all([
+      await tx
+        .select()
+        .from(serviceCategories)
+        .where(eq(serviceCategories.clinicId, clinicId))
+        .orderBy(asc(serviceCategories.sortOrder), asc(serviceCategories.name)),
+      await tx
+        .select({
+          id: services.id,
+          categoryId: services.categoryId,
+          name: services.name,
+          slug: services.slug,
+          durationMinutes: services.durationMinutes,
+          bufferBeforeMinutes: services.bufferBeforeMinutes,
+          bufferAfterMinutes: services.bufferAfterMinutes,
+          priceCents: services.priceCents,
+          priceDisplay: services.priceDisplay,
+          isFlexible: services.isFlexible,
+          isActive: services.isActive,
+          sortOrder: services.sortOrder,
+        })
+        .from(services)
+        .where(eq(services.clinicId, clinicId))
+        .orderBy(asc(services.sortOrder), asc(services.name)),
+    ]),
+  );
   return categories.map((category) => ({
     id: category.id,
     name: category.name,
@@ -437,29 +440,34 @@ export async function listCatalog(
 export async function listActiveServices(
   clinicId: string,
 ): Promise<ActiveService[]> {
-  return db
-    .select({
-      id: services.id,
-      name: services.name,
-      categoryName: serviceCategories.name,
-      durationMinutes: services.durationMinutes,
-      bufferBeforeMinutes: services.bufferBeforeMinutes,
-      bufferAfterMinutes: services.bufferAfterMinutes,
-      isFlexible: services.isFlexible,
-    })
-    .from(services)
-    .innerJoin(serviceCategories, eq(services.categoryId, serviceCategories.id))
-    .where(
-      and(
-        eq(services.clinicId, clinicId),
-        eq(services.isActive, true),
-        eq(serviceCategories.isActive, true),
+  return inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: services.id,
+        name: services.name,
+        categoryName: serviceCategories.name,
+        durationMinutes: services.durationMinutes,
+        bufferBeforeMinutes: services.bufferBeforeMinutes,
+        bufferAfterMinutes: services.bufferAfterMinutes,
+        isFlexible: services.isFlexible,
+      })
+      .from(services)
+      .innerJoin(
+        serviceCategories,
+        eq(services.categoryId, serviceCategories.id),
+      )
+      .where(
+        and(
+          eq(services.clinicId, clinicId),
+          eq(services.isActive, true),
+          eq(serviceCategories.isActive, true),
+        ),
+      )
+      .orderBy(
+        asc(serviceCategories.sortOrder),
+        asc(serviceCategories.name),
+        asc(services.sortOrder),
+        asc(services.name),
       ),
-    )
-    .orderBy(
-      asc(serviceCategories.sortOrder),
-      asc(serviceCategories.name),
-      asc(services.sortOrder),
-      asc(services.name),
-    );
+  );
 }

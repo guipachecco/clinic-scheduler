@@ -1,6 +1,9 @@
 # PostgreSQL para desenvolvimento local: docker compose up -d
 # Usuário e senha abaixo valem só para esta máquina. Produção usa outro banco,
 # com credenciais próprias guardadas na hospedagem.
+# Os usuários do app (app_auth, app_panel, app_client, app_platform) vêm da
+# migração 0011; o pnpm db:migrate dá a cada um a senha de desenvolvimento
+# "<usuário>_dev" das URLs DATABASE_URL_* do .env.example.
 services:
   db:
     image: postgres:17-alpine

@@ -1,7 +1,7 @@
 import { count, eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import { db, pool } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { isAppointmentOverlapError, isUniqueViolation } from "@/db/errors";
 import {
   appointments,
@@ -94,7 +94,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
+  await endPools();
 });
 
 describe("appointments_no_overlap constraint", () => {

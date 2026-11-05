@@ -1,13 +1,13 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { db, pool } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { clinics, patients, users } from "@/db/schema";
 
 import { CLINIC } from "../helpers/clinic";
 
 afterAll(async () => {
-  await pool.end();
+  await endPools();
 });
 
 async function failure(promise: Promise<unknown>) {

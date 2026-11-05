@@ -2,7 +2,7 @@
 import { stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
 
-import { pool } from "../src/db/client";
+import { endPools } from "../src/db/client";
 import {
   AdminAccountError,
   createAdmin,
@@ -127,4 +127,4 @@ main()
     else console.error("Erro inesperado:", error);
     process.exitCode = 1;
   })
-  .finally(() => pool.end());
+  .finally(() => endPools());

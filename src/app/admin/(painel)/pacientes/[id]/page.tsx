@@ -12,10 +12,12 @@ import {
   todayInClinic,
   type PatientFormInput,
 } from "@/modules/patients/fields";
+import { listPendingLinks } from "@/modules/patients/links";
 import { getPatient } from "@/modules/patients/patients";
 
 import { formatDate } from "../format";
 import { PatientForm } from "../patient-form";
+import { PendingLinkNotice } from "../pending-link-notice";
 
 import { AnonymizeForm } from "./anonymize-form";
 import { AppointmentHistory } from "./appointment-history";
@@ -62,6 +64,9 @@ export default async function PatientPage({
     );
   }
 
+  const pendingLinks = (await listPendingLinks(clinicId)).filter(
+    (link) => link.existingId === patient.id,
+  );
   const today = todayInClinic();
   const defaults: PatientFormInput = {
     name: patient.name,
@@ -108,6 +113,14 @@ export default async function PatientPage({
           </p>
         )}
       </header>
+
+      {pendingLinks.map((link) => (
+        <PendingLinkNotice
+          key={link.provisionalId}
+          link={link}
+          showExisting={false}
+        />
+      ))}
 
       <section aria-labelledby="dados" className="grid gap-4">
         <h2 id="dados" className="font-heading text-lg font-semibold">

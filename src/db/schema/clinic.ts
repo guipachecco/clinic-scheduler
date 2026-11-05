@@ -115,6 +115,8 @@ export const media = pgTable(
   },
   (t) => [
     index("media_clinic_id_idx").on(t.clinicId),
+    // Target of the clinics' composite media references below.
+    unique("media_clinic_id_id_unique").on(t.clinicId, t.id),
     check(
       "media_mime_type_check",
       sql`${t.mimeType} in ('image/jpeg', 'image/png', 'image/webp')`,
@@ -155,17 +157,14 @@ export const clinics = pgTable(
     contactEmail: text("contact_email"),
     address: text("address"),
     mapsUrl: text("maps_url"),
-    logoMediaId: uuid("logo_media_id").references((): AnyPgColumn => media.id, {
-      onDelete: "set null",
-    }),
+    // Both media references are composite with the clinic (see the foreign
+    // keys below), so a clinic can only point at its own images.
+    logoMediaId: uuid("logo_media_id"),
     // Short name and area shown in the panel (e.g. "Karina" / "Manicure");
     // the display name falls back to `name` when empty.
     displayName: text("display_name"),
     areaLabel: text("area_label"),
-    ownerPhotoMediaId: uuid("owner_photo_media_id").references(
-      (): AnyPgColumn => media.id,
-      { onDelete: "set null" },
-    ),
+    ownerPhotoMediaId: uuid("owner_photo_media_id"),
     theme: jsonb("theme").$type<ClinicTheme>().notNull().default({}),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     minAdvanceMinutes: integer("min_advance_minutes").notNull().default(120),
@@ -184,6 +183,18 @@ export const clinics = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
+    // No ON DELETE action: the image is unlinked before it is deleted
+    // (src/modules/branding/photo.ts).
+    foreignKey({
+      name: "clinics_logo_media_fk",
+      columns: [t.id, t.logoMediaId],
+      foreignColumns: [media.clinicId, media.id],
+    }),
+    foreignKey({
+      name: "clinics_owner_photo_media_fk",
+      columns: [t.id, t.ownerPhotoMediaId],
+      foreignColumns: [media.clinicId, media.id],
+    }),
     check("clinics_slug_check", sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check("clinics_name_check", sql`char_length(${t.name}) between 1 and 100`),
     check(
@@ -394,16 +405,31 @@ export const patients = pgTable(
     referredBy: text("referred_by"),
     notes: text("notes"),
     anonymizedAt: timestamp("anonymized_at", { withTimezone: true }),
+    // The client account that books online as this patient (one per clinic).
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    // On a provisional record from an online signup: the existing patient
+    // whose phone it matched, until the owner says whether it is the same
+    // person. Same clinic only (composite reference).
+    pendingLinkPatientId: uuid("pending_link_patient_id"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
     unique("patients_clinic_id_id_unique").on(t.clinicId, t.id),
-    uniqueIndex("patients_phone_name_idx").on(
-      t.clinicId,
-      t.phone,
-      t.nameNormalized,
-    ),
+    foreignKey({
+      name: "patients_pending_link_fk",
+      columns: [t.clinicId, t.pendingLinkPatientId],
+      foreignColumns: [t.clinicId, t.id],
+    }).onDelete("restrict"),
+    uniqueIndex("patients_user_id_idx")
+      .on(t.clinicId, t.userId)
+      .where(sql`${t.userId} is not null`),
+    // A provisional record may repeat the name and phone it matched.
+    uniqueIndex("patients_phone_name_idx")
+      .on(t.clinicId, t.phone, t.nameNormalized)
+      .where(sql`${t.pendingLinkPatientId} is null`),
     uniqueIndex("patients_cpf_idx")
       .on(t.clinicId, t.cpf)
       .where(sql`${t.cpf} is not null`),
@@ -413,7 +439,7 @@ export const patients = pgTable(
     ),
     check(
       "patients_anonymized_check",
-      sql`${t.anonymizedAt} is null or (${t.phone} is null and ${t.email} is null and ${t.nameNormalized} is null and ${t.nickname} is null and ${t.cpf} is null and ${t.rg} is null and ${t.landlinePhone} is null and ${t.birthDate} is null and ${t.gender} is null and ${t.referralSource} is null and ${t.referredBy} is null and ${t.notes} is null)`,
+      sql`${t.anonymizedAt} is null or (${t.phone} is null and ${t.email} is null and ${t.nameNormalized} is null and ${t.nickname} is null and ${t.cpf} is null and ${t.rg} is null and ${t.landlinePhone} is null and ${t.birthDate} is null and ${t.gender} is null and ${t.referralSource} is null and ${t.referredBy} is null and ${t.notes} is null and ${t.userId} is null)`,
     ),
     check(
       "patients_phone_check",

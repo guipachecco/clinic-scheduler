@@ -7,6 +7,7 @@ import {
   patientFormSchema,
   type PatientFormInput,
 } from "@/modules/patients/fields";
+import { confirmLink, rejectLink } from "@/modules/patients/links";
 import {
   anonymizePatient,
   createPatient,
@@ -167,4 +168,61 @@ export async function anonymizePatientAction(
     };
   }
   return { ok: true };
+}
+
+export type LinkResult = { ok: true } | { ok: false; message: string };
+
+const LINK_ERROR = "Não foi possível salvar. Tente novamente.";
+const LINK_NOT_FOUND = "Este aviso não está mais pendente. Atualize a página.";
+
+// "É a mesma": the online signup is the existing patient.
+export async function confirmLinkAction(
+  provisionalId: string,
+): Promise<LinkResult> {
+  const session = await requireAdmin();
+  if (!idSchema.safeParse(provisionalId).success) {
+    return { ok: false, message: LINK_NOT_FOUND };
+  }
+  let result;
+  try {
+    result = await confirmLink(
+      session.clinicId,
+      provisionalId,
+      session.user.id,
+    );
+  } catch {
+    return { ok: false, message: LINK_ERROR };
+  }
+  if (result.ok) return result;
+  return {
+    ok: false,
+    message:
+      result.reason === "existing_has_account"
+        ? "Esta ficha já está ligada a outra conta online. Não dá para juntar."
+        : LINK_NOT_FOUND,
+  };
+}
+
+// "Não é": the online signup becomes a patient of its own.
+export async function rejectLinkAction(
+  provisionalId: string,
+): Promise<LinkResult> {
+  const session = await requireAdmin();
+  if (!idSchema.safeParse(provisionalId).success) {
+    return { ok: false, message: LINK_NOT_FOUND };
+  }
+  let result;
+  try {
+    result = await rejectLink(session.clinicId, provisionalId, session.user.id);
+  } catch {
+    return { ok: false, message: LINK_ERROR };
+  }
+  if (result.ok) return result;
+  return {
+    ok: false,
+    message:
+      result.reason === "same_name_and_phone"
+        ? "As duas fichas têm o mesmo nome e celular. Ajuste o nome da ficha nova antes de concluir."
+        : LINK_NOT_FOUND,
+  };
 }

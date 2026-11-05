@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import { db, pool } from "@/db/client";
+import { db, endPools } from "@/db/owner";
 import { auditLogs, serviceCategories, services, users } from "@/db/schema";
 import {
   categoryFormSchema,
@@ -79,7 +79,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await pool.end();
+  await endPools();
 });
 
 describe("createService / getService", () => {

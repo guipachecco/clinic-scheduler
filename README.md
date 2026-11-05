@@ -12,7 +12,7 @@ Sistema web de agendamentos para uma clínica de biomedicina: site institucional
 | 4     | Qualidade: testes dos fluxos, segurança e responsividade     | A fazer                                                                  |
 | 5     | Publicação: produção, domínio, backups e monitoramento       | A fazer                                                                  |
 
-O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), expediente semanal e bloqueios de agenda no painel (horários de atendimento por dia da semana, folgas, férias e feriados, com a lista de feriados nacionais pronta para adicionar), agenda no painel (visões de dia, semana, mês e lista no fuso da clínica, novo agendamento com busca de paciente, remarcação arrastando no calendário ou pela ficha do atendimento, avisos de fora do expediente, sobre bloqueio ou no passado que pedem confirmação, recusa de horários sobrepostos, confirmação, conclusão, falta e cancelamento com motivo, e o histórico de atendimentos na ficha do paciente), financeiro no painel (orçamento, aprovação à vista, parcelada ou por sessão, agendamento do pacote de uma vez, baixa e estorno de pagamentos, despesas, caixa e valores a receber, descrito em [docs/financeiro.md](docs/financeiro.md)), várias clínicas no mesmo sistema (cada uma só enxerga os próprios dados; o root cria clínicas e escolhe qual abrir no painel, descrito em [docs/multiclinica.md](docs/multiclinica.md)), marca Zemana em todas as telas e para todas as clínicas (cores, logo e fontes Bricolage Grotesque e Figtree, descrita em [docs/identidade-visual.md](docs/identidade-visual.md)), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
+O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), expediente semanal e bloqueios de agenda no painel (horários de atendimento por dia da semana, folgas, férias e feriados, com a lista de feriados nacionais pronta para adicionar), agenda no painel (visões de dia, semana, mês e lista no fuso da clínica, novo agendamento com busca de paciente, remarcação arrastando no calendário ou pela ficha do atendimento, avisos de fora do expediente, sobre bloqueio ou no passado que pedem confirmação, recusa de horários sobrepostos, confirmação, conclusão, falta e cancelamento com motivo, e o histórico de atendimentos na ficha do paciente), financeiro no painel (orçamento, aprovação à vista, parcelada ou por sessão, agendamento do pacote de uma vez, baixa e estorno de pagamentos, despesas, caixa e valores a receber, descrito em [docs/financeiro.md](docs/financeiro.md)), várias clínicas no mesmo sistema (cada uma só enxerga os próprios dados; o root cria clínicas e escolhe qual abrir no painel, descrito em [docs/multiclinica.md](docs/multiclinica.md)), área da cliente no link de cada clínica (`/<endereço>`: cadastro com confirmação de e-mail, agendamento online nos horários livres, "Meus horários" e troca de senha, com a dona confirmando quando o cadastro bate com uma ficha que já existe, descrito em [docs/multiclinica.md](docs/multiclinica.md#área-da-cliente)), um usuário do banco para cada parte do app com row-level security, marca Zemana em todas as telas e para todas as clínicas (cores, logo e fontes Bricolage Grotesque e Figtree, descrita em [docs/identidade-visual.md](docs/identidade-visual.md)), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. O site público ainda mostra só "Site em construção".
 
 ## Tecnologias
 
@@ -65,6 +65,7 @@ pnpm dev
 
 - Site: http://localhost:3000
 - Painel: http://localhost:3000/admin
+- Área da cliente de uma clínica: http://localhost:3000/<endereço> (por exemplo, http://localhost:3000/grais). Sem `RESEND_API_KEY`, os e-mails de confirmação e de troca de senha ficam em arquivos JSON na pasta `.emails/`; abra o arquivo e copie o link.
 
 No primeiro acesso ao painel, depois da senha, o sistema pede a configuração da verificação em duas etapas. Tenha no celular um aplicativo autenticador (Google Authenticator, Microsoft Authenticator ou outro), leia o QR code e guarde os códigos de recuperação. Sem 2FA ativo, o painel não abre. Faça esse primeiro acesso logo depois de criar a conta: até lá, quem tiver a senha consegue cadastrar o próprio celular.
 
@@ -74,12 +75,27 @@ Use sempre o mesmo endereço do `BETTER_AUTH_URL` (por exemplo, `localhost` e n�
 
 As variáveis ficam no `.env` (desenvolvimento) ou no painel da hospedagem (produção). O app confere tudo ao iniciar e para com uma mensagem clara se faltar algo. O `.env` nunca vai para o Git.
 
-| Variável             | Para que serve                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`       | Conexão com o PostgreSQL (`postgres://usuario:senha@host:porta/banco`)                            |
-| `BETTER_AUTH_SECRET` | Assina as sessões e criptografa o segredo do 2FA. Mínimo de 32 caracteres e um valor por ambiente |
-| `BETTER_AUTH_URL`    | Endereço do site. Em produção, obrigatoriamente com `https://`                                    |
-| `LOG_LEVEL`          | Nível dos logs: `debug`, `info` (padrão), `warn` ou `error`                                       |
+| Variável                                                                                  | Para que serve                                                                                                                                              |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                            | Conexão do dono das tabelas (`postgres://usuario:senha@host:porta/banco`), usada só pelo `pnpm db:migrate` e pelos testes. O site não lê esta variável      |
+| `DATABASE_URL_AUTH`, `DATABASE_URL_PANEL`, `DATABASE_URL_CLIENT`, `DATABASE_URL_PLATFORM` | Uma conexão para cada usuário do app (`app_auth`, `app_panel`, `app_client`, `app_platform`). O `pnpm db:migrate` define a senha de cada um a partir da URL |
+| `BETTER_AUTH_SECRET`                                                                      | Assina as sessões e criptografa o segredo do 2FA. Mínimo de 32 caracteres e um valor por ambiente                                                           |
+| `BETTER_AUTH_URL`                                                                         | Endereço do site. Em produção, obrigatoriamente com `https://`                                                                                              |
+| `LOG_LEVEL`                                                                               | Nível dos logs: `debug`, `info` (padrão), `warn` ou `error`                                                                                                 |
+| `RESEND_API_KEY`                                                                          | Chave da Resend, que envia os e-mails da área da cliente. Obrigatória em produção                                                                           |
+| `EMAIL_FROM`                                                                              | Remetente dos e-mails, de um domínio verificado na Resend (ex.: `Zemana <nao-responda@seudominio.com.br>`). Obrigatório quando há `RESEND_API_KEY`          |
+| `EMAIL_OUTBOX_DIR`                                                                        | Sem `RESEND_API_KEY`, nada é enviado: cada e-mail vira um arquivo JSON nesta pasta (padrão `.emails/`, fora do Git)                                         |
+
+Os quatro usuários do banco e o que cada um pode fazer:
+
+| Usuário        | Usado por                               | Pode                                                                                                                           |
+| -------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `app_auth`     | Login (Better Auth)                     | Só as tabelas de login e de limite de tentativas                                                                               |
+| `app_panel`    | Painel da dona e do root numa clínica   | As tabelas da clínica aberta, filtradas pelo banco. No histórico (`audit_logs`), só muda a ficha de uma linha ao juntar fichas |
+| `app_client`   | Área da cliente                         | A parte pública da clínica, os serviços online, a própria ficha e os próprios horários. Nada de financeiro                     |
+| `app_platform` | Tela de clínicas do root e `pnpm admin` | Criar e listar clínicas e contas de dona                                                                                       |
+
+Os detalhes estão em [Várias clínicas](docs/multiclinica.md#usuários-do-banco).
 
 Trocar o `BETTER_AUTH_SECRET` encerra todas as sessões e invalida o 2FA já configurado. Depois da troca, rode `pnpm admin reset-2fa <email>` para cada conta.
 
@@ -158,6 +174,8 @@ O que a fundação já faz:
 - Sessão encerrada 12 horas depois do login, em cookie `httpOnly`, `SameSite=Lax` e, em produção, `Secure`.
 - Em produção, no máximo 5 tentativas de login por minuto por IP, com a contagem guardada no PostgreSQL.
 - Sessão conferida no servidor em cada página e ação do painel, não só no proxy.
+- Cada parte do app entra no banco com um usuário próprio, e a row-level security do PostgreSQL só deixa ver as linhas da clínica aberta (e, na área da cliente, só a própria ficha e os próprios horários). Nenhum desses usuários é dono de tabela nem tem `BYPASSRLS`.
+- Conta de cliente com sessão de 30 dias e sem acesso ao painel; e-mail confirmado antes de marcar horário.
 - CSP com nonce por requisição, HSTS, bloqueio de iframe, `nosniff`, `Referrer-Policy` e `Permissions-Policy`.
 - Logs em JSON sem nome, telefone, e-mail, tokens ou parâmetros de consultas ao banco.
 - Variáveis de ambiente validadas na inicialização e segredos fora do Git.
@@ -168,10 +186,11 @@ O sistema aplica privacidade desde a concepção, mas isso não o torna adequado
 
 A publicação é a Etapa 5. O plano aprovado é Vercel Pro (funções em São Paulo, `gru1`) com Neon (PostgreSQL em `aws-sa-east-1`), e o roteiro completo (domínio, backups, monitoramento e teste de restauração) entra neste README nessa etapa. Em resumo, produção vai precisar de:
 
-1. Um PostgreSQL 17 gerenciado e um usuário da aplicação sem privilégios de superusuário.
-2. As variáveis da tabela de configuração cadastradas na hospedagem, com um `BETTER_AUTH_SECRET` exclusivo e o `BETTER_AUTH_URL` com `https://`.
-3. `pnpm db:migrate` com o `DATABASE_URL` de produção antes de cada versão que traga migrações.
-4. `pnpm admin create` uma única vez, apontando para o banco de produção.
+1. Um PostgreSQL 17 gerenciado. No Neon, o `DATABASE_URL` é o usuário dono do banco (o `neondb_owner`, que não é superusuário), com a conexão direta, sem o pooler.
+2. Os quatro usuários do app criados pela migração, não pelo painel do Neon: o `pnpm db:migrate` cria `app_auth`, `app_panel`, `app_client` e `app_platform` (migração `0011`) e define a senha de cada um a partir das URLs `DATABASE_URL_AUTH`, `DATABASE_URL_PANEL`, `DATABASE_URL_CLIENT` e `DATABASE_URL_PLATFORM`. Use uma senha nova e forte em cada URL (`postgres://app_panel:<senha>@<host>/<banco>?sslmode=require`); as URLs do app podem usar o host com pooler do Neon. Nunca torne um desses usuários dono do banco ou das tabelas nem dê `BYPASSRLS`: isso desliga a separação entre clínicas. Antes de mexer no banco, o `pnpm db:migrate` confere se cada URL usa o usuário certo e tem senha. Depois de aplicar as migrações e antes de definir qualquer senha, confere os quatro usuários e para com um aviso, sem dar login a nenhum, se algum for superusuário, tiver `BYPASSRLS`, `CREATEROLE` ou `CREATEDB`, for membro de outro papel ou for dono de alguma tabela, view, sequência, função ou schema deste banco, ou do próprio banco. O aviso cita só os nomes dos usuários, nunca URLs ou senhas.
+3. As variáveis da tabela de configuração cadastradas na hospedagem, menos o `DATABASE_URL`: o site só se conecta com os quatro usuários do app, e a senha do dono fica apenas onde se roda o `pnpm db:migrate`. Cadastre um `BETTER_AUTH_SECRET` exclusivo, o `BETTER_AUTH_URL` com `https://`, a `RESEND_API_KEY` e o `EMAIL_FROM` de um domínio verificado na Resend.
+4. `pnpm db:migrate` com o `DATABASE_URL` e as quatro `DATABASE_URL_*` de produção antes de cada versão que traga migrações. Para trocar a senha de um usuário do app, mude a URL e rode o `pnpm db:migrate` de novo.
+5. `pnpm admin create` uma única vez, apontando para o banco de produção.
 
 ## Documentação
 

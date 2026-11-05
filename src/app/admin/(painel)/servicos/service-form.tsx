@@ -35,6 +35,8 @@ const EMPTY: ServiceFormInput = {
   preparationInstructions: "",
   sortOrder: "0",
   isActive: true,
+  // Not on the form: online bookings are confirmed right away (the column
+  // stays, and an edit keeps the value the service already had).
   requiresApproval: false,
   onlineBookingEnabled: true,
 };
@@ -96,7 +98,7 @@ function Checkbox({
   label,
 }: {
   form: ServiceFormApi;
-  name: "isActive" | "requiresApproval" | "onlineBookingEnabled";
+  name: "isActive" | "onlineBookingEnabled";
   label: string;
 }) {
   return (
@@ -303,11 +305,6 @@ export function ServiceForm(props: Props) {
 
       <div className="grid gap-1">
         <Checkbox form={form} name="isActive" label="Ativo" />
-        <Checkbox
-          form={form}
-          name="requiresApproval"
-          label="Exige confirmação"
-        />
         <Checkbox
           form={form}
           name="onlineBookingEnabled"

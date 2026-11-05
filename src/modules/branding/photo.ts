@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 import sharp, { type OutputInfo } from "sharp";
 
-import { db } from "@/db/client";
+import { inClinic } from "@/db/client";
 import { auditLogs, clinics, media } from "@/db/schema";
 
 // Owner photo of a clinic. Uploads are re-encoded (EXIF and other metadata
@@ -52,7 +52,7 @@ export async function saveOwnerPhoto(
     };
   }
 
-  return db.transaction(async (tx) => {
+  return inClinic(clinicId, async (tx) => {
     const [clinic] = await tx
       .select({ previous: clinics.ownerPhotoMediaId })
       .from(clinics)
@@ -101,7 +101,7 @@ export async function removeOwnerPhoto(
   clinicId: string,
   actorUserId: string,
 ): Promise<{ ok: true }> {
-  await db.transaction(async (tx) => {
+  await inClinic(clinicId, async (tx) => {
     const [clinic] = await tx
       .select({ previous: clinics.ownerPhotoMediaId })
       .from(clinics)
@@ -133,10 +133,12 @@ export async function getClinicMedia(
   clinicId: string,
   mediaId: string,
 ): Promise<{ mimeType: string; data: Buffer } | null> {
-  const [row] = await db
-    .select({ mimeType: media.mimeType, data: media.data })
-    .from(media)
-    .where(and(eq(media.id, mediaId), eq(media.clinicId, clinicId)))
-    .limit(1);
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ mimeType: media.mimeType, data: media.data })
+      .from(media)
+      .where(and(eq(media.id, mediaId), eq(media.clinicId, clinicId)))
+      .limit(1),
+  );
   return row ?? null;
 }
