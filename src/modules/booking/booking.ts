@@ -15,7 +15,7 @@ import {
 import { DateTime } from "luxon";
 
 import { asClient, type Tx } from "@/db/client";
-import { isAppointmentOverlapError } from "@/db/errors";
+import { findPgError, isAppointmentOverlapError } from "@/db/errors";
 import {
   ACTIVE_APPOINTMENT_STATUSES,
   appointments,
@@ -35,7 +35,9 @@ import { type BusyInterval, freeSlots, parseLocalDate } from "./slots";
 // she needs of the rest of the agenda (busy time, opening hours) comes from
 // the definer functions of migrations 0013 and 0014, without names or ids.
 // Nothing here returns another patient's data, nor pending_link_patient_id.
-// Errors never carry patient data.
+// Errors never carry patient data. The clock is always the server's own
+// (new Date() inside each function): min advance, past slots and the active
+// limit must never depend on a caller-supplied time.
 
 // Who is booking. Every field comes from the server: clinicId and patientId
 // from getClientContext, userId and emailVerified from the Better Auth
@@ -134,9 +136,10 @@ async function readClinic(
 }
 
 // The service, when it is open to online booking. Policy services_client
-// already hides every other one (inactive, offline, flexible, inactive
-// category); the conditions are repeated here so that a looser policy never
-// turns into a bookable service.
+// hides every other one (inactive, offline, flexible, inactive category).
+// The WHERE repeats the service-level conditions (active, online, not
+// flexible); the category check is left to the policy, and the insert policy
+// of 0014 checks all of them again.
 async function readService(
   tx: Tx,
   clinicId: string,
@@ -183,6 +186,33 @@ async function isOwnRow(tx: Tx, ctx: BookingContext): Promise<boolean> {
 
 // Rolls the booking transaction back when her row changed under it.
 class RowNoLongerHers extends Error {}
+
+// The owner may change the agenda between the checks and the insert: the
+// service switched off or its category deactivated (the insert policy of
+// 0014 refuses it, 42501), or the service or her row deleted (foreign key,
+// 23503). Those become "unavailable"; nothing else is caught here.
+class InsertRefused extends Error {}
+
+const REFUSED_FOREIGN_KEYS = new Set([
+  "appointments_service_fk",
+  "appointments_patient_fk",
+]);
+
+async function insertBooking<T>(insert: () => Promise<T>): Promise<T> {
+  try {
+    return await insert();
+  } catch (error) {
+    const pgError = findPgError(error);
+    if (
+      pgError?.code === "42501" ||
+      (pgError?.code === "23503" &&
+        REFUSED_FOREIGN_KEYS.has(pgError.constraint ?? ""))
+    ) {
+      throw new InsertRefused();
+    }
+    throw error;
+  }
+}
 
 async function readHours(tx: Tx, clinicId: string): Promise<DayHours[]> {
   const result = await tx.execute<{
@@ -292,9 +322,9 @@ export async function listFreeSlots(
   ctx: BookingContext,
   serviceId: string,
   date: string,
-  now: Date = new Date(),
 ): Promise<string[]> {
   if (!validContext(ctx)) return [];
+  const now = new Date();
   return asClient(scope(ctx), async (tx) => {
     const clinic = await readClinic(tx, ctx.clinicId);
     if (!clinic) return [];
@@ -317,9 +347,9 @@ export async function listDaysWithSlots(
   ctx: BookingContext,
   serviceId: string,
   month: string,
-  now: Date = new Date(),
 ): Promise<string[]> {
   if (!validContext(ctx) || !MONTH_PATTERN.test(month)) return [];
+  const now = new Date();
   return asClient(scope(ctx), async (tx) => {
     const clinic = await readClinic(tx, ctx.clinicId);
     if (!clinic) return [];
@@ -360,11 +390,11 @@ export async function listDaysWithSlots(
 export async function bookOnline(
   ctx: BookingContext,
   input: { serviceId: string; startsAt: string | Date },
-  now: Date = new Date(),
 ): Promise<BookingResult> {
   if (!ctx.emailVerified) return { ok: false, reason: "unverified" };
   if (!validContext(ctx)) return { ok: false, reason: "unavailable" };
   const startsAt = new Date(input.startsAt);
+  const now = new Date();
   try {
     return await asClient(scope(ctx), async (tx): Promise<BookingResult> => {
       await lockAgenda(tx, ctx.clinicId);
@@ -415,28 +445,30 @@ export async function bookOnline(
       const endsAt = new Date(
         startsAt.getTime() + service.durationMinutes * MINUTE,
       );
-      const [row] = await tx
-        .insert(appointments)
-        .values({
-          clinicId: ctx.clinicId,
-          patientId: ctx.patientId,
-          serviceId: service.id,
-          serviceName: service.name,
-          serviceDurationMinutes: service.durationMinutes,
-          customLabel: null,
-          startsAt,
-          endsAt,
-          occupiedFrom: new Date(
-            startsAt.getTime() - service.bufferBeforeMinutes * MINUTE,
-          ),
-          occupiedUntil: new Date(
-            endsAt.getTime() + service.bufferAfterMinutes * MINUTE,
-          ),
-          status: "confirmed",
-          source: "online",
-          confirmedAt: now,
-        })
-        .returning({ id: appointments.id });
+      const [row] = await insertBooking(() =>
+        tx
+          .insert(appointments)
+          .values({
+            clinicId: ctx.clinicId,
+            patientId: ctx.patientId,
+            serviceId: service.id,
+            serviceName: service.name,
+            serviceDurationMinutes: service.durationMinutes,
+            customLabel: null,
+            startsAt,
+            endsAt,
+            occupiedFrom: new Date(
+              startsAt.getTime() - service.bufferBeforeMinutes * MINUTE,
+            ),
+            occupiedUntil: new Date(
+              endsAt.getTime() + service.bufferAfterMinutes * MINUTE,
+            ),
+            status: "confirmed",
+            source: "online",
+            confirmedAt: now,
+          })
+          .returning({ id: appointments.id }),
+      );
 
       await tx.insert(auditLogs).values({
         clinicId: ctx.clinicId,
@@ -462,7 +494,7 @@ export async function bookOnline(
       return { ok: true, appointmentId: row!.id };
     });
   } catch (error) {
-    if (error instanceof RowNoLongerHers) {
+    if (error instanceof RowNoLongerHers || error instanceof InsertRefused) {
       return { ok: false, reason: "unavailable" };
     }
     if (isAppointmentOverlapError(error)) return { ok: false, reason: "taken" };
@@ -475,9 +507,9 @@ export async function bookOnline(
 // the latest past ones.
 export async function listMyAppointments(
   ctx: BookingContext,
-  now: Date = new Date(),
 ): Promise<{ upcoming: MyAppointment[]; past: MyAppointment[] }> {
   if (!validContext(ctx)) return { upcoming: [], past: [] };
+  const now = new Date();
   const columns = {
     id: appointments.id,
     startsAt: appointments.startsAt,

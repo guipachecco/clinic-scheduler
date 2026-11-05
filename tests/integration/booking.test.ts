@@ -1,5 +1,13 @@
 import { and, eq, inArray, like, sql } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import { db, endPools } from "@/db/client";
 import {
@@ -28,6 +36,49 @@ import {
 import { registerClientPatient } from "@/modules/clients/context";
 
 import { otherClinic } from "../helpers/clinic";
+
+// A hook that runs, on the owner connection, right after bookOnline has read
+// the busy intervals (its last read before the insert): a way to change the
+// agenda between the checks and the insert, like a concurrent owner edit.
+const hooks = vi.hoisted(() => ({
+  afterBusyRead: null as null | (() => Promise<void>),
+}));
+
+vi.mock("@/db/client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/db/client")>();
+  const sqlText = (query: unknown) =>
+    ((query as { queryChunks?: { value?: string[] }[] })?.queryChunks ?? [])
+      .map((chunk) => chunk?.value?.join?.("") ?? "")
+      .join("");
+  return {
+    ...original,
+    asClient: ((ctx, fn) =>
+      original.asClient(ctx, (tx) =>
+        fn(
+          new Proxy(tx, {
+            get(target, key, receiver) {
+              if (key === "execute") {
+                return async (query: Parameters<typeof target.execute>[0]) => {
+                  const result = await target.execute(query);
+                  const hook = hooks.afterBusyRead;
+                  if (
+                    hook &&
+                    sqlText(query).includes("client_busy_intervals")
+                  ) {
+                    hooks.afterBusyRead = null;
+                    await hook();
+                  }
+                  return result;
+                };
+              }
+              const value = Reflect.get(target, key, receiver);
+              return typeof value === "function" ? value.bind(target) : value;
+            },
+          }),
+        ),
+      )) as typeof original.asClient,
+  };
+});
 
 // Online booking by clients, in a clinic of its own so that its hours and
 // settings never touch other test files. Every record is fictitious. The
@@ -246,6 +297,11 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  hooks.afterBusyRead = null;
+  // The booking functions read the server clock; only Date is faked, so the
+  // database driver keeps its real timers.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(NOW);
   await clearAgenda();
   await setClinic(defaultClinic);
   await setService({
@@ -258,6 +314,7 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+  vi.useRealTimers();
   await cleanup();
   await endPools();
 });
@@ -283,7 +340,7 @@ describe("online booking", () => {
   });
 
   it("lists free slots and days with slots", async () => {
-    expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY, NOW)).toEqual([
+    expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY)).toEqual([
       local(MONDAY, "09:00"),
       local(MONDAY, "09:30"),
       local(MONDAY, "10:00"),
@@ -291,15 +348,13 @@ describe("online booking", () => {
       local(MONDAY, "11:00"),
     ]);
     // Saturday is closed; the flexible service is never offered.
-    expect(
-      await listFreeSlots(ctx("ana"), serviceId, "2033-03-05", NOW),
-    ).toEqual([]);
-    expect(await listFreeSlots(ctx("ana"), flexibleId, MONDAY, NOW)).toEqual(
+    expect(await listFreeSlots(ctx("ana"), serviceId, "2033-03-05")).toEqual(
       [],
     );
+    expect(await listFreeSlots(ctx("ana"), flexibleId, MONDAY)).toEqual([]);
 
     await setClinic({ maxAdvanceDays: 9 });
-    const days = await listDaysWithSlots(ctx("ana"), serviceId, "2033-03", NOW);
+    const days = await listDaysWithSlots(ctx("ana"), serviceId, "2033-03");
     // Today 2033-03-01 (it is 09:00 local: 11:00 is still two hours ahead)
     // to 2033-03-10, weekdays only.
     expect(days).toEqual([
@@ -312,17 +367,16 @@ describe("online booking", () => {
       "2033-03-09",
       "2033-03-10",
     ]);
-    expect(
-      await listDaysWithSlots(ctx("ana"), serviceId, "2033-04", NOW),
-    ).toEqual([]);
+    expect(await listDaysWithSlots(ctx("ana"), serviceId, "2033-04")).toEqual(
+      [],
+    );
   });
 
   it("booking lands confirmed and online", async () => {
-    const result = await bookOnline(
-      ctx("ana"),
-      { serviceId, startsAt: local(MONDAY, "09:00") },
-      NOW,
-    );
+    const result = await bookOnline(ctx("ana"), {
+      serviceId,
+      startsAt: local(MONDAY, "09:00"),
+    });
     expect(result).toMatchObject({ ok: true });
     const id = (result as { appointmentId: string }).appointmentId;
 
@@ -355,18 +409,17 @@ describe("online booking", () => {
     });
 
     // The slot is gone for everyone.
-    expect(
-      await listFreeSlots(ctx("bia"), serviceId, MONDAY, NOW),
-    ).not.toContain(local(MONDAY, "09:00"));
+    expect(await listFreeSlots(ctx("bia"), serviceId, MONDAY)).not.toContain(
+      local(MONDAY, "09:00"),
+    );
   });
 
   it("the service's own buffers apply to the new booking", async () => {
     await setService({ bufferBeforeMinutes: 10, bufferAfterMinutes: 15 });
-    const first = await bookOnline(
-      ctx("ana"),
-      { serviceId, startsAt: local(MONDAY, "10:00") },
-      NOW,
-    );
+    const first = await bookOnline(ctx("ana"), {
+      serviceId,
+      startsAt: local(MONDAY, "10:00"),
+    });
     expect(first.ok).toBe(true);
     const [row] = await db
       .select()
@@ -376,22 +429,21 @@ describe("online booking", () => {
     expect(row!.occupiedUntil.toISOString()).toBe("2033-03-07T14:15:00.000Z");
 
     // 09:00 would end at 10:00 plus 15 minutes; 11:00 starts 10 minutes early.
-    const free = await listFreeSlots(ctx("bia"), serviceId, MONDAY, NOW);
+    const free = await listFreeSlots(ctx("bia"), serviceId, MONDAY);
     expect(free).toEqual([]);
     expect(
-      await bookOnline(
-        ctx("bia"),
-        { serviceId, startsAt: local(MONDAY, "11:00") },
-        NOW,
-      ),
+      await bookOnline(ctx("bia"), {
+        serviceId,
+        startsAt: local(MONDAY, "11:00"),
+      }),
     ).toEqual({ ok: false, reason: "taken" });
   });
 
   it("two simultaneous bookings: one taken", async () => {
     const slot = { serviceId, startsAt: local(TUESDAY, "10:00") };
     const results = await Promise.all([
-      bookOnline(ctx("ana"), slot, NOW),
-      bookOnline(ctx("bia"), slot, NOW),
+      bookOnline(ctx("ana"), slot),
+      bookOnline(ctx("bia"), slot),
     ]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(results.filter((r) => !r.ok)).toEqual([
@@ -407,29 +459,26 @@ describe("online booking", () => {
   it("limit of active appointments", async () => {
     await setClinic({ maxActiveAppointmentsPerPhone: 2 });
     for (const time of ["09:00", "10:00"]) {
-      const result = await bookOnline(
-        ctx("cris"),
-        { serviceId, startsAt: local(WEDNESDAY, time) },
-        NOW,
-      );
+      const result = await bookOnline(ctx("cris"), {
+        serviceId,
+        startsAt: local(WEDNESDAY, time),
+      });
       expect(result.ok).toBe(true);
     }
     expect(
-      await bookOnline(
-        ctx("cris"),
-        { serviceId, startsAt: local(WEDNESDAY, "11:00") },
-        NOW,
-      ),
+      await bookOnline(ctx("cris"), {
+        serviceId,
+        startsAt: local(WEDNESDAY, "11:00"),
+      }),
     ).toEqual({ ok: false, reason: "limit" });
 
     // Another client is counted on her own record.
     expect(
       (
-        await bookOnline(
-          ctx("ana"),
-          { serviceId, startsAt: local(WEDNESDAY, "11:00") },
-          NOW,
-        )
+        await bookOnline(ctx("ana"), {
+          serviceId,
+          startsAt: local(WEDNESDAY, "11:00"),
+        })
       ).ok,
     ).toBe(true);
 
@@ -449,11 +498,10 @@ describe("online booking", () => {
       );
     expect(
       (
-        await bookOnline(
-          ctx("cris"),
-          { serviceId, startsAt: local(TUESDAY, "09:00") },
-          NOW,
-        )
+        await bookOnline(ctx("cris"), {
+          serviceId,
+          startsAt: local(TUESDAY, "09:00"),
+        })
       ).ok,
     ).toBe(true);
   });
@@ -462,41 +510,41 @@ describe("online booking", () => {
     const slot = { serviceId, startsAt: local(MONDAY, "09:00") };
 
     await setClinic({ onlineBookingEnabled: false });
-    expect(await bookOnline(ctx("ana"), slot, NOW)).toEqual({
+    expect(await bookOnline(ctx("ana"), slot)).toEqual({
       ok: false,
       reason: "unavailable",
     });
-    expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY, NOW)).toEqual([]);
-    expect(
-      await listDaysWithSlots(ctx("ana"), serviceId, "2033-03", NOW),
-    ).toEqual([]);
+    expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY)).toEqual([]);
+    expect(await listDaysWithSlots(ctx("ana"), serviceId, "2033-03")).toEqual(
+      [],
+    );
 
     await setClinic({ onlineBookingEnabled: true, isActive: false });
-    expect(await bookOnline(ctx("ana"), slot, NOW)).toEqual({
+    expect(await bookOnline(ctx("ana"), slot)).toEqual({
       ok: false,
       reason: "unavailable",
     });
 
     await setClinic({ isActive: true });
     await setService({ onlineBookingEnabled: false });
-    expect(await bookOnline(ctx("ana"), slot, NOW)).toEqual({
+    expect(await bookOnline(ctx("ana"), slot)).toEqual({
       ok: false,
       reason: "unavailable",
     });
-    expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY, NOW)).toEqual([]);
+    expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY)).toEqual([]);
 
     await setService({ onlineBookingEnabled: true, isActive: false });
-    expect(await bookOnline(ctx("ana"), slot, NOW)).toEqual({
+    expect(await bookOnline(ctx("ana"), slot)).toEqual({
       ok: false,
       reason: "unavailable",
     });
 
     await setService({ isActive: true });
     expect(
-      await bookOnline(ctx("ana"), { ...slot, serviceId: flexibleId }, NOW),
+      await bookOnline(ctx("ana"), { ...slot, serviceId: flexibleId }),
     ).toEqual({ ok: false, reason: "unavailable" });
     expect(
-      await bookOnline(ctx("ana"), { ...slot, serviceId: "nao-e-um-id" }, NOW),
+      await bookOnline(ctx("ana"), { ...slot, serviceId: "nao-e-um-id" }),
     ).toEqual({ ok: false, reason: "unavailable" });
 
     await db
@@ -504,7 +552,7 @@ describe("online booking", () => {
       .set({ isActive: false })
       .where(eq(serviceCategories.id, categoryId));
     try {
-      expect(await bookOnline(ctx("ana"), slot, NOW)).toEqual({
+      expect(await bookOnline(ctx("ana"), slot)).toEqual({
         ok: false,
         reason: "unavailable",
       });
@@ -522,28 +570,65 @@ describe("online booking", () => {
     expect(rows).toEqual([]);
   });
 
+  it("service switched off between the checks and the insert", async () => {
+    hooks.afterBusyRead = () => setService({ onlineBookingEnabled: false });
+    expect(
+      await bookOnline(ctx("ana"), {
+        serviceId,
+        startsAt: local(MONDAY, "09:00"),
+      }),
+    ).toEqual({ ok: false, reason: "unavailable" });
+    expect(hooks.afterBusyRead).toBe(null);
+
+    await setService({ onlineBookingEnabled: true });
+    hooks.afterBusyRead = async () => {
+      await db
+        .update(serviceCategories)
+        .set({ isActive: false })
+        .where(eq(serviceCategories.id, categoryId));
+    };
+    try {
+      expect(
+        await bookOnline(ctx("ana"), {
+          serviceId,
+          startsAt: local(MONDAY, "09:00"),
+        }),
+      ).toEqual({ ok: false, reason: "unavailable" });
+      expect(hooks.afterBusyRead).toBe(null);
+    } finally {
+      await db
+        .update(serviceCategories)
+        .set({ isActive: true })
+        .where(eq(serviceCategories.id, categoryId));
+    }
+
+    const rows = await db
+      .select({ id: appointments.id })
+      .from(appointments)
+      .where(eq(appointments.clinicId, clinicId));
+    expect(rows).toEqual([]);
+  });
+
   it("unverified e-mail", async () => {
     expect(
-      await bookOnline(
-        ctx("ana", { emailVerified: false }),
-        { serviceId, startsAt: local(MONDAY, "09:00") },
-        NOW,
-      ),
+      await bookOnline(ctx("ana", { emailVerified: false }), {
+        serviceId,
+        startsAt: local(MONDAY, "09:00"),
+      }),
     ).toEqual({ ok: false, reason: "unverified" });
   });
 
   it("a patient id that is not hers books nothing", async () => {
     expect(
-      await bookOnline(
-        ctx("ana", { patientId: patient.bia }),
-        { serviceId, startsAt: local(MONDAY, "09:00") },
-        NOW,
-      ),
+      await bookOnline(ctx("ana", { patientId: patient.bia }), {
+        serviceId,
+        startsAt: local(MONDAY, "09:00"),
+      }),
     ).toEqual({ ok: false, reason: "unavailable" });
   });
 
   it("block added after listing makes confirm fail", async () => {
-    const slots = await listFreeSlots(ctx("ana"), serviceId, MONDAY, NOW);
+    const slots = await listFreeSlots(ctx("ana"), serviceId, MONDAY);
     expect(slots).toContain(local(MONDAY, "10:00"));
     await db.insert(timeBlocks).values({
       clinicId,
@@ -553,11 +638,10 @@ describe("online booking", () => {
       endsAt: new Date(local(MONDAY, "11:00")),
     });
     expect(
-      await bookOnline(
-        ctx("ana"),
-        { serviceId, startsAt: local(MONDAY, "10:00") },
-        NOW,
-      ),
+      await bookOnline(ctx("ana"), {
+        serviceId,
+        startsAt: local(MONDAY, "10:00"),
+      }),
     ).toEqual({ ok: false, reason: "taken" });
   });
 
@@ -572,13 +656,13 @@ describe("online booking", () => {
       "não é uma data",
     ]) {
       expect(
-        await bookOnline(ctx("ana"), { serviceId, startsAt }, NOW),
+        await bookOnline(ctx("ana"), { serviceId, startsAt }),
         startsAt,
       ).toEqual({ ok: false, reason: "taken" });
     }
 
     // The owner shortens the hours after the list was shown.
-    expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY, NOW)).toContain(
+    expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY)).toContain(
       local(MONDAY, "11:00"),
     );
     await db
@@ -589,11 +673,10 @@ describe("online booking", () => {
       );
     try {
       expect(
-        await bookOnline(
-          ctx("ana"),
-          { serviceId, startsAt: local(MONDAY, "11:00") },
-          NOW,
-        ),
+        await bookOnline(ctx("ana"), {
+          serviceId,
+          startsAt: local(MONDAY, "11:00"),
+        }),
       ).toEqual({ ok: false, reason: "taken" });
     } finally {
       await db
@@ -614,11 +697,10 @@ describe("online booking", () => {
       .from(services)
       .where(eq(services.id, serviceId));
     expect(row!.requiresApproval).toBe(true);
-    const result = await bookOnline(
-      ctx("bia"),
-      { serviceId, startsAt: local(MONDAY, "11:00") },
-      NOW,
-    );
+    const result = await bookOnline(ctx("bia"), {
+      serviceId,
+      startsAt: local(MONDAY, "11:00"),
+    });
     expect(result.ok).toBe(true);
     const [booked] = await db
       .select({
@@ -631,11 +713,10 @@ describe("online booking", () => {
   });
 
   it("a provisional record books through itself", async () => {
-    const result = await bookOnline(
-      ctx("duda"),
-      { serviceId, startsAt: local(MONDAY, "09:00") },
-      NOW,
-    );
+    const result = await bookOnline(ctx("duda"), {
+      serviceId,
+      startsAt: local(MONDAY, "09:00"),
+    });
     expect(result.ok).toBe(true);
     const [row] = await db
       .select({ patientId: appointments.patientId })
@@ -650,12 +731,13 @@ describe("online booking", () => {
       ["ana", local(MONDAY, "09:00")],
       ["bia", local(MONDAY, "10:00")],
     ] as const) {
-      expect(
-        (await bookOnline(ctx(who), { serviceId, startsAt }, NOW)).ok,
-      ).toBe(true);
+      expect((await bookOnline(ctx(who), { serviceId, startsAt })).ok).toBe(
+        true,
+      );
     }
     const later = new Date("2033-03-07T14:00:00Z");
-    const mine = await listMyAppointments(ctx("ana"), later);
+    vi.setSystemTime(later);
+    const mine = await listMyAppointments(ctx("ana"));
     expect(mine.upcoming.map((a) => a.startsAt.toISOString())).toEqual([
       "2033-03-08T12:00:00.000Z",
     ]);
