@@ -134,8 +134,8 @@ const ZEMANA: Palette = {
     ring: "#2a0081",
   },
   dark: {
-    primary: "#d4c2ff",
-    "primary-pressed": "#bfa5ff",
+    primary: "#b7e7fc",
+    "primary-pressed": "#8fd3f2",
     "primary-foreground": "#0b0b10",
     highlight: "#f5c700",
     "highlight-foreground": "#2a0081",
@@ -144,7 +144,7 @@ const ZEMANA: Palette = {
     "brand-muted": "#1d0a52",
     "brand-accent": "#ffd3f0",
     "brand-accent-foreground": "#2a0081",
-    ring: "#d4c2ff",
+    ring: "#b7e7fc",
   },
 };
 
