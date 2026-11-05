@@ -49,6 +49,29 @@ export function inClinic<T>(
   return withClinic(panelDb, clinicId, fn);
 }
 
+export type ClientScope = {
+  clinicId: string;
+  patientId: string;
+  userId: string;
+};
+
+// The client area's way into the database: app_client, scoped to one clinic
+// and to her own patient row there (migration 0013). Like withClinic, the
+// settings last only for the transaction.
+export function asClient<T>(
+  ctx: ClientScope,
+  fn: (tx: Tx) => Promise<T>,
+): Promise<T> {
+  return clientDb.transaction(async (tx) => {
+    await tx.execute(sql`
+      select set_config('app.clinic_id', ${ctx.clinicId}, true),
+             set_config('app.patient_id', ${ctx.patientId}, true),
+             set_config('app.user_id', ${ctx.userId}, true)
+    `);
+    return fn(tx);
+  });
+}
+
 // The PostgreSQL user the panel's transactions run as (checked by the tests).
 export async function currentDbUser(clinicId: string): Promise<string> {
   return inClinic(clinicId, async (tx) => {

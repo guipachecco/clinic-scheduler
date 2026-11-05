@@ -92,6 +92,13 @@
       "when": 1793910818940,
       "tag": "0012_client_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793911731459,
+      "tag": "0013_client_access",
+      "breakpoints": true
     }
   ]
 }
