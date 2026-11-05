@@ -18,6 +18,7 @@ import {
   registerClientPatient,
 } from "@/modules/clients/context";
 import { normalizeName } from "@/modules/patients/fields";
+import { anonymizePatient } from "@/modules/patients/patients";
 
 import { CLINIC, otherClinic } from "../helpers/clinic";
 
@@ -231,6 +232,23 @@ describe("client access", () => {
     expect(seen).toEqual([{ id: patientAna }]);
   });
 
+  it("client cannot read the clinic's private patient fields", async () => {
+    const own = await asClient(ctx("ana", patientAna), (tx) =>
+      tx.select({ name: patients.name, phone: patients.phone }).from(patients),
+    );
+    expect(own).toEqual([
+      { name: "Ana Acesso Cliente", phone: "+5511900002201" },
+    ]);
+    for (const column of ["notes", "cpf", "rg", "referral_source"]) {
+      const code = await pgErrorCode(
+        asClient(ctx("ana", patientAna), (tx) =>
+          tx.execute(sql`select ${sql.identifier(column)} from patients`),
+        ),
+      );
+      expect(code, column).toBe("42501");
+    }
+  });
+
   it("client reads only her own appointments", async () => {
     const seen = await asClient(ctx("ana", patientAna), (tx) =>
       tx
@@ -377,6 +395,26 @@ describe("client access", () => {
         .update(services)
         .set({ onlineBookingEnabled: true })
         .where(eq(services.id, serviceId));
+    }
+
+    // A service whose category is inactive is not bookable either.
+    await db
+      .update(serviceCategories)
+      .set({ isActive: false })
+      .where(eq(serviceCategories.id, categoryId));
+    try {
+      const hidden = await asClient(ctx("ana", patientAna), (tx) =>
+        tx
+          .select({ id: services.id })
+          .from(services)
+          .where(eq(services.id, serviceId)),
+      );
+      expect(hidden).toEqual([]);
+    } finally {
+      await db
+        .update(serviceCategories)
+        .set({ isActive: true })
+        .where(eq(serviceCategories.id, categoryId));
     }
 
     const clinic = await asClient(ctx("ana", patientAna), (tx) =>
@@ -573,6 +611,37 @@ describe("client access", () => {
     expect(row).toEqual({ pending: null });
   });
 
+  it("anonymizing a patient unlinks her account", async () => {
+    const fia = await createUser("fia");
+    const id = await registerClientPatient({
+      clinicId: CLINIC,
+      userId: fia,
+      name: "Fia Acesso Cliente",
+      phone: "+5511900002208",
+      email: null,
+    });
+    expect((await getClientContext("grais", fia))?.patientId).toBe(id);
+
+    expect(await anonymizePatient(CLINIC, id, fia)).toEqual({ ok: true });
+    const [row] = await db
+      .select({ userId: patients.userId })
+      .from(patients)
+      .where(eq(patients.id, id));
+    expect(row).toEqual({ userId: null });
+    expect(await getClientContext("grais", fia)).toMatchObject({
+      patientId: null,
+      pending: false,
+    });
+
+    // The database refuses an anonymized row tied to an account.
+    const code = await pgErrorCode(
+      db.update(patients).set({ userId: fia }).where(eq(patients.id, id)),
+    );
+    expect(code).toBe("23514");
+    // Its name is now the anonymized label, out of reach of the cleanup.
+    await db.delete(patients).where(eq(patients.id, id));
+  });
+
   it("register refuses bad input and accounts that are not clients", async () => {
     const admin = await db
       .select({ id: users.id })
@@ -643,9 +712,14 @@ describe("client access", () => {
       `,
     );
     expect(reachable.rows).toEqual(
-      ["appointments", "audit_logs", "clinics", "patients", "services"].map(
-        (table_name) => ({ table_name, rls: true }),
-      ),
+      [
+        "appointments",
+        "audit_logs",
+        "clinics",
+        "patients",
+        "service_categories",
+        "services",
+      ].map((table_name) => ({ table_name, rls: true })),
     );
 
     // The definer functions run for app_client only.

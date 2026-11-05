@@ -419,6 +419,8 @@ export async function anonymizePatient(
         referralSource: null,
         referredBy: null,
         notes: null,
+        // The account no longer books as this patient.
+        userId: null,
         anonymizedAt: new Date(),
       })
       .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)));

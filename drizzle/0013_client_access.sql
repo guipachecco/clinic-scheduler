@@ -8,7 +8,7 @@
 -- She reads the clinic's public columns, its bookable services, her own row
 -- and her own appointments, books confirmed online appointments for herself
 -- and writes their audit rows. Nothing else: no finance, auth or media table,
--- and no audit SELECT (tests/integration/client-access.test.ts checks it).
+-- no audit SELECT, no private patient column (tests/integration/client-access.test.ts checks it).
 --
 -- What she needs beyond her own rows goes through the SECURITY DEFINER
 -- functions below. They run as the migration owner, which owns the tables and
@@ -16,21 +16,39 @@
 -- explicitly and returns only the columns listed. EXECUTE is for app_client
 -- only.
 
+-- An anonymized patient is no longer tied to an account (anonymizePatient
+-- clears user_id). Rows anonymized before this migration are cleared first.
+UPDATE "patients" SET "user_id" = NULL WHERE "anonymized_at" IS NOT NULL AND "user_id" IS NOT NULL;--> statement-breakpoint
+ALTER TABLE "patients" DROP CONSTRAINT "patients_anonymized_check";--> statement-breakpoint
+ALTER TABLE "patients" ADD CONSTRAINT "patients_anonymized_check" CHECK ("patients"."anonymized_at" is null or ("patients"."phone" is null and "patients"."email" is null and "patients"."name_normalized" is null and "patients"."nickname" is null and "patients"."cpf" is null and "patients"."rg" is null and "patients"."landline_phone" is null and "patients"."birth_date" is null and "patients"."gender" is null and "patients"."referral_source" is null and "patients"."referred_by" is null and "patients"."notes" is null and "patients"."user_id" is null));--> statement-breakpoint
+
 -- Public clinic columns: those of PublicClinic (src/modules/clients/context.ts).
 GRANT SELECT (id, slug, name, display_name, whatsapp_phone, contact_email, address, maps_url, online_booking_enabled, min_advance_minutes, max_advance_days, slot_step_minutes, max_active_appointments_per_phone, timezone) ON clinics TO app_client;--> statement-breakpoint
 CREATE POLICY clinics_client ON clinics FOR SELECT TO app_client
   USING (id = nullif(current_setting('app.clinic_id', true), '')::uuid);--> statement-breakpoint
 
--- Services she may book: active, open to online booking and not flexible.
--- requires_approval is ignored online, so it is not readable.
+-- Services she may book: active, in an active category, open to online
+-- booking and not flexible. requires_approval is ignored online, so it is not
+-- readable. Of the categories she reads only what that check needs.
+GRANT SELECT (id, clinic_id, is_active) ON service_categories TO app_client;--> statement-breakpoint
+CREATE POLICY service_categories_client ON service_categories FOR SELECT TO app_client
+  USING (clinic_id = nullif(current_setting('app.clinic_id', true), '')::uuid);--> statement-breakpoint
 GRANT SELECT (id, clinic_id, category_id, name, slug, description, duration_minutes, buffer_before_minutes, buffer_after_minutes, price_cents, price_display, online_booking_enabled, preparation_instructions, is_flexible, is_active, sort_order) ON services TO app_client;--> statement-breakpoint
 CREATE POLICY services_client ON services FOR SELECT TO app_client
   USING (
     clinic_id = nullif(current_setting('app.clinic_id', true), '')::uuid
     AND is_active AND online_booking_enabled AND NOT is_flexible
+    AND EXISTS (
+      SELECT 1 FROM service_categories c
+      WHERE c.id = services.category_id
+        AND c.clinic_id = services.clinic_id
+        AND c.is_active
+    )
   );--> statement-breakpoint
 
-GRANT SELECT ON patients TO app_client;--> statement-breakpoint
+-- Her own row, without the clinic's private fields (notes, documents,
+-- referral and the rest of the registry).
+GRANT SELECT (id, clinic_id, user_id, name, phone, email, pending_link_patient_id, anonymized_at) ON patients TO app_client;--> statement-breakpoint
 CREATE POLICY patients_client ON patients FOR SELECT TO app_client
   USING (
     id = nullif(current_setting('app.patient_id', true), '')::uuid
@@ -62,8 +80,8 @@ CREATE POLICY audit_logs_client ON audit_logs FOR INSERT TO app_client
   );--> statement-breakpoint
 
 -- The active clinic for the slug and the user's patients row in it
--- (patient_id null when she has none). No row for an unknown or suspended
--- clinic. pending: her row is a provisional record (see below).
+-- (patient_id null when she has none or it was anonymized). No row for an
+-- unknown or suspended clinic. pending: her row is a provisional record.
 CREATE FUNCTION client_context(p_slug text, p_user uuid)
 RETURNS TABLE (clinic_id uuid, patient_id uuid, pending boolean)
 LANGUAGE sql STABLE SECURITY DEFINER
@@ -71,7 +89,8 @@ SET search_path = public, pg_temp
 AS $$
   SELECT c.id, p.id, coalesce(p.pending_link_patient_id IS NOT NULL, false)
   FROM clinics c
-  LEFT JOIN patients p ON p.clinic_id = c.id AND p.user_id = p_user
+  LEFT JOIN patients p
+    ON p.clinic_id = c.id AND p.user_id = p_user AND p.anonymized_at IS NULL
   WHERE c.slug = p_slug AND c.is_active
 $$;--> statement-breakpoint
 
