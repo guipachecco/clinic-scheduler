@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 import { DB_ROLE_ENV, DB_ROLE_NAMES, type RoleUrls } from "./roles";
 
@@ -18,7 +18,6 @@ export async function runMigrations(ownerUrl: string, roleUrls?: RoleUrls) {
     await migrate(drizzle({ client: pool }), {
       migrationsFolder: MIGRATIONS_FOLDER,
     });
-    if (logins.length === 0) return;
     const client = await pool.connect();
     try {
       for (const { role, password } of logins) {
@@ -26,11 +25,31 @@ export async function runMigrations(ownerUrl: string, roleUrls?: RoleUrls) {
           `ALTER ROLE ${client.escapeIdentifier(role)} LOGIN PASSWORD ${client.escapeLiteral(password)}`,
         );
       }
+      await assertRolesUnprivileged(client);
     } finally {
       client.release();
     }
   } finally {
     await pool.end();
+  }
+}
+
+// Migration 0011 keeps a role that already exists on the server as it is. A
+// pre-existing role with SUPERUSER, BYPASSRLS, CREATEROLE, CREATEDB or a
+// membership in another role would get around row-level security, so refuse.
+async function assertRolesUnprivileged(client: PoolClient) {
+  const { rows } = await client.query<{ rolname: string }>(
+    `SELECT r.rolname FROM pg_roles r
+     WHERE r.rolname = ANY($1)
+       AND (r.rolsuper OR r.rolbypassrls OR r.rolcreaterole OR r.rolcreatedb
+            OR EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.member = r.oid))
+     ORDER BY r.rolname`,
+    [DB_ROLE_NAMES],
+  );
+  if (rows.length > 0) {
+    throw new Error(
+      `Usuários do banco com privilégios a mais (superuser, BYPASSRLS, CREATEROLE, CREATEDB ou membro de outro papel): ${rows.map((row) => row.rolname).join(", ")}`,
+    );
   }
 }
 

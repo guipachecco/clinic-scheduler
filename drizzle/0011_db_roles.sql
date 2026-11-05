@@ -8,6 +8,15 @@
 --
 -- The owner (the migration user) is not bound by RLS. App roles never own a
 -- table and never have BYPASSRLS; tests/integration/db-roles.test.ts checks it.
+-- A clinic may only point its logo and owner photo at its own images: the
+-- media references become composite with the clinic. Foreign keys are checked
+-- without RLS, so a single-column reference would accept another clinic's row.
+ALTER TABLE "media" ADD CONSTRAINT "media_clinic_id_id_unique" UNIQUE("clinic_id","id");--> statement-breakpoint
+ALTER TABLE "clinics" DROP CONSTRAINT "clinics_logo_media_id_media_id_fk";--> statement-breakpoint
+ALTER TABLE "clinics" DROP CONSTRAINT "clinics_owner_photo_media_id_media_id_fk";--> statement-breakpoint
+ALTER TABLE "clinics" ADD CONSTRAINT "clinics_logo_media_fk" FOREIGN KEY ("id","logo_media_id") REFERENCES "public"."media"("clinic_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "clinics" ADD CONSTRAINT "clinics_owner_photo_media_fk" FOREIGN KEY ("id","owner_photo_media_id") REFERENCES "public"."media"("clinic_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+
 DO $$
 DECLARE
   role_name text;
@@ -71,8 +80,11 @@ CREATE POLICY service_availability_panel ON service_availability FOR ALL TO app_
       AND s.clinic_id = nullif(current_setting('app.clinic_id', true), '')::uuid
   ));--> statement-breakpoint
 
--- The panel reads and edits (branding, booking settings) its own clinic only.
-GRANT SELECT, UPDATE ON clinics TO app_panel;--> statement-breakpoint
+-- The panel reads its own clinic and changes only the branding columns it
+-- edits today (src/modules/branding). Never id, slug, is_active (root's
+-- suspension switch), logo_media_id or created_at.
+GRANT SELECT ON clinics TO app_panel;--> statement-breakpoint
+GRANT UPDATE (display_name, area_label, theme, owner_photo_media_id, updated_at) ON clinics TO app_panel;--> statement-breakpoint
 ALTER TABLE clinics ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE POLICY clinics_panel ON clinics FOR ALL TO app_panel
   USING (id = nullif(current_setting('app.clinic_id', true), '')::uuid)

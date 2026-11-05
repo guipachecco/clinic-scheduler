@@ -115,6 +115,8 @@ export const media = pgTable(
   },
   (t) => [
     index("media_clinic_id_idx").on(t.clinicId),
+    // Target of the clinics' composite media references below.
+    unique("media_clinic_id_id_unique").on(t.clinicId, t.id),
     check(
       "media_mime_type_check",
       sql`${t.mimeType} in ('image/jpeg', 'image/png', 'image/webp')`,
@@ -155,17 +157,14 @@ export const clinics = pgTable(
     contactEmail: text("contact_email"),
     address: text("address"),
     mapsUrl: text("maps_url"),
-    logoMediaId: uuid("logo_media_id").references((): AnyPgColumn => media.id, {
-      onDelete: "set null",
-    }),
+    // Both media references are composite with the clinic (see the foreign
+    // keys below), so a clinic can only point at its own images.
+    logoMediaId: uuid("logo_media_id"),
     // Short name and area shown in the panel (e.g. "Karina" / "Manicure");
     // the display name falls back to `name` when empty.
     displayName: text("display_name"),
     areaLabel: text("area_label"),
-    ownerPhotoMediaId: uuid("owner_photo_media_id").references(
-      (): AnyPgColumn => media.id,
-      { onDelete: "set null" },
-    ),
+    ownerPhotoMediaId: uuid("owner_photo_media_id"),
     theme: jsonb("theme").$type<ClinicTheme>().notNull().default({}),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     minAdvanceMinutes: integer("min_advance_minutes").notNull().default(120),
@@ -184,6 +183,18 @@ export const clinics = pgTable(
     updatedAt: updatedAt(),
   },
   (t) => [
+    // No ON DELETE action: the image is unlinked before it is deleted
+    // (src/modules/branding/photo.ts).
+    foreignKey({
+      name: "clinics_logo_media_fk",
+      columns: [t.id, t.logoMediaId],
+      foreignColumns: [media.clinicId, media.id],
+    }),
+    foreignKey({
+      name: "clinics_owner_photo_media_fk",
+      columns: [t.id, t.ownerPhotoMediaId],
+      foreignColumns: [media.clinicId, media.id],
+    }),
     check("clinics_slug_check", sql`${t.slug} ~ '^[a-z0-9]+(-[a-z0-9]+)*$'`),
     check("clinics_name_check", sql`char_length(${t.name}) between 1 and 100`),
     check(

@@ -1,4 +1,4 @@
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -8,7 +8,7 @@ import { findPgError } from "@/db/errors";
 import { runMigrations } from "@/db/migrate";
 import { DB_ROLE_NAMES } from "@/db/roles";
 import * as schema from "@/db/schema";
-import { patients, users } from "@/db/schema";
+import { clinics, media, patients, users } from "@/db/schema";
 
 import { CLINIC, otherClinic } from "../helpers/clinic";
 import { ROLE_URLS } from "../helpers/roles";
@@ -20,6 +20,17 @@ import { ROLE_URLS } from "../helpers/roles";
 let clinicB: string;
 let patientA: string;
 let patientB: string;
+let mediaB: string;
+
+// Tables app_panel may reach without row-level security. Each entry needs a
+// reason here; none so far.
+const PANEL_TABLES_WITHOUT_RLS = new Set<string>([]);
+
+const roleList = () =>
+  sql.join(
+    DB_ROLE_NAMES.map((name) => sql`${name}`),
+    sql`, `,
+  );
 
 async function pgErrorCode(promise: Promise<unknown>) {
   try {
@@ -52,10 +63,24 @@ beforeAll(async () => {
     .returning({ id: patients.id });
   patientA = a!.id;
   patientB = b!.id;
+  const [photo] = await db
+    .insert(media)
+    .values({
+      clinicId: clinicB,
+      kind: "photo",
+      mimeType: "image/png",
+      data: Buffer.from([1, 2, 3]),
+      byteSize: 3,
+      width: 1,
+      height: 1,
+    })
+    .returning({ id: media.id });
+  mediaB = photo!.id;
 });
 
 afterAll(async () => {
   await db.delete(patients).where(inArray(patients.id, [patientA, patientB]));
+  await db.delete(media).where(eq(media.id, mediaB));
   await endPools();
 });
 
@@ -92,6 +117,83 @@ describe("database roles", () => {
         rolsuper: false,
       })),
     );
+  });
+
+  it("no app role is a member of another role or has admin attributes", async () => {
+    const memberships = await db.execute<{ member: string; role: string }>(sql`
+      select m.rolname as member, r.rolname as role
+      from pg_auth_members am
+      join pg_roles m on m.oid = am.member
+      join pg_roles r on r.oid = am.roleid
+      where m.rolname in (${roleList()})
+    `);
+    expect(memberships.rows).toEqual([]);
+
+    const admins = await db.execute<{ rolname: string }>(sql`
+      select rolname from pg_roles
+      where rolname in (${roleList()}) and (rolcreaterole or rolcreatedb)
+    `);
+    expect(admins.rows).toEqual([]);
+  });
+
+  it("every table the panel can reach has RLS", async () => {
+    const reachable = await db.execute<{
+      table_name: string;
+      rls: boolean;
+    }>(sql`
+      select n.nspname || '.' || c.relname as table_name,
+             c.relrowsecurity as rls
+      from pg_class c
+      join pg_namespace n on n.oid = c.relnamespace
+      where c.relkind in ('r', 'p', 'v', 'm', 'f')
+        and n.nspname not in ('pg_catalog', 'information_schema')
+        and has_table_privilege('app_panel', c.oid,
+              'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+      order by 1
+    `);
+    expect(reachable.rows.length).toBeGreaterThan(10);
+    const missing = reachable.rows.filter(
+      (row) => !row.rls && !PANEL_TABLES_WITHOUT_RLS.has(row.table_name),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("panel cannot change the clinic's protected columns", async () => {
+    for (const change of [{ isActive: false }, { slug: "outro-endereco" }]) {
+      const code = await pgErrorCode(
+        inClinic(CLINIC, (tx) =>
+          tx.update(clinics).set(change).where(eq(clinics.id, CLINIC)),
+        ),
+      );
+      expect(code).toBe("42501");
+    }
+    // Branding stays editable.
+    await inClinic(CLINIC, (tx) =>
+      tx.update(clinics).set({ areaLabel: null }).where(eq(clinics.id, CLINIC)),
+    );
+  });
+
+  it("panel cannot point its photo at another clinic's image", async () => {
+    const code = await pgErrorCode(
+      inClinic(CLINIC, (tx) =>
+        tx
+          .update(clinics)
+          .set({ ownerPhotoMediaId: mediaB })
+          .where(eq(clinics.id, CLINIC)),
+      ),
+    );
+    expect(code).toBe("23503");
+  });
+
+  it("refuses an app role with extra privileges", async () => {
+    await db.execute(sql`grant pg_read_all_data to app_client`);
+    try {
+      await expect(
+        runMigrations(process.env.DATABASE_URL!, ROLE_URLS),
+      ).rejects.toThrowError(/privilégios a mais.*app_client/);
+    } finally {
+      await db.execute(sql`revoke pg_read_all_data from app_client`);
+    }
   });
 
   it("every clinic table has RLS and a panel policy", async () => {
