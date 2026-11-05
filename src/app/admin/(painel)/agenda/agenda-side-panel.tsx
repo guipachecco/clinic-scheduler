@@ -110,6 +110,7 @@ export function AgendaSidePanel({
                     >
                       {event.serviceLabel} ·{" "}
                       {pending ? "aguardando" : `${minutesOf(event)} min`}
+                      {event.online ? " · Online" : ""}
                     </span>
                   </span>
                 </li>

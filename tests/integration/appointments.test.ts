@@ -969,6 +969,11 @@ describe("listAppointmentsInRange", () => {
       NOW,
     );
     await created({ date: "2026-11-20" });
+    // Booked by the client through the clinic link: labelled Online.
+    await db
+      .update(appointments)
+      .set({ source: "online" })
+      .where(eq(appointments.id, plain));
 
     const range = {
       from: new Date("2026-11-10T03:00:00Z"),
@@ -988,16 +993,18 @@ describe("listAppointmentsInRange", () => {
         end: "2026-11-10T14:00:00.000Z",
         status: "confirmed",
         editable: true,
+        online: false,
       },
       {
         id: plain,
-        title: `João · ${LABEL}`,
+        title: `João · ${LABEL} · Online`,
         patientLabel: "João",
         serviceLabel: LABEL,
         start: "2026-11-10T17:00:00.000Z",
         end: "2026-11-10T18:00:00.000Z",
         status: "confirmed",
         editable: true,
+        online: true,
       },
     ]);
 

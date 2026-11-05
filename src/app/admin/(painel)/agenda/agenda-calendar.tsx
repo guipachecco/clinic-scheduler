@@ -151,7 +151,8 @@ function renderDayHeader(arg: DayHeaderContentArg) {
   );
 }
 
-// Name on the first line, "service · status" on the second. The hidden time
+// Name on the first line, "service · status" on the second (plus "Online"
+// for a booking made through the clinic link). The hidden time
 // and separator keep the text starting like the title for screen readers.
 // A block is a hatched card: "Bloqueado" over its title.
 function renderEvent(arg: EventContentArg) {
@@ -165,10 +166,12 @@ function renderEvent(arg: EventContentArg) {
       </span>
     );
   }
-  const { patientLabel, serviceLabel, status } = arg.event.extendedProps as {
+  const { patientLabel, serviceLabel, status, online } = arg.event
+    .extendedProps as {
     patientLabel?: string;
     serviceLabel?: string;
     status?: Status;
+    online?: boolean;
   };
   if (!patientLabel) return true;
   const statusText = status ? ` · ${STATUS_LABELS[status].toLowerCase()}` : "";
@@ -180,6 +183,7 @@ function renderEvent(arg: EventContentArg) {
       <span className="agenda-event-service">
         {serviceLabel}
         {statusText}
+        {online ? " · Online" : ""}
       </span>
     </span>
   );
@@ -293,6 +297,7 @@ export function AgendaCalendar({
                 patientLabel: event.patientLabel,
                 serviceLabel: event.serviceLabel,
                 status: event.status,
+                online: event.online,
               },
               // Editable events inherit the calendar's `editable`, which is
               // off on phones and while a move is saving or undecided. The

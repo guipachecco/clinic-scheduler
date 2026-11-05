@@ -15,6 +15,7 @@ import {
   TEST_ADMIN_AGENDA,
   TEST_ADMIN_CLIENT_AREA,
   TEST_ADMIN_FINANCE,
+  TEST_ADMIN_PATIENT_LINKS,
   TEST_ROOT,
   TEST_ROOT_BRANDING,
   TEST_ADMIN_PATIENTS,
@@ -47,6 +48,7 @@ export default async function globalSetup() {
     await createAdmin(TEST_ADMIN_AGENDA);
     await createAdmin(TEST_ADMIN_FINANCE);
     await createAdmin(TEST_ADMIN_CLIENT_AREA);
+    await createAdmin(TEST_ADMIN_PATIENT_LINKS);
     await createAdmin(TEST_ROOT);
     await createAdmin(TEST_ROOT_BRANDING);
   } finally {

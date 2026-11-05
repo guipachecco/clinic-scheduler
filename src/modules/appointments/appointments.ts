@@ -66,7 +66,8 @@ export type AppointmentRecord = {
 
 export type CalendarEvent = {
   id: string;
-  // "Name · Service", for the list view and the accessible name.
+  // "Name · Service" (plus " · Online" for an online booking), for the list
+  // view and the accessible name.
   title: string;
   patientLabel: string;
   serviceLabel: string;
@@ -74,6 +75,8 @@ export type CalendarEvent = {
   end: string;
   status: Status;
   editable: boolean;
+  // Booked by the client through the clinic link (source online).
+  online: boolean;
 };
 
 export type PatientAppointmentItem = {
@@ -898,6 +901,7 @@ const calendarColumns = {
   startsAt: appointments.startsAt,
   endsAt: appointments.endsAt,
   status: appointments.status,
+  source: appointments.source,
   serviceName: appointments.serviceName,
   customLabel: appointments.customLabel,
   name: patients.name,
@@ -910,6 +914,7 @@ function toCalendarEvent(row: {
   startsAt: Date;
   endsAt: Date;
   status: Status;
+  source: "admin" | "online";
   serviceName: string;
   customLabel: string | null;
   name: string;
@@ -918,15 +923,17 @@ function toCalendarEvent(row: {
 }): CalendarEvent {
   const patientLabel = displayName(row);
   const serviceLabel = row.customLabel ?? row.serviceName;
+  const online = row.source === "online";
   return {
     id: row.id,
-    title: `${patientLabel} · ${serviceLabel}`,
+    title: `${patientLabel} · ${serviceLabel}${online ? " · Online" : ""}`,
     patientLabel,
     serviceLabel,
     start: row.startsAt.toISOString(),
     end: row.endsAt.toISOString(),
     status: row.status,
     editable: !row.anonymizedAt && isEditableStatus(row.status),
+    online,
   };
 }
 

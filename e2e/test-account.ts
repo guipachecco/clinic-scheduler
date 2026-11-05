@@ -78,3 +78,13 @@ export const TEST_ADMIN_CLIENT_AREA = {
   name: "Dona da Área da Cliente",
   password: "senha-de-teste-area-cliente-bem-longa",
 };
+
+// Owner of clinic B of the client-area fixtures: answers the provisional
+// records of e2e/patient-links.spec.ts.
+export const TEST_ADMIN_PATIENT_LINKS = {
+  role: "admin" as const,
+  clinicSlug: "clinica-cliente-b",
+  email: "dona-fichas-online@example.test",
+  name: "Dona das Fichas Online",
+  password: "senha-de-teste-fichas-online-bem-longa",
+};
