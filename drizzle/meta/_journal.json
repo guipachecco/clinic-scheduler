@@ -99,6 +99,13 @@
       "when": 1793912004505,
       "tag": "0013_client_access",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793912798070,
+      "tag": "0014_client_booking_guards",
+      "breakpoints": true
     }
   ]
 }

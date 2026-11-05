@@ -46,6 +46,7 @@ let patientCarla: string;
 let existingPatient: string;
 let appointmentAna: string;
 let appointmentBia: string;
+let onlineBefore: boolean;
 
 const at = (iso: string) => new Date(iso);
 const ctx = (who: "ana" | "bia", patientId: string) => ({
@@ -61,6 +62,13 @@ async function pgErrorCode(promise: Promise<unknown>) {
     return findPgError(error)?.code;
   }
   return "no error";
+}
+
+async function setOnlineBooking(clinicId: string, enabled: boolean) {
+  await db
+    .update(clinics)
+    .set({ onlineBookingEnabled: enabled })
+    .where(eq(clinics.id, clinicId));
 }
 
 async function createUser(local: string) {
@@ -132,7 +140,9 @@ async function cleanup() {
   await db
     .delete(timeBlocks)
     .where(eq(timeBlocks.title, "Bloqueio acesso cliente"));
-  await db.delete(services).where(eq(services.slug, "servico-acesso-cliente"));
+  await db
+    .delete(services)
+    .where(like(services.slug, "servico-acesso-cliente%"));
   await db
     .delete(serviceCategories)
     .where(eq(serviceCategories.slug, "categoria-acesso-cliente"));
@@ -140,6 +150,11 @@ async function cleanup() {
 
 beforeAll(async () => {
   await cleanup();
+  const [grais] = await db
+    .select({ online: clinics.onlineBookingEnabled })
+    .from(clinics)
+    .where(eq(clinics.id, CLINIC));
+  onlineBefore = grais!.online;
   clinicB = await otherClinic(SLUG_B);
   for (const who of Object.keys(user) as (keyof typeof user)[]) {
     user[who] = await createUser(who);
@@ -217,6 +232,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await setOnlineBooking(CLINIC, onlineBefore);
   await cleanup();
   await endPools();
 });
@@ -429,7 +445,95 @@ describe("client access", () => {
     expect(privateColumn).toBe("42501");
   });
 
+  it("busy intervals are empty while online booking is off", async () => {
+    const busy = () =>
+      clientDb.execute(
+        sql`select * from client_busy_intervals(${CLINIC}, ${"2033-03-10T00:00:00Z"}, ${"2033-03-11T00:00:00Z"})`,
+      );
+    await setOnlineBooking(CLINIC, false);
+    expect((await busy()).rows).toEqual([]);
+    await setOnlineBooking(CLINIC, true);
+    expect((await busy()).rows.length).toBeGreaterThan(0);
+  });
+
+  it("client inserts only for a bookable service", async () => {
+    const [offline] = await db
+      .insert(services)
+      .values({
+        clinicId: CLINIC,
+        categoryId,
+        name: "Serviço fictício fora do online",
+        slug: "servico-acesso-cliente-fora",
+        durationMinutes: 60,
+        isActive: true,
+        onlineBookingEnabled: false,
+      })
+      .returning({ id: services.id });
+    try {
+      const cases: Array<{
+        label: string;
+        values: Partial<typeof services.$inferInsert>;
+      }> = [
+        { label: "offline", values: {} },
+        {
+          label: "inactive",
+          values: { onlineBookingEnabled: true, isActive: false },
+        },
+        {
+          label: "flexible",
+          values: { onlineBookingEnabled: true, isFlexible: true },
+        },
+      ];
+      for (const { label, values } of cases) {
+        await db
+          .update(services)
+          .set({
+            onlineBookingEnabled: false,
+            isActive: true,
+            isFlexible: false,
+            ...values,
+          })
+          .where(eq(services.id, offline!.id));
+        const code = await pgErrorCode(
+          asClient(ctx("ana", patientAna), (tx) =>
+            tx.insert(appointments).values(
+              appointmentValues(patientAna, "2033-03-12T13:00:00Z", {
+                serviceId: offline!.id,
+                ...(label === "flexible" ? { customLabel: "Rótulo" } : {}),
+              }),
+            ),
+          ),
+        );
+        expect(code, label).toBe("42501");
+      }
+
+      // A service in an inactive category is refused too.
+      await db
+        .update(serviceCategories)
+        .set({ isActive: false })
+        .where(eq(serviceCategories.id, categoryId));
+      try {
+        const code = await pgErrorCode(
+          asClient(ctx("ana", patientAna), (tx) =>
+            tx
+              .insert(appointments)
+              .values(appointmentValues(patientAna, "2033-03-12T13:00:00Z")),
+          ),
+        );
+        expect(code).toBe("42501");
+      } finally {
+        await db
+          .update(serviceCategories)
+          .set({ isActive: true })
+          .where(eq(serviceCategories.id, categoryId));
+      }
+    } finally {
+      await db.delete(services).where(eq(services.id, offline!.id));
+    }
+  });
+
   it("busy intervals carry no names", async () => {
+    await setOnlineBooking(CLINIC, true);
     const result = await clientDb.execute(
       sql`select * from client_busy_intervals(${CLINIC}, ${"2033-03-10T00:00:00Z"}, ${"2033-03-11T00:00:00Z"})`,
     );
