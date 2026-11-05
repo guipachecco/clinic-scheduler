@@ -2,15 +2,24 @@ import * as z from "zod";
 
 const PLACEHOLDER_SECRET = "troque-por-um-segredo-gerado";
 
+function postgresUrl() {
+  return z.url({
+    protocol: /^postgres(ql)?$/,
+    error: "deve ser uma URL postgres:// ou postgresql://",
+  });
+}
+
 export const serverEnvSchema = z
   .object({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    DATABASE_URL: z.url({
-      protocol: /^postgres(ql)?$/,
-      error: "deve ser uma URL postgres:// ou postgresql://",
-    }),
+    DATABASE_URL: postgresUrl(),
+    // One login per PostgreSQL role (see src/db/roles.ts).
+    DATABASE_URL_AUTH: postgresUrl(),
+    DATABASE_URL_PANEL: postgresUrl(),
+    DATABASE_URL_CLIENT: postgresUrl(),
+    DATABASE_URL_PLATFORM: postgresUrl(),
     BETTER_AUTH_SECRET: z
       .string()
       .min(32, "deve ter pelo menos 32 caracteres")

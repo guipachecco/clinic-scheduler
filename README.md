@@ -74,12 +74,13 @@ Use sempre o mesmo endereço do `BETTER_AUTH_URL` (por exemplo, `localhost` e n�
 
 As variáveis ficam no `.env` (desenvolvimento) ou no painel da hospedagem (produção). O app confere tudo ao iniciar e para com uma mensagem clara se faltar algo. O `.env` nunca vai para o Git.
 
-| Variável             | Para que serve                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`       | Conexão com o PostgreSQL (`postgres://usuario:senha@host:porta/banco`)                            |
-| `BETTER_AUTH_SECRET` | Assina as sessões e criptografa o segredo do 2FA. Mínimo de 32 caracteres e um valor por ambiente |
-| `BETTER_AUTH_URL`    | Endereço do site. Em produção, obrigatoriamente com `https://`                                    |
-| `LOG_LEVEL`          | Nível dos logs: `debug`, `info` (padrão), `warn` ou `error`                                       |
+| Variável                                                                                  | Para que serve                                                                                                                                              |
+| ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                            | Conexão com o PostgreSQL (`postgres://usuario:senha@host:porta/banco`), usada pelas migrações                                                               |
+| `DATABASE_URL_AUTH`, `DATABASE_URL_PANEL`, `DATABASE_URL_CLIENT`, `DATABASE_URL_PLATFORM` | Uma conexão para cada usuário do app (`app_auth`, `app_panel`, `app_client`, `app_platform`). O `pnpm db:migrate` define a senha de cada um a partir da URL |
+| `BETTER_AUTH_SECRET`                                                                      | Assina as sessões e criptografa o segredo do 2FA. Mínimo de 32 caracteres e um valor por ambiente                                                           |
+| `BETTER_AUTH_URL`                                                                         | Endereço do site. Em produção, obrigatoriamente com `https://`                                                                                              |
+| `LOG_LEVEL`                                                                               | Nível dos logs: `debug`, `info` (padrão), `warn` ou `error`                                                                                                 |
 
 Trocar o `BETTER_AUTH_SECRET` encerra todas as sessões e invalida o 2FA já configurado. Depois da troca, rode `pnpm admin reset-2fa <email>` para cada conta.
 

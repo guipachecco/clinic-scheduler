@@ -5,6 +5,10 @@ import { parseServerEnv } from "./env";
 const valid = {
   NODE_ENV: "production",
   DATABASE_URL: "postgres://user:password@db.example.com:5432/app",
+  DATABASE_URL_AUTH: "postgres://app_auth:a@db.example.com:5432/app",
+  DATABASE_URL_PANEL: "postgres://app_panel:b@db.example.com:5432/app",
+  DATABASE_URL_CLIENT: "postgres://app_client:c@db.example.com:5432/app",
+  DATABASE_URL_PLATFORM: "postgres://app_platform:d@db.example.com:5432/app",
   BETTER_AUTH_SECRET: "a".repeat(32),
   BETTER_AUTH_URL: "https://clinica.example.com",
 };
@@ -48,6 +52,17 @@ describe("parseServerEnv", () => {
       parseServerEnv({ ...valid, BETTER_AUTH_URL: "http://localhost:3000" })
         .BETTER_AUTH_URL,
     ).toBe("http://localhost:3000");
+  });
+
+  it("requires a connection URL for each database role", () => {
+    const withoutPanel: Record<string, string> = { ...valid };
+    delete withoutPanel.DATABASE_URL_PANEL;
+    expect(() => parseServerEnv(withoutPanel)).toThrowError(
+      /DATABASE_URL_PANEL: não definida/,
+    );
+    expect(() =>
+      parseServerEnv({ ...valid, DATABASE_URL_CLIENT: "http://x/app" }),
+    ).toThrowError(/DATABASE_URL_CLIENT/);
   });
 
   it("rejects a database URL that is not PostgreSQL", () => {

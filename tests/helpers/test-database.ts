@@ -2,8 +2,11 @@ import { Client } from "pg";
 
 import { runMigrations } from "../../src/db/migrate";
 
-// Drops and recreates the database, then applies every migration. Refuses to
-// touch a database whose name does not end in "_test".
+import { devRoleUrls } from "./roles";
+
+// Drops and recreates the database, then applies every migration and gives
+// the app roles their development logins. Refuses to touch a database whose
+// name does not end in "_test".
 export async function resetDatabase(connectionString: string) {
   const url = new URL(connectionString);
   const databaseName = decodeURIComponent(url.pathname.slice(1));
@@ -24,5 +27,5 @@ export async function resetDatabase(connectionString: string) {
     await client.end();
   }
 
-  await runMigrations(connectionString);
+  await runMigrations(connectionString, devRoleUrls(connectionString));
 }

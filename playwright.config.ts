@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { devRoleUrls, roleUrlEnv } from "./tests/helpers/roles";
+
 const PORT = 3100;
 const BASE_URL = `http://localhost:${PORT}`;
 
@@ -12,6 +14,7 @@ export const E2E_DATABASE_URL =
 // Values for automated tests only. Real secrets never go in the repository.
 export const E2E_SERVER_ENV = {
   DATABASE_URL: E2E_DATABASE_URL,
+  ...roleUrlEnv(devRoleUrls(E2E_DATABASE_URL)),
   BETTER_AUTH_SECRET: "segredo-apenas-para-testes-e2e-0123456789abcdef",
   BETTER_AUTH_URL: BASE_URL,
   LOG_LEVEL: "warn",

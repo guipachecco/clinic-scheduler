@@ -8,6 +8,15 @@ const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
   "postgres://clinic:clinic@localhost:5432/clinic_scheduler_test";
 
+// The app roles on that database, with the development passwords "<role>_dev"
+// (as tests/helpers/roles.ts builds them; the config loader cannot import it).
+function roleUrl(role: string) {
+  const url = new URL(TEST_DATABASE_URL);
+  url.username = role;
+  url.password = `${role}_dev`;
+  return url.toString();
+}
+
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
@@ -23,6 +32,10 @@ export default defineConfig({
     // Values for automated tests only. Real secrets never go in the repository.
     env: {
       DATABASE_URL: TEST_DATABASE_URL,
+      DATABASE_URL_AUTH: roleUrl("app_auth"),
+      DATABASE_URL_PANEL: roleUrl("app_panel"),
+      DATABASE_URL_CLIENT: roleUrl("app_client"),
+      DATABASE_URL_PLATFORM: roleUrl("app_platform"),
       BETTER_AUTH_SECRET: "segredo-apenas-para-testes-automatizados-0123456789",
       BETTER_AUTH_URL: "http://localhost:3000",
       LOG_LEVEL: "warn",
