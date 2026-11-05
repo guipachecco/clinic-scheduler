@@ -9,7 +9,7 @@ import {
   safeNext,
 } from "@/modules/clients/session";
 
-import { PageTitle } from "../ui";
+import { PageTitle, Unavailable } from "../ui";
 
 import { CompleteForm, SignupForm } from "./signup-forms";
 
@@ -20,6 +20,8 @@ export default async function SignupPage({
   searchParams,
 }: PageProps<"/[slug]/cadastro">) {
   const clinic = await requireClinic((await params).slug);
+  // No new accounts or records while the clinic has online booking off.
+  if (!clinic.onlineBookingEnabled) return <Unavailable clinic={clinic} />;
   const query = await searchParams;
   const next = safeNext(clinic.slug, query.next) ?? `/${clinic.slug}/marcar`;
   const user = await getClientUser();

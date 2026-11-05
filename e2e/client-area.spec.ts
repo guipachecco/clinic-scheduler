@@ -344,6 +344,16 @@ test.describe("client area", () => {
       page.getByRole("link", { name: "Marcar horário" }),
     ).toHaveCount(0);
 
+    // Nor can a stranger sign up there: no form, only the contacts.
+    await page.goto(`/${off.slug}/cadastro`);
+    await expect(
+      page.getByText("Agendamento online indisponível"),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Criar conta" })).toHaveCount(
+      0,
+    );
+    await expect(page.getByLabel("Senha")).toHaveCount(0);
+
     await page.goto("/clinica-que-nao-existe");
     await expect(page.getByText("Página não encontrada")).toBeVisible();
     await page.goto("/entrar");

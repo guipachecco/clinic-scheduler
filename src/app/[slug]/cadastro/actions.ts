@@ -29,6 +29,8 @@ export type SignupResult =
   { ok: true } | { ok: false; fieldErrors: Record<string, string> };
 
 const GENERIC_ERROR = "Não foi possível criar a conta. Tente novamente.";
+const ONLINE_OFF =
+  "O agendamento online desta clínica está desligado. Fale direto com ela.";
 
 // Creates her account (role client, by createClientAccount, limited per IP)
 // and her record in this clinic, then sends the confirmation e-mail. The
@@ -44,6 +46,10 @@ export async function signUp(
   const clinic = await findClinic(slug);
   if (!clinic) {
     return { ok: false, fieldErrors: { form: "Clínica não encontrada." } };
+  }
+  // The page shows Unavailable; this also stops a direct call.
+  if (!clinic.onlineBookingEnabled) {
+    return { ok: false, fieldErrors: { form: ONLINE_OFF } };
   }
   const { name, phone, email, password } = parsed.data;
 
@@ -107,6 +113,9 @@ export async function completeRegistration(
   const context = await getClientContext(slug, user.id);
   if (!context) {
     return { ok: false, fieldErrors: { form: "Clínica não encontrada." } };
+  }
+  if (!context.clinic.onlineBookingEnabled) {
+    return { ok: false, fieldErrors: { form: ONLINE_OFF } };
   }
   if (!context.patientId) {
     try {
