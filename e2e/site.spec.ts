@@ -80,9 +80,7 @@ test("the theme button switches to the dark theme and remembers it", async ({
     "background-color",
     "rgb(11, 11, 16)",
   );
-  await expect(
-    page.getByRole("img", { name: "Grais Saúde Integrativa" }),
-  ).toHaveAttribute("src", /logo-preto/);
+  await expect(page.getByText("Painel", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Tema escuro" }).click();
   await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);

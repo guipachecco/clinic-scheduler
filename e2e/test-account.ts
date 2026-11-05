@@ -60,3 +60,11 @@ export const TEST_ROOT = {
   name: "Root de Teste",
   password: "senha-de-teste-root-bem-longa",
 };
+
+// Root account of the branding suite (each root account sets up its own 2FA).
+export const TEST_ROOT_BRANDING = {
+  role: "root" as const,
+  email: "identidade@example.test",
+  name: "Root de Identidade",
+  password: "senha-de-teste-identidade-bem-longa",
+};

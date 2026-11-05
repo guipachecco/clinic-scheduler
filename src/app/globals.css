@@ -49,6 +49,7 @@
   --color-ring: var(--ring);
   --font-sans: "Figtree Variable", system-ui, sans-serif;
   --font-heading: "Archivo Variable", system-ui, sans-serif;
+  --font-wordmark: "Fraunces Variable", Georgia, serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

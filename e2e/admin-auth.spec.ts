@@ -42,9 +42,7 @@ test("the access screen shows the brand and loads fonts from the app itself", as
   });
 
   await page.goto("/admin/entrar");
-  await expect(
-    page.getByRole("img", { name: "Grais Saúde Integrativa" }),
-  ).toBeVisible();
+  await expect(page.getByText("Painel", { exact: true })).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
 
   expect(messages.filter((m) => m.includes("Content Security Policy"))).toEqual(

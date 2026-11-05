@@ -6,6 +6,7 @@ import {
   TEST_ADMIN_AGENDA,
   TEST_ADMIN_FINANCE,
   TEST_ROOT,
+  TEST_ROOT_BRANDING,
   TEST_ADMIN_PATIENTS,
   TEST_ADMIN_SCHEDULE,
   TEST_ADMIN_SERVICES,
@@ -26,6 +27,7 @@ export default async function globalSetup() {
     await createAdmin(TEST_ADMIN_AGENDA);
     await createAdmin(TEST_ADMIN_FINANCE);
     await createAdmin(TEST_ROOT);
+    await createAdmin(TEST_ROOT_BRANDING);
   } finally {
     await pool.end();
   }
