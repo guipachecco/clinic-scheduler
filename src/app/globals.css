@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+/* Dark theme follows the .dark class on <html>, set from the theme cookie. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* The Zemana identity: deep purple primary, yellow highlight (never used as
+   text on light backgrounds), pink accent, neutral lilac-tinted surfaces. The
+   dark theme lifts the purple to a light lilac on near-black surfaces. `brand`
+   is the surface behind the logo (sidebar, sign-in screens). The identity
+   tokens must equal PALETTES.zemana (checked by palettes.test.ts). */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-pressed: var(--primary-pressed);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-muted: var(--brand-muted);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-status-requested: var(--status-requested);
+  --color-status-requested-foreground: var(--status-requested-foreground);
+  --color-status-requested-border: var(--status-requested-border);
+  --color-status-confirmed: var(--status-confirmed);
+  --color-status-confirmed-foreground: var(--status-confirmed-foreground);
+  --color-status-completed: var(--status-completed);
+  --color-status-completed-foreground: var(--status-completed-foreground);
+  --color-status-no-show: var(--status-no-show);
+  --color-status-no-show-foreground: var(--status-no-show-foreground);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-cancelled-foreground: var(--status-cancelled-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: "Figtree Variable", system-ui, sans-serif;
+  --font-heading: "Bricolage Grotesque Variable", system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: #f7f5f8;
+  --foreground: #1c1a22;
+  --card: #ffffff;
+  --card-foreground: #1c1a22;
+  --popover: #ffffff;
+  --popover-foreground: #1c1a22;
+  --primary: #2a0081;
+  --primary-pressed: #1d005c;
+  --primary-foreground: #ffffff;
+  --secondary: #eeebf0;
+  --secondary-foreground: #2a0081;
+  --muted: #eeebf0;
+  --muted-foreground: #5e5868;
+  --accent: #eeebf0;
+  --accent-foreground: #1c1a22;
+  --highlight: #f5c700;
+  --highlight-foreground: #2a0081;
+  --status-requested: #fff4c2;
+  --status-requested-foreground: #5c4700;
+  --status-requested-border: #c9a400;
+  --status-confirmed: #2a0081;
+  --status-confirmed-foreground: #ffffff;
+  --status-completed: #e1f2e8;
+  --status-completed-foreground: #1b5e38;
+  --status-no-show: #f6e3e8;
+  --status-no-show-foreground: #7e1a35;
+  --status-cancelled: #eeebf0;
+  --status-cancelled-foreground: #5e5868;
+  --destructive: #b3261e;
+  --destructive-foreground: #ffffff;
+  --brand: #2a0081;
+  --brand-foreground: #ffffff;
+  --brand-muted: #1d005c;
+  --brand-accent: #ffd3f0;
+  --brand-accent-foreground: #2a0081;
+  --border: #e4dfe8;
+  --input: #c9c2cf;
+  --ring: #2a0081;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #0b0b10;
+  --foreground: #f2f0f5;
+  --card: #16151c;
+  --card-foreground: #f2f0f5;
+  --popover: #16151c;
+  --popover-foreground: #f2f0f5;
+  --primary: #b7e7fc;
+  --primary-pressed: #8fd3f2;
+  --primary-foreground: #0b0b10;
+  --secondary: #23212b;
+  --secondary-foreground: #b7e7fc;
+  --muted: #23212b;
+  --muted-foreground: #aaa4b5;
+  --accent: #23212b;
+  --accent-foreground: #f2f0f5;
+  --highlight: #f5c700;
+  --highlight-foreground: #2a0081;
+  --status-requested: #3a3000;
+  --status-requested-foreground: #f5c700;
+  --status-requested-border: #f5c700;
+  --status-confirmed: #b7e7fc;
+  --status-confirmed-foreground: #0b0b10;
+  --status-completed: #12301f;
+  --status-completed-foreground: #8fe3b0;
+  --status-no-show: #3a1420;
+  --status-no-show-foreground: #ff9db5;
+  --status-cancelled: #23212b;
+  --status-cancelled-foreground: #aaa4b5;
+  --destructive: #f0625a;
+  --destructive-foreground: #0b0b10;
+  --brand: #14033a;
+  --brand-foreground: #f2f0f5;
+  --brand-muted: #1d0a52;
+  --brand-accent: #ffd3f0;
+  --brand-accent-foreground: #2a0081;
+  --border: #2a2833;
+  --input: #4a4655;
+  --ring: #b7e7fc;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+  }
+}

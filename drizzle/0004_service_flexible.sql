@@ -1,0 +1,1 @@
+ALTER TABLE "services" ADD COLUMN "is_flexible" boolean DEFAULT false NOT NULL;

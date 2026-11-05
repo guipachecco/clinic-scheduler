@@ -1,0 +1,382 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { Route } from "next";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useForm, useWatch, type UseFormReturn } from "react-hook-form";
+
+import { FieldError, FormError } from "@/components/form-message";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  formatBrPhoneInput,
+  formatCpfInput,
+  GENDERS,
+  patientFormSchema,
+  REFERRAL_SOURCES,
+  todayInClinic,
+  type PatientFormInput,
+  type PatientFormValues,
+} from "@/modules/patients/fields";
+
+import { createPatientAction, updatePatientAction } from "./actions";
+
+const EMPTY: PatientFormInput = {
+  name: "",
+  nickname: "",
+  cpf: "",
+  rg: "",
+  phone: "",
+  landlinePhone: "",
+  email: "",
+  birthDate: "",
+  gender: "",
+  referralSource: "",
+  referredBy: "",
+  notes: "",
+};
+
+const SAVE_ERROR = "Não foi possível salvar. Tente novamente.";
+
+type Props =
+  | { mode: "create"; voltar?: "agenda"; inicio?: string }
+  | { mode: "edit"; id: string; defaults: PatientFormInput };
+
+type PatientFormApi = UseFormReturn<
+  PatientFormInput,
+  unknown,
+  PatientFormValues
+>;
+
+type TextField = {
+  name: keyof PatientFormInput;
+  label: string;
+  type?: string;
+  inputMode?: "tel" | "numeric" | "email";
+  autoComplete?: string;
+  placeholder?: string;
+  mask?: (value: string) => string;
+  hint?: string;
+};
+
+function countDigits(value: string) {
+  return value.replace(/\D/g, "").length;
+}
+
+// Re-masks the field as the user types and keeps the caret next to the same
+// digit. Backspace right after a separator ("." "-" ")" " ") removes the digit
+// before it, so the punctuation never traps the caret.
+function applyMask(
+  event: React.ChangeEvent<HTMLInputElement>,
+  mask: (value: string) => string,
+  setValue: (value: string) => void,
+) {
+  const input = event.target;
+  let raw = input.value;
+  let caret = input.selectionStart ?? raw.length;
+  const inputType = (event.nativeEvent as InputEvent).inputType;
+  // The value before this keystroke: the last masked value, or the default.
+  const previous = input.dataset.masked ?? input.defaultValue;
+  if (
+    inputType === "deleteContentBackward" &&
+    countDigits(raw) === countDigits(previous) &&
+    caret > 0
+  ) {
+    const before = raw.slice(0, caret).replace(/\d(?=\D*$)/, "");
+    raw = before + raw.slice(caret);
+    caret = before.length;
+  }
+  const digitsBeforeCaret = countDigits(raw.slice(0, caret));
+  const masked = mask(raw);
+  input.dataset.masked = masked;
+  setValue(masked);
+  let position = 0;
+  for (let seen = 0; position < masked.length; position++) {
+    if (seen === digitsBeforeCaret) break;
+    if (/\d/.test(masked[position])) seen++;
+  }
+  requestAnimationFrame(() => input.setSelectionRange(position, position));
+}
+
+function TextInput({
+  field,
+  form,
+}: {
+  field: TextField;
+  form: PatientFormApi;
+}) {
+  const error = form.formState.errors[field.name]?.message;
+  const mask = field.mask;
+  const errorId = `${field.name}-error`;
+  const hintId = `${field.name}-hint`;
+  const describedBy =
+    [field.hint ? hintId : null, error ? errorId : null]
+      .filter(Boolean)
+      .join(" ") || undefined;
+  return (
+    <div className="grid content-start gap-2">
+      <Label htmlFor={field.name}>{field.label}</Label>
+      <Input
+        id={field.name}
+        type={field.type ?? "text"}
+        autoComplete={field.autoComplete ?? "off"}
+        inputMode={field.inputMode}
+        placeholder={field.placeholder}
+        max={field.type === "date" ? todayInClinic() : undefined}
+        aria-invalid={Boolean(error)}
+        aria-describedby={describedBy}
+        {...form.register(field.name, {
+          onChange: mask
+            ? (event: React.ChangeEvent<HTMLInputElement>) => {
+                applyMask(event, mask, (value) =>
+                  form.setValue(field.name, value, { shouldDirty: true }),
+                );
+              }
+            : undefined,
+        })}
+      />
+      {field.hint ? (
+        <p id={hintId} className="text-sm text-muted-foreground">
+          {field.hint}
+        </p>
+      ) : null}
+      <FieldError id={errorId} message={error} />
+    </div>
+  );
+}
+
+export function PatientForm(props: Props) {
+  const defaults = props.mode === "edit" ? props.defaults : EMPTY;
+  const [formError, setFormError] = useState<string | null>(null);
+  const [existingId, setExistingId] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const router = useRouter();
+  const form = useForm<PatientFormInput, unknown, PatientFormValues>({
+    resolver: zodResolver(patientFormSchema),
+    defaultValues: defaults,
+  });
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    setError,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = form;
+
+  const isReferral =
+    useWatch({ control: form.control, name: "referralSource" }) === "referral";
+  useEffect(() => {
+    if (!isReferral) setValue("referredBy", "");
+  }, [isReferral, setValue]);
+
+  async function onSubmit() {
+    setFormError(null);
+    setExistingId(null);
+    setSaved(false);
+    // Raw text goes to the server, which parses it again with the same schema.
+    const input = getValues();
+    let result;
+    try {
+      result =
+        props.mode === "edit"
+          ? await updatePatientAction(props.id, input)
+          : await createPatientAction(input);
+    } catch {
+      setFormError(SAVE_ERROR);
+      return;
+    }
+    // The action returns success instead of redirecting (a redirect would
+    // reject here and be mistaken for a failure), so navigation is ours.
+    if (result.ok) {
+      if (props.mode === "create") {
+        if (props.voltar === "agenda") {
+          const query = new URLSearchParams({ paciente: result.id });
+          if (props.inicio) query.set("inicio", props.inicio);
+          router.push(`/admin/agenda/novo?${query}` as Route);
+        } else {
+          router.push(`/admin/pacientes/${result.id}` as Route);
+        }
+      } else {
+        router.refresh();
+        setSaved(true);
+      }
+      return;
+    }
+    const entries = Object.entries(result.fieldErrors);
+    entries.forEach(([name, message], index) => {
+      // Focus goes to the first field with a server error.
+      setError(
+        name as keyof PatientFormInput,
+        { message },
+        { shouldFocus: index === 0 },
+      );
+    });
+    setExistingId(result.existingPatientId ?? null);
+    setFormError(
+      result.formError ?? (entries.length === 0 ? SAVE_ERROR : null),
+    );
+  }
+
+  const idle =
+    props.mode === "edit" ? "Salvar alterações" : "Cadastrar paciente";
+  const referralError = errors.referralSource?.message;
+  const notesError = errors.notes?.message;
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-6">
+      <div className="grid gap-4 md:grid-cols-2">
+        <TextInput
+          form={form}
+          field={{ name: "name", label: "Nome completo" }}
+        />
+        <TextInput form={form} field={{ name: "nickname", label: "Apelido" }} />
+        <TextInput
+          form={form}
+          field={{
+            name: "phone",
+            label: "WhatsApp",
+            type: "tel",
+            inputMode: "numeric",
+            autoComplete: "tel",
+            placeholder: "(00) 00000-0000",
+            mask: formatBrPhoneInput,
+            hint: "Com DDD, por exemplo (48) 99999-0000.",
+          }}
+        />
+        <TextInput
+          form={form}
+          field={{
+            name: "landlinePhone",
+            label: "Telefone fixo",
+            type: "tel",
+            inputMode: "numeric",
+            autoComplete: "tel",
+            placeholder: "(00) 0000-0000",
+            mask: formatBrPhoneInput,
+          }}
+        />
+        <TextInput
+          form={form}
+          field={{
+            name: "birthDate",
+            label: "Data de nascimento",
+            type: "date",
+          }}
+        />
+        <div className="grid content-start gap-2">
+          <Label htmlFor="gender">Gênero</Label>
+          <NativeSelect
+            id="gender"
+            aria-invalid={Boolean(errors.gender)}
+            aria-describedby={errors.gender ? "gender-error" : undefined}
+            {...register("gender")}
+          >
+            <option value="">Não informado</option>
+            {GENDERS.map((gender) => (
+              <option key={gender.value} value={gender.value}>
+                {gender.label}
+              </option>
+            ))}
+          </NativeSelect>
+          <FieldError id="gender-error" message={errors.gender?.message} />
+        </div>
+        <TextInput
+          form={form}
+          field={{
+            name: "cpf",
+            label: "CPF",
+            inputMode: "numeric",
+            autoComplete: "off",
+            placeholder: "000.000.000-00",
+            mask: formatCpfInput,
+          }}
+        />
+        <TextInput form={form} field={{ name: "rg", label: "RG" }} />
+        <TextInput
+          form={form}
+          field={{
+            name: "email",
+            label: "E-mail",
+            type: "email",
+            inputMode: "email",
+          }}
+        />
+        <div className="grid content-start gap-2">
+          <Label htmlFor="referralSource">Como conheceu</Label>
+          <NativeSelect
+            id="referralSource"
+            aria-invalid={Boolean(referralError)}
+            aria-describedby={
+              referralError ? "referralSource-error" : undefined
+            }
+            {...register("referralSource")}
+          >
+            <option value="">Não informado</option>
+            {REFERRAL_SOURCES.map((source) => (
+              <option key={source.value} value={source.value}>
+                {source.label}
+              </option>
+            ))}
+          </NativeSelect>
+          <FieldError id="referralSource-error" message={referralError} />
+        </div>
+        {isReferral ? (
+          <TextInput
+            form={form}
+            field={{ name: "referredBy", label: "Indicado por" }}
+          />
+        ) : null}
+      </div>
+
+      <div className="grid gap-2">
+        <Label htmlFor="notes">Observações</Label>
+        <Textarea
+          id="notes"
+          aria-invalid={Boolean(notesError)}
+          aria-describedby={
+            notesError ? "notes-hint notes-error" : "notes-hint"
+          }
+          {...register("notes")}
+        />
+        <p id="notes-hint" className="text-sm text-muted-foreground">
+          Não registre informações de saúde aqui
+        </p>
+        <FieldError id="notes-error" message={notesError} />
+      </div>
+
+      {existingId ? (
+        <div role="alert" className="grid gap-1 text-sm">
+          <p className="text-destructive">
+            Já existe um paciente com estes dados.
+          </p>
+          <Link
+            href={`/admin/pacientes/${existingId}` as Route}
+            className="font-medium text-primary underline underline-offset-4"
+          >
+            Ver cadastro existente
+          </Link>
+        </div>
+      ) : null}
+      <FormError message={formError} />
+      {saved ? (
+        <p role="status" className="text-sm font-medium text-primary">
+          Alterações salvas.
+        </p>
+      ) : null}
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Salvando..." : idle}
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/admin/pacientes">Voltar à lista</Link>
+        </Button>
+      </div>
+    </form>
+  );
+}

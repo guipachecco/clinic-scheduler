@@ -1,0 +1,3 @@
+ALTER TABLE "appointments" ADD COLUMN "custom_label" text;--> statement-breakpoint
+ALTER TABLE "appointments" ADD CONSTRAINT "appointments_custom_label_check" CHECK ("appointments"."custom_label" is null or char_length("appointments"."custom_label") between 1 and 60);--> statement-breakpoint
+ALTER TABLE "appointments" ADD CONSTRAINT "appointments_cancellation_reason_check" CHECK ("appointments"."cancellation_reason" is null or "appointments"."cancellation_reason" in ('patient_request','rescheduled','clinic_unavailable','other'));
