@@ -84,7 +84,7 @@ export async function sendVerificationEmail({
 }
 
 // Better Auth awaits this before it answers, so the answer would take longer
-// when an e-mail really goes out (the clinic lookup and the Resend call) than
+// when an e-mail really goes out (the clinic lookup and the MailerSend call) than
 // for an unknown address. Inside a request the work runs after the response
 // instead; outside one (scripts, tests) it is awaited as before. next/server
 // is loaded lazily: plain Node (scripts/admin.ts, the e2e setup) cannot

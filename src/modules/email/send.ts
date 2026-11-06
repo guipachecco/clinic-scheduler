@@ -4,11 +4,13 @@ import path from "node:path";
 
 import { env } from "@/lib/env";
 
-// The one way the app sends e-mail. With RESEND_API_KEY (required on the real
-// site, see src/lib/env.ts) the message goes out through Resend. Otherwise it
-// is written as a JSON file to EMAIL_OUTBOX_DIR, where development and the
-// tests read it. No import of "server-only": scripts/admin.ts loads this
-// through src/lib/auth.ts.
+import { parseSender } from "./sender";
+
+// The one way the app sends e-mail. With MAILERSEND_API_KEY (required on the
+// real site, see src/lib/env.ts) the message goes out through MailerSend.
+// Otherwise it is written as a JSON file to EMAIL_OUTBOX_DIR, where
+// development and the tests read it. No import of "server-only":
+// scripts/admin.ts loads this through src/lib/auth.ts.
 
 export type EmailMessage = {
   to: string;
@@ -19,26 +21,29 @@ export type EmailMessage = {
 
 export type OutboxMessage = EmailMessage & { sentAt: string };
 
-const RESEND_URL = "https://api.resend.com/emails";
+export const MAILERSEND_URL = "https://api.mailersend.com/v1/email";
 
 export async function sendEmail(message: EmailMessage): Promise<void> {
-  if (env.RESEND_API_KEY) {
-    await sendWithResend(env.RESEND_API_KEY, message);
+  if (env.MAILERSEND_API_KEY) {
+    await sendWithMailerSend(env.MAILERSEND_API_KEY, message);
     return;
   }
   await writeToOutbox(message);
 }
 
-async function sendWithResend(apiKey: string, message: EmailMessage) {
-  const response = await fetch(RESEND_URL, {
+async function sendWithMailerSend(apiKey: string, message: EmailMessage) {
+  // env.ts requires a valid EMAIL_FROM whenever there is a key.
+  const from = parseSender(env.EMAIL_FROM ?? "");
+  if (!from) throw new Error("EMAIL_FROM inválido.");
+  const response = await fetch(MAILERSEND_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: env.EMAIL_FROM,
-      to: [message.to],
+      from,
+      to: [{ email: message.to }],
       subject: message.subject,
       html: message.html,
       text: message.text,
@@ -46,7 +51,9 @@ async function sendWithResend(apiKey: string, message: EmailMessage) {
   });
   // Only the status: the response may echo the recipient.
   if (!response.ok) {
-    throw new Error(`Falha ao enviar o e-mail (Resend ${response.status}).`);
+    throw new Error(
+      `Falha ao enviar o e-mail (MailerSend ${response.status}).`,
+    );
   }
 }
 

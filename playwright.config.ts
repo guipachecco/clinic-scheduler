@@ -14,7 +14,7 @@ export const E2E_DATABASE_URL =
   process.env.E2E_DATABASE_URL ??
   "postgres://clinic:clinic@localhost:5432/clinic_scheduler_e2e_test";
 
-// E-mails the site sends during the tests (no RESEND_API_KEY): the tests read
+// E-mails the site sends during the tests (no MAILERSEND_API_KEY): the tests read
 // the links from here.
 export const E2E_EMAIL_OUTBOX_DIR = path.join(
   tmpdir(),
