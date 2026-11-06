@@ -1,5 +1,7 @@
 import * as z from "zod";
 
+import { parseSender } from "@/modules/email/sender";
+
 const PLACEHOLDER_SECRET = "troque-por-um-segredo-gerado";
 
 function postgresUrl() {
@@ -41,11 +43,17 @@ export const serverEnvSchema = z
       error: "deve ser a URL pública do site, como https://exemplo.com.br",
     }),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-    // E-mail (src/modules/email/send.ts). With RESEND_API_KEY, messages go out
-    // through Resend from EMAIL_FROM; without it, they are written as JSON
-    // files to EMAIL_OUTBOX_DIR and nothing leaves the machine.
-    RESEND_API_KEY: optionalText(),
-    EMAIL_FROM: optionalText(),
+    // E-mail (src/modules/email/send.ts). With MAILERSEND_API_KEY, messages go
+    // out through MailerSend from EMAIL_FROM; without it, they are written as
+    // JSON files to EMAIL_OUTBOX_DIR and nothing leaves the machine.
+    MAILERSEND_API_KEY: optionalText(),
+    EMAIL_FROM: optionalText().refine(
+      (value) => value === undefined || parseSender(value) !== null,
+      {
+        error:
+          'deve ser um remetente, como "Zemana <nao-responda@seudominio.com.br>"',
+      },
+    ),
     EMAIL_OUTBOX_DIR: optionalText().transform((value) => value ?? ".emails"),
   })
   .refine(
@@ -64,13 +72,14 @@ export const serverEnvSchema = z
     (env) =>
       env.NODE_ENV !== "production" ||
       isLocalhost(env.BETTER_AUTH_URL) ||
-      env.RESEND_API_KEY !== undefined,
-    { error: "obrigatória em produção", path: ["RESEND_API_KEY"] },
+      env.MAILERSEND_API_KEY !== undefined,
+    { error: "obrigatória em produção", path: ["MAILERSEND_API_KEY"] },
   )
   .refine(
-    (env) => env.RESEND_API_KEY === undefined || env.EMAIL_FROM !== undefined,
+    (env) =>
+      env.MAILERSEND_API_KEY === undefined || env.EMAIL_FROM !== undefined,
     {
-      error: "obrigatória quando RESEND_API_KEY está definida",
+      error: "obrigatória quando MAILERSEND_API_KEY está definida",
       path: ["EMAIL_FROM"],
     },
   );

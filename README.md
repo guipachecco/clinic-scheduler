@@ -65,7 +65,7 @@ pnpm dev
 
 - Site: http://localhost:3000
 - Painel: http://localhost:3000/admin
-- Área da cliente de uma clínica: http://localhost:3000/<endereço> (por exemplo, http://localhost:3000/grais). Sem `RESEND_API_KEY`, os e-mails de confirmação e de troca de senha ficam em arquivos JSON na pasta `.emails/`; abra o arquivo e copie o link.
+- Área da cliente de uma clínica: http://localhost:3000/<endereço> (por exemplo, http://localhost:3000/grais). Sem `MAILERSEND_API_KEY`, os e-mails de confirmação e de troca de senha ficam em arquivos JSON na pasta `.emails/`; abra o arquivo e copie o link.
 
 No primeiro acesso ao painel, depois da senha, o sistema pede a configuração da verificação em duas etapas. Tenha no celular um aplicativo autenticador (Google Authenticator, Microsoft Authenticator ou outro), leia o QR code e guarde os códigos de recuperação. Sem 2FA ativo, o painel não abre. Faça esse primeiro acesso logo depois de criar a conta: até lá, quem tiver a senha consegue cadastrar o próprio celular.
 
@@ -82,9 +82,9 @@ As variáveis ficam no `.env` (desenvolvimento) ou no painel da hospedagem (prod
 | `BETTER_AUTH_SECRET`                                                                      | Assina as sessões e criptografa o segredo do 2FA. Mínimo de 32 caracteres e um valor por ambiente                                                           |
 | `BETTER_AUTH_URL`                                                                         | Endereço do site. Em produção, obrigatoriamente com `https://`                                                                                              |
 | `LOG_LEVEL`                                                                               | Nível dos logs: `debug`, `info` (padrão), `warn` ou `error`                                                                                                 |
-| `RESEND_API_KEY`                                                                          | Chave da Resend, que envia os e-mails da área da cliente. Obrigatória em produção                                                                           |
-| `EMAIL_FROM`                                                                              | Remetente dos e-mails, de um domínio verificado na Resend (ex.: `Zemana <nao-responda@seudominio.com.br>`). Obrigatório quando há `RESEND_API_KEY`          |
-| `EMAIL_OUTBOX_DIR`                                                                        | Sem `RESEND_API_KEY`, nada é enviado: cada e-mail vira um arquivo JSON nesta pasta (padrão `.emails/`, fora do Git)                                         |
+| `MAILERSEND_API_KEY`                                                                      | Chave da MailerSend, que envia os e-mails da área da cliente. Obrigatória em produção                                                                       |
+| `EMAIL_FROM`                                                                              | Remetente dos e-mails, de um domínio verificado na MailerSend (ex.: `Zemana <nao-responda@seudominio.com.br>`). Obrigatório quando há `MAILERSEND_API_KEY`  |
+| `EMAIL_OUTBOX_DIR`                                                                        | Sem `MAILERSEND_API_KEY`, nada é enviado: cada e-mail vira um arquivo JSON nesta pasta (padrão `.emails/`, fora do Git)                                     |
 
 Os quatro usuários do banco e o que cada um pode fazer:
 
@@ -188,7 +188,7 @@ A publicação é a Etapa 5. O plano aprovado é Vercel Pro (funções em São P
 
 1. Um PostgreSQL 17 gerenciado. No Neon, o `DATABASE_URL` é o usuário dono do banco (o `neondb_owner`, que não é superusuário), com a conexão direta, sem o pooler.
 2. Os quatro usuários do app criados pela migração, não pelo painel do Neon: o `pnpm db:migrate` cria `app_auth`, `app_panel`, `app_client` e `app_platform` (migração `0011`) e define a senha de cada um a partir das URLs `DATABASE_URL_AUTH`, `DATABASE_URL_PANEL`, `DATABASE_URL_CLIENT` e `DATABASE_URL_PLATFORM`. Use uma senha nova e forte em cada URL (`postgres://app_panel:<senha>@<host>/<banco>?sslmode=require`); as URLs do app podem usar o host com pooler do Neon. Nunca torne um desses usuários dono do banco ou das tabelas nem dê `BYPASSRLS`: isso desliga a separação entre clínicas. Antes de mexer no banco, o `pnpm db:migrate` confere se cada URL usa o usuário certo e tem senha. Depois de aplicar as migrações e antes de definir qualquer senha, confere os quatro usuários e para com um aviso, sem dar login a nenhum, se algum for superusuário, tiver `BYPASSRLS`, `CREATEROLE` ou `CREATEDB`, for membro de outro papel ou for dono de alguma tabela, view, sequência, função ou schema deste banco, ou do próprio banco. O aviso cita só os nomes dos usuários, nunca URLs ou senhas.
-3. As variáveis da tabela de configuração cadastradas na hospedagem, menos o `DATABASE_URL`: o site só se conecta com os quatro usuários do app, e a senha do dono fica apenas onde se roda o `pnpm db:migrate`. Cadastre um `BETTER_AUTH_SECRET` exclusivo, o `BETTER_AUTH_URL` com `https://`, a `RESEND_API_KEY` e o `EMAIL_FROM` de um domínio verificado na Resend.
+3. As variáveis da tabela de configuração cadastradas na hospedagem, menos o `DATABASE_URL`: o site só se conecta com os quatro usuários do app, e a senha do dono fica apenas onde se roda o `pnpm db:migrate`. Cadastre um `BETTER_AUTH_SECRET` exclusivo, o `BETTER_AUTH_URL` com `https://`, a `MAILERSEND_API_KEY` e o `EMAIL_FROM` de um domínio verificado na MailerSend.
 4. `pnpm db:migrate` com o `DATABASE_URL` e as quatro `DATABASE_URL_*` de produção antes de cada versão que traga migrações. Para trocar a senha de um usuário do app, mude a URL e rode o `pnpm db:migrate` de novo.
 5. `pnpm admin create` uma única vez, apontando para o banco de produção.
 

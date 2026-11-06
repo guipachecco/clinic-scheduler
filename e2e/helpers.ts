@@ -56,7 +56,7 @@ type OutboxEmail = {
   sentAt: string;
 };
 
-// E-mails the e2e server wrote to its outbox (no RESEND_API_KEY), oldest
+// E-mails the e2e server wrote to its outbox (no MAILERSEND_API_KEY), oldest
 // first.
 export async function readOutbox(): Promise<OutboxEmail[]> {
   let names: string[];

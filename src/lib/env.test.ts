@@ -10,7 +10,7 @@ const valid = {
   DATABASE_URL_PLATFORM: "postgres://app_platform:d@db.example.com:5432/app",
   BETTER_AUTH_SECRET: "a".repeat(32),
   BETTER_AUTH_URL: "https://clinica.example.com",
-  RESEND_API_KEY: "re_chave_ficticia",
+  MAILERSEND_API_KEY: "mlsn.chave_ficticia",
   EMAIL_FROM: "Zemana <nao-responda@example.com>",
 };
 
