@@ -7,7 +7,9 @@ import { findPgError } from "@/db/errors";
 import {
   appointments,
   auditLogs,
+  loyaltyRedemptions,
   patients,
+  reviews,
   serviceCategories,
   services,
   users,
@@ -134,6 +136,10 @@ async function patientRow(id: string) {
 
 async function clearClinic(id: string) {
   await db.delete(auditLogs).where(eq(auditLogs.clinicId, id));
+  await db.delete(reviews).where(eq(reviews.clinicId, id));
+  await db
+    .delete(loyaltyRedemptions)
+    .where(eq(loyaltyRedemptions.clinicId, id));
   await db.delete(appointments).where(eq(appointments.clinicId, id));
   await db
     .delete(patients)
@@ -314,6 +320,79 @@ describe("pending links", () => {
       [s.oldAppointment, s.onlineAppointment].sort(),
     );
     expect(await listPendingLinks(clinicId)).toEqual([]);
+  });
+
+  it("confirm moves her reviews and loyalty rewards", async () => {
+    const s = await scenario();
+    // Rows that reference the provisional record ON DELETE restrict.
+    const [review] = await db
+      .insert(reviews)
+      .values({ clinicId, patientId: s.provisionalId, rating: 5 })
+      .returning({ id: reviews.id });
+    const [redemption] = await db
+      .insert(loyaltyRedemptions)
+      .values({ clinicId, patientId: s.provisionalId, createdBy: ownerId })
+      .returning({ id: loyaltyRedemptions.id });
+
+    expect(await confirmLink(clinicId, s.provisionalId, ownerId)).toEqual({
+      ok: true,
+    });
+
+    expect(await patientRow(s.provisionalId)).toBeNull();
+    const [movedReview] = await db
+      .select({ patientId: reviews.patientId, rating: reviews.rating })
+      .from(reviews)
+      .where(eq(reviews.id, review!.id));
+    expect(movedReview).toEqual({ patientId: s.existingId, rating: 5 });
+    const [movedRedemption] = await db
+      .select({ patientId: loyaltyRedemptions.patientId })
+      .from(loyaltyRedemptions)
+      .where(eq(loyaltyRedemptions.id, redemption!.id));
+    expect(movedRedemption).toEqual({ patientId: s.existingId });
+  });
+
+  it("reject keeps her reviews and rewards on her own record", async () => {
+    const s = await scenario();
+    await db
+      .insert(reviews)
+      .values({ clinicId, patientId: s.provisionalId, rating: 4 });
+    await db
+      .insert(loyaltyRedemptions)
+      .values({ clinicId, patientId: s.provisionalId });
+    expect(await rejectLink(clinicId, s.provisionalId, ownerId)).toEqual({
+      ok: true,
+    });
+    const [review] = await db
+      .select({ patientId: reviews.patientId })
+      .from(reviews)
+      .where(eq(reviews.clinicId, clinicId));
+    expect(review).toEqual({ patientId: s.provisionalId });
+    const [redemption] = await db
+      .select({ patientId: loyaltyRedemptions.patientId })
+      .from(loyaltyRedemptions)
+      .where(eq(loyaltyRedemptions.clinicId, clinicId));
+    expect(redemption).toEqual({ patientId: s.provisionalId });
+  });
+
+  it("the panel may move only patient_id of reviews and rewards", async () => {
+    const s = await scenario();
+    const [review] = await db
+      .insert(reviews)
+      .values({ clinicId, patientId: s.provisionalId, rating: 4 })
+      .returning({ id: reviews.id });
+    const error = await inClinic(clinicId, (tx) =>
+      tx.update(reviews).set({ rating: 1 }).where(eq(reviews.id, review!.id)),
+    ).catch((caught: unknown) => caught);
+    expect(findPgError(error)?.code).toBe("42501");
+    // Another clinic sees no row to move.
+    const moved = await inClinic(secondClinicId, (tx) =>
+      tx
+        .update(reviews)
+        .set({ patientId: s.existingId })
+        .where(eq(reviews.id, review!.id))
+        .returning({ id: reviews.id }),
+    );
+    expect(moved).toEqual([]);
   });
 
   it("reject keeps both records", async () => {

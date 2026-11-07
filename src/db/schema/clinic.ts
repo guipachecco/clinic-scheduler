@@ -531,8 +531,9 @@ export const products = pgTable(
 
 // A client's review of the clinic. She may write one after a completed
 // appointment, as many as she likes (policy reviews_client_insert, migration
-// 0017). The panel only hides a review, never edits it; hidden reviews are
-// neither shown nor counted.
+// 0017). The panel only hides a review, never edits it (it moves patient_id
+// only when merging a provisional record, migration 0018); hidden reviews and
+// those of an anonymized patient are neither shown nor counted.
 export const reviews = pgTable(
   "reviews",
   {

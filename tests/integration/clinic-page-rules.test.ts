@@ -431,6 +431,49 @@ describe("clinic page rules", () => {
     }
   });
 
+  it("withdraws the reviews of an anonymized patient (migration 0018)", async () => {
+    const eva = await createPatient(
+      clinicB,
+      await createUser("eva"),
+      `Eva ${TAG} Lima`,
+      "+5511900003305",
+    );
+    const [review] = await db
+      .insert(reviews)
+      .values({ clinicId: clinicB, patientId: eva, rating: 2 })
+      .returning({ id: reviews.id });
+    const listed = async () =>
+      (
+        await call(sql`select * from client_public_reviews(${clinicB}, 50)`)
+      ).map((row) => row.id);
+    expect(await listed()).toContain(review!.id);
+    expect(
+      await call(sql`select * from client_review_summary(${clinicB})`),
+    ).toEqual([{ average: "3.0", total: 2 }]);
+
+    // What anonymizePatient leaves (without its audit row). The row loses its
+    // user link, so this test removes it itself.
+    await db
+      .update(patients)
+      .set({
+        name: "Paciente anonimizada",
+        nameNormalized: null,
+        phone: null,
+        userId: null,
+        anonymizedAt: new Date(),
+      })
+      .where(eq(patients.id, eva));
+    try {
+      expect(await listed()).not.toContain(review!.id);
+      expect(
+        await call(sql`select * from client_review_summary(${clinicB})`),
+      ).toEqual([{ average: "4.0", total: 1 }]);
+    } finally {
+      await db.delete(reviews).where(eq(reviews.patientId, eva));
+      await db.delete(patients).where(eq(patients.id, eva));
+    }
+  });
+
   it("shows clients only active products of their clinic", async () => {
     await db.insert(products).values([
       { clinicId: CLINIC, name: `Creme ${TAG} A`, priceCents: 4500 },
