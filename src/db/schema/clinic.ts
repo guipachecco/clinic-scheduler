@@ -179,6 +179,16 @@ export const clinics = pgTable(
     onlineBookingEnabled: boolean("online_booking_enabled")
       .notNull()
       .default(false),
+    // Clinic page (migration 0017): Instagram handle without the "@", the
+    // amenities shown (keys of clinics_amenities_check) and the loyalty card.
+    instagramHandle: text("instagram_handle"),
+    amenities: text("amenities")
+      .array()
+      .notNull()
+      .default(sql`'{}'`),
+    loyaltyEnabled: boolean("loyalty_enabled").notNull().default(false),
+    loyaltyVisits: integer("loyalty_visits").notNull().default(10),
+    loyaltyReward: text("loyalty_reward"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -221,6 +231,30 @@ export const clinics = pgTable(
     check(
       "clinics_max_active_check",
       sql`${t.maxActiveAppointmentsPerPhone} between 1 and 20`,
+    ),
+    check(
+      "clinics_instagram_check",
+      sql`${t.instagramHandle} is null or ${t.instagramHandle} ~ '^[A-Za-z0-9._]{1,30}$'`,
+    ),
+    check(
+      "clinics_amenities_check",
+      sql`${t.amenities} <@ ARRAY['wifi', 'estacionamento', 'acessibilidade', 'ar_condicionado', 'cafe_agua', 'banheiro', 'espaco_kids', 'aceita_pets']::text[]`,
+    ),
+    check(
+      "clinics_loyalty_visits_check",
+      sql`${t.loyaltyVisits} between 2 and 50`,
+    ),
+    check(
+      "clinics_loyalty_reward_check",
+      sql`${t.loyaltyReward} is null or char_length(${t.loyaltyReward}) <= 120`,
+    ),
+    check(
+      "clinics_loyalty_check",
+      sql`not ${t.loyaltyEnabled} or ${t.loyaltyReward} is not null`,
+    ),
+    check(
+      "clinics_maps_url_check",
+      sql`${t.mapsUrl} is null or ${t.mapsUrl} ~ '^https://'`,
     ),
   ],
 );
@@ -461,6 +495,93 @@ export const patients = pgTable(
       "patients_lengths_check",
       sql`char_length(${t.nickname}) <= 40 and char_length(${t.rg}) <= 20 and char_length(${t.referredBy}) <= 120 and char_length(${t.notes}) <= 1000`,
     ),
+  ],
+);
+
+// Products the clinic sells, listed on its public page. Clients see only the
+// active ones (policy products_client, migration 0017).
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    priceCents: integer("price_cents"),
+    description: text("description"),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index("products_clinic_id_idx").on(t.clinicId),
+    check("products_name_check", sql`char_length(${t.name}) between 1 and 80`),
+    check(
+      "products_price_check",
+      sql`${t.priceCents} is null or ${t.priceCents} between 0 and 10000000`,
+    ),
+    check(
+      "products_description_check",
+      sql`${t.description} is null or char_length(${t.description}) <= 300`,
+    ),
+  ],
+);
+
+// A client's review of the clinic. She may write one after a completed
+// appointment, as many as she likes (policy reviews_client_insert, migration
+// 0017). The panel only hides a review, never edits it; hidden reviews are
+// neither shown nor counted.
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    rating: smallint("rating").notNull(),
+    comment: text("comment"),
+    isHidden: boolean("is_hidden").notNull().default(false),
+    hiddenAt: timestamp("hidden_at", { withTimezone: true }),
+    hiddenBy: uuid("hidden_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "reviews_patient_fk",
+      columns: [t.clinicId, t.patientId],
+      foreignColumns: [patients.clinicId, patients.id],
+    }).onDelete("restrict"),
+    index("reviews_clinic_created_at_idx").on(t.clinicId, t.createdAt),
+    check("reviews_rating_check", sql`${t.rating} between 1 and 5`),
+    check(
+      "reviews_comment_check",
+      sql`${t.comment} is null or char_length(${t.comment}) <= 500`,
+    ),
+  ],
+);
+
+// Each loyalty reward a patient received, recorded by the panel.
+export const loyaltyRedemptions = pgTable(
+  "loyalty_redemptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    createdAt: createdAt(),
+    createdBy: uuid("created_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+  },
+  (t) => [
+    foreignKey({
+      name: "loyalty_redemptions_patient_fk",
+      columns: [t.clinicId, t.patientId],
+      foreignColumns: [patients.clinicId, patients.id],
+    }).onDelete("restrict"),
+    index("loyalty_redemptions_patient_idx").on(t.clinicId, t.patientId),
   ],
 );
 

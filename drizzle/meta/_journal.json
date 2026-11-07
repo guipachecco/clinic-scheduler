@@ -120,6 +120,13 @@
       "when": 1793918148420,
       "tag": "0016_client_appointment_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1794087316919,
+      "tag": "0017_clinic_page",
+      "breakpoints": true
     }
   ]
 }
