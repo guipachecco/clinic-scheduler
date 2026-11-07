@@ -291,7 +291,7 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
   }
   return (
     <div className="grid gap-3">
-      {!page.onlineBookingEnabled ? (
+      {!page.onlineBookingEnabled && !page.whatsappPhone ? (
         <p className="text-sm text-muted-foreground">
           Para marcar um horário, fale com a clínica pelos contatos abaixo.
         </p>
@@ -323,6 +323,17 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
                   >
                     Agendar
                   </Link>
+                </Button>
+              ) : page.whatsappPhone ? (
+                <Button asChild size="sm" variant="outline">
+                  <a
+                    href={whatsappUrl(page.whatsappPhone)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Icon name="whatsapp" />
+                    Fale com a clínica
+                  </a>
                 </Button>
               ) : null}
             </li>

@@ -191,6 +191,8 @@ test.describe("página inicial da clínica", () => {
     await expect(page.getByText("Wi-Fi", { exact: true })).toBeVisible();
     await expect(page.getByText("Atendimento visível (página)")).toBeVisible();
     await expect(page.getByText("Nota 5 de 5")).toBeVisible();
+    await expect(page.getByText("Ana S.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Ana Paula Souza")).toHaveCount(0);
     await expect(page.getByText("Comentário escondido (página)")).toHaveCount(
       0,
     );
@@ -236,9 +238,17 @@ test.describe("página inicial da clínica", () => {
   }) => {
     await page.goto(`/${OFFLINE.slug}`);
     const main = page.getByRole("main");
-    await expect(main.getByText(OFFLINE.service)).toBeVisible();
+    const item = main
+      .getByRole("listitem")
+      .filter({ hasText: OFFLINE.service });
+    await expect(item).toBeVisible();
     await expect(main.getByRole("link", { name: "Agendar" })).toHaveCount(0);
-    await expect(main.getByRole("link", { name: "WhatsApp" })).toBeVisible();
+    const contact = item.getByRole("link", { name: "Fale com a clínica" });
+    await expect(contact).toHaveAttribute(
+      "href",
+      "https://wa.me/5511987650102",
+    );
+    await expect(contact).toHaveAttribute("target", "_blank");
   });
 
   test("Agendar on a service carries it to the booking page", async ({
