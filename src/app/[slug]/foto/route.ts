@@ -12,11 +12,15 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
   const photo = await getOwnerPhoto(slug);
-  if (!photo) return new Response("Not found", { status: 404 });
+  // Only images are served from here, whatever was stored.
+  if (!photo || !photo.mimeType.startsWith("image/")) {
+    return new Response("Not found", { status: 404 });
+  }
   return new Response(new Uint8Array(photo.data), {
     headers: {
       "Content-Type": photo.mimeType,
       "Cache-Control": "public, max-age=300",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
