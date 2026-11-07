@@ -324,6 +324,81 @@ test.describe("client area", () => {
     expect(await logo().getAttribute("src")).toContain("fundo-escuro");
   });
 
+  test("clinic link shows the bottom navigation", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(`/${A.slug}`);
+    const nav = page.getByRole("navigation", { name: "Navegação" });
+    const links = [
+      { name: "Início", href: `/${A.slug}` },
+      { name: "Agendar", href: `/${A.slug}/marcar` },
+      { name: "Meus horários", href: `/${A.slug}/meus-horarios` },
+      { name: "Perfil", href: `/${A.slug}/entrar` },
+    ];
+    for (const { name, href } of links) {
+      const link = nav.getByRole("link", { name });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute("href", href);
+      // An icon, never an emoji.
+      await expect(link.locator("svg")).toHaveCount(1);
+    }
+    expect(await noSidewaysScroll(page)).toBe(true);
+  });
+
+  test("profile shows her name and e-mail and the nav points to it", async () => {
+    await client.goto(`/${A.slug}/perfil`);
+    await expect(client.getByRole("heading", { name: "Perfil" })).toBeVisible();
+    await expect(client.getByText(CLIENT.name)).toBeVisible();
+    await expect(client.getByText(CLIENT.email)).toBeVisible();
+    await expect(client.getByRole("button", { name: "Sair" })).toBeVisible();
+    await expect(
+      client
+        .getByRole("navigation", { name: "Navegação" })
+        .getByRole("link", { name: "Perfil" }),
+    ).toHaveAttribute("href", `/${A.slug}/perfil`);
+  });
+
+  test("owner photo route serves only an active clinic's photo", async ({
+    request,
+  }) => {
+    const [media] = await query<{ id: string }>(
+      `INSERT INTO media (clinic_id, kind, mime_type, data, byte_size, width, height)
+       SELECT id, 'photo', 'image/png', '\\x89504e47'::bytea, 4, 1, 1
+       FROM clinics WHERE slug = $1 RETURNING id`,
+      [A.slug],
+    );
+    try {
+      await query(
+        "UPDATE clinics SET owner_photo_media_id = $1 WHERE slug = $2",
+        [media!.id, A.slug],
+      );
+      const withPhoto = await request.get(`/${A.slug}/foto`);
+      expect(withPhoto.status()).toBe(200);
+      expect(withPhoto.headers()["content-type"]).toContain("image/");
+      expect(withPhoto.headers()["cache-control"]).toBe("public, max-age=300");
+
+      // Deactivated clinic: not served.
+      await query("UPDATE clinics SET is_active = false WHERE slug = $1", [
+        A.slug,
+      ]);
+      expect((await request.get(`/${A.slug}/foto`)).status()).toBe(404);
+      await query("UPDATE clinics SET is_active = true WHERE slug = $1", [
+        A.slug,
+      ]);
+
+      // A clinic without a photo.
+      expect((await request.get(`/${B.slug}/foto`)).status()).toBe(404);
+    } finally {
+      await query("UPDATE clinics SET is_active = true WHERE slug = $1", [
+        A.slug,
+      ]);
+      await query(
+        "UPDATE clinics SET owner_photo_media_id = NULL WHERE slug = $1",
+        [A.slug],
+      );
+      await query("DELETE FROM media WHERE id = $1", [media!.id]);
+    }
+  });
+
   test("a clinic without online booking shows its contacts; unknown and reserved links are not found", async ({
     page,
   }) => {
