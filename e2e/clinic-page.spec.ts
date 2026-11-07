@@ -1,7 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
+
+import { clearRateLimits } from "./helpers";
 
 // The clinic's home page on a phone (/<slug>): hero, tabs and the sections
 // below them. Dedicated fictitious clinics go straight into the throwaway e2e
@@ -19,7 +21,28 @@ const OFFLINE = {
   slug: "clinica-pagina-sem-online",
   service: "Massagem (pagina)",
 };
-const SLUGS = [FULL.slug, BARE.slug, OFFLINE.slug];
+const REVIEW = {
+  slug: "clinica-pagina-avaliacao",
+  service: "Drenagem (avaliação)",
+  reward: "Uma sobrancelha grátis",
+};
+const SLUGS = [FULL.slug, BARE.slug, OFFLINE.slug, REVIEW.slug];
+
+// Fictitious clients created through the signup form of the REVIEW clinic.
+const PEOPLE = {
+  done: {
+    name: "Maria Clara Teste",
+    phone: "(11) 98888-0101",
+    email: "cliente-avalia@example.test",
+    password: "senha-da-cliente-bem-longa",
+  },
+  fresh: {
+    name: "Joana Nova Teste",
+    phone: "(11) 98888-0102",
+    email: "cliente-sem-atendimento@example.test",
+    password: "senha-da-cliente-bem-longa",
+  },
+};
 
 let serviceId = "";
 
@@ -42,6 +65,9 @@ async function removeClinics(client: Client) {
   ).rows.map((row) => row.id);
   for (const table of [
     "reviews",
+    "audit_logs",
+    "loyalty_redemptions",
+    "appointments",
     "products",
     "payment_methods",
     "services",
@@ -52,6 +78,53 @@ async function removeClinics(client: Client) {
     await client.query(`DELETE FROM ${table} WHERE clinic_id = ANY($1)`, [ids]);
   }
   await client.query("DELETE FROM clinics WHERE id = ANY($1)", [ids]);
+  await client.query("DELETE FROM users WHERE email = ANY($1)", [
+    Object.values(PEOPLE).map((person) => person.email),
+  ]);
+}
+
+async function signUp(page: Page, person: typeof PEOPLE.done) {
+  await page.goto(`/${REVIEW.slug}/cadastro`);
+  await page.getByLabel("Nome").fill(person.name);
+  await page.getByLabel("Celular (WhatsApp)").fill(person.phone);
+  await page.getByLabel("E-mail").fill(person.email);
+  await page.getByLabel("Senha").fill(person.password);
+  await page.getByRole("button", { name: "Criar conta" }).click();
+  await expect(page).toHaveURL(new RegExp(`/${REVIEW.slug}/marcar$`));
+}
+
+async function signIn(page: Page, person: typeof PEOPLE.done) {
+  await page.goto(`/${REVIEW.slug}/entrar`);
+  await page.getByLabel("E-mail").fill(person.email);
+  await page.getByLabel("Senha").fill(person.password);
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page).not.toHaveURL(/\/entrar/);
+}
+
+// A completed appointment of the person in the REVIEW clinic, days ago.
+async function addCompleted(client: Client, email: string, daysAgo: number) {
+  const {
+    rows: [row],
+  } = await client.query<{ clinic_id: string; id: string }>(
+    `SELECT p.clinic_id, p.id FROM patients p JOIN users u ON u.id = p.user_id
+     JOIN clinics c ON c.id = p.clinic_id WHERE u.email = $1 AND c.slug = $2`,
+    [email, REVIEW.slug],
+  );
+  const {
+    rows: [service],
+  } = await client.query<{ id: string }>(
+    "SELECT id FROM services WHERE clinic_id = $1",
+    [row!.clinic_id],
+  );
+  await client.query(
+    `INSERT INTO appointments (clinic_id, patient_id, service_id, service_name,
+       service_duration_minutes, starts_at, ends_at, occupied_from,
+       occupied_until, status, source, confirmed_at)
+     SELECT $1, $2, $3, $4, 60, t, t + interval '60 minutes', t,
+       t + interval '60 minutes', 'completed', 'admin', now()
+     FROM (SELECT now() - make_interval(days => $5::int) AS t) x`,
+    [row!.clinic_id, row!.id, service!.id, REVIEW.service, daysAgo],
+  );
 }
 
 async function addService(
@@ -152,6 +225,19 @@ test.describe("página inicial da clínica", () => {
         [OFFLINE.slug],
       );
       await addService(client, offline!.id, OFFLINE.service);
+
+      const {
+        rows: [review],
+      } = await client.query<{ id: string }>(
+        `INSERT INTO clinics (slug, name, display_name, loyalty_enabled,
+           loyalty_visits, loyalty_reward, online_booking_enabled)
+         VALUES ($1, 'Clínica Página Avaliação (teste)', 'Clínica Avaliação',
+           true, 2, $2, true)
+         RETURNING id`,
+        [REVIEW.slug, REVIEW.reward],
+      );
+      await addHours(client, review!.id);
+      await addService(client, review!.id, REVIEW.service);
     });
   });
 
@@ -260,5 +346,82 @@ test.describe("página inicial da clínica", () => {
       "href",
       `/${FULL.slug}/marcar?servico=${serviceId}`,
     );
+  });
+
+  test("client with a completed appointment reviews", async ({ browser }) => {
+    await clearRateLimits();
+    const context = await browser.newContext({
+      viewport: { width: 360, height: 800 },
+    });
+    const page = await context.newPage();
+    await signUp(page, PEOPLE.done);
+    await withDb((client) => addCompleted(client, PEOPLE.done.email, 3));
+
+    await page.goto(`/${REVIEW.slug}`);
+    await page.getByRole("link", { name: "Avaliar" }).click();
+    await expect(page).toHaveURL(new RegExp(`/${REVIEW.slug}/avaliar$`));
+
+    const five = page.getByRole("button", { name: "5 estrelas" });
+    await expect(five).toHaveAttribute("aria-pressed", "false");
+    await five.click();
+    await expect(five).toHaveAttribute("aria-pressed", "true");
+    await page
+      .getByLabel("Comentário")
+      .fill("Adorei o atendimento (avaliação)");
+    await page.getByRole("button", { name: "Enviar" }).click();
+    await expect(page.getByText("Obrigada pela avaliação!")).toBeVisible();
+
+    await page.goto(`/${REVIEW.slug}`);
+    await expect(page.getByText("Maria T.", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Adorei o atendimento (avaliação)"),
+    ).toBeVisible();
+    await expect(page.getByText("Maria Clara Teste")).toHaveCount(0);
+    await context.close();
+  });
+
+  test("client without a completed appointment cannot review", async ({
+    browser,
+  }) => {
+    await clearRateLimits();
+    const context = await browser.newContext({
+      viewport: { width: 360, height: 800 },
+    });
+    const page = await context.newPage();
+    await signUp(page, PEOPLE.fresh);
+
+    await page.goto(`/${REVIEW.slug}/avaliar`);
+    await expect(
+      page.getByText("Você poderá avaliar depois do seu primeiro atendimento."),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Enviar" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /estrela/ })).toHaveCount(0);
+
+    await page.goto(`/${REVIEW.slug}`);
+    await expect(page.getByRole("link", { name: "Avaliar" })).toHaveCount(0);
+    await context.close();
+  });
+
+  test("loyalty card shows progress", async ({ browser }) => {
+    await clearRateLimits();
+    const context = await browser.newContext({
+      viewport: { width: 360, height: 800 },
+    });
+    const page = await context.newPage();
+    await signIn(page, PEOPLE.done);
+
+    await page.goto(`/${REVIEW.slug}`);
+    await page.getByRole("tab", { name: "Fidelidade" }).click();
+    const panel = page.getByRole("tabpanel");
+    await expect(panel.getByText(REVIEW.reward)).toBeVisible();
+    await expect(panel.getByText("1 de 2")).toBeVisible();
+
+    await withDb((client) => addCompleted(client, PEOPLE.done.email, 5));
+    await page.reload();
+    await page.getByRole("tab", { name: "Fidelidade" }).click();
+    await expect(
+      page.getByRole("tabpanel").getByText(`Você ganhou: ${REVIEW.reward}`),
+    ).toBeVisible();
+    await context.close();
   });
 });

@@ -1,7 +1,11 @@
 import { DateTime } from "luxon";
 import { notFound } from "next/navigation";
 
-import { canReview, getClinicPage } from "@/modules/clinic-page/public";
+import {
+  canReview,
+  getClinicPage,
+  getLoyaltyProgress,
+} from "@/modules/clinic-page/public";
 import { getClientContext } from "@/modules/clients/context";
 import { getClientUser, requireClinic } from "@/modules/clients/session";
 
@@ -21,19 +25,29 @@ import {
 } from "./home/sections";
 import { Tabs, type TabItem } from "./home/tabs";
 
-// She can review once a completed appointment exists; only a signed-in client
-// with a record in this clinic can.
-async function clientCanReview(slug: string, clinicId: string) {
+// What the page shows only to a signed-in client with a record in this
+// clinic: whether she can review and her loyalty card. Both are read as her.
+async function clientExtras(
+  slug: string,
+  clinicId: string,
+  loyaltyVisits: number | null,
+) {
+  const none = { mayReview: false, progress: null };
   const user = await getClientUser();
-  if (!user) return false;
+  if (!user) return none;
   const context = await getClientContext(slug, user.id);
-  if (!context?.patientId) return false;
-  return canReview({
+  if (!context?.patientId) return none;
+  const ctx = {
     clinicId,
     patientId: context.patientId,
     userId: user.id,
     emailVerified: user.emailVerified,
-  });
+  };
+  const [mayReview, progress] = await Promise.all([
+    canReview(ctx),
+    loyaltyVisits ? getLoyaltyProgress(ctx, loyaltyVisits) : null,
+  ]);
+  return { mayReview, progress };
 }
 
 // The clinic link's home: photos area and owner, tabs (services, photos,
@@ -43,7 +57,11 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
   const clinic = await requireClinic(slug);
   const page = await getClinicPage(slug);
   if (!page) notFound();
-  const mayReview = await clientCanReview(slug, clinic.id);
+  const { mayReview, progress } = await clientExtras(
+    slug,
+    clinic.id,
+    page.loyalty?.visits ?? null,
+  );
 
   const now = new Date();
   const today = DateTime.fromJSDate(now, { zone: page.timezone }).weekday % 7;
@@ -56,7 +74,9 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
     tabs.push({
       id: "fidelidade",
       label: "Fidelidade",
-      content: <LoyaltyTab loyalty={page.loyalty} />,
+      content: (
+        <LoyaltyTab slug={slug} loyalty={page.loyalty} progress={progress} />
+      ),
     });
   }
   if (page.products.length > 0) {

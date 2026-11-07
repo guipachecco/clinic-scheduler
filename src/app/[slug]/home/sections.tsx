@@ -88,7 +88,7 @@ export function Reviews({
       action={
         canReview ? (
           <Button asChild size="sm" variant="outline">
-            <Link href={`/${page.slug}/avaliar` as Route}>Avaliar</Link>
+            <Link href={`/${page.slug}/avaliar`}>Avaliar</Link>
           </Button>
         ) : undefined
       }
@@ -353,13 +353,19 @@ export function PhotosTab() {
   );
 }
 
+// The rule always; with a signed-in client, her stamp card or her prize.
+// Signed out, a link to sign in and see the card.
 export function LoyaltyTab({
+  slug,
   loyalty,
+  progress,
 }: {
+  slug: string;
   loyalty: NonNullable<ClinicPage["loyalty"]>;
+  progress: { stamps: number; prize: boolean } | null;
 }) {
   return (
-    <div className="grid gap-1 rounded-2xl bg-primary p-4 text-primary-foreground">
+    <div className="grid gap-3 rounded-2xl bg-primary p-4 text-primary-foreground">
       <b className="flex items-center gap-2">
         <Icon name="gift" />
         Cartão fidelidade
@@ -368,6 +374,44 @@ export function LoyaltyTab({
         A cada {loyalty.visits} atendimentos concluídos, você ganha:{" "}
         <span className="font-semibold">{loyalty.reward}</span>
       </p>
+      {progress ? (
+        progress.prize ? (
+          <p className="rounded-xl bg-primary-foreground/15 p-3 text-sm font-semibold">
+            Você ganhou: {loyalty.reward}. Avise na próxima visita.
+          </p>
+        ) : (
+          <div className="grid gap-2">
+            <ul aria-hidden="true" className="flex flex-wrap gap-1.5">
+              {Array.from({ length: loyalty.visits }, (_, index) => (
+                <li
+                  key={index}
+                  className={
+                    index < progress.stamps
+                      ? "flex size-7 items-center justify-center rounded-full bg-primary-foreground text-primary"
+                      : "size-7 rounded-full border border-primary-foreground/50"
+                  }
+                >
+                  {index < progress.stamps ? (
+                    <Icon name="check" className="size-4" />
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm font-semibold">
+              {progress.stamps} de {loyalty.visits}
+            </p>
+          </div>
+        )
+      ) : (
+        <Link
+          href={
+            `/${slug}/entrar?next=${encodeURIComponent(`/${slug}`)}` as Route
+          }
+          className="text-sm font-semibold underline underline-offset-4"
+        >
+          Entrar para ver o seu cartão
+        </Link>
+      )}
     </div>
   );
 }
