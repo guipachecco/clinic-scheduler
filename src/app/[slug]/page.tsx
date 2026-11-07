@@ -1,53 +1,83 @@
-import Link from "next/link";
+import { DateTime } from "luxon";
+import { notFound } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
+import { canReview, getClinicPage } from "@/modules/clinic-page/public";
+import { getClientContext } from "@/modules/clients/context";
 import { getClientUser, requireClinic } from "@/modules/clients/session";
 
-import { SignOutButton } from "./sign-out-button";
-import { clinicName, PageTitle, Unavailable } from "./ui";
+import { Hero } from "./home/hero";
+import {
+  AboutTab,
+  Amenities,
+  Contacts,
+  Hours,
+  Location,
+  LoyaltyTab,
+  PaymentMethods,
+  PhotosTab,
+  ProductsTab,
+  Reviews,
+  ServicesTab,
+} from "./home/sections";
+import { Tabs, type TabItem } from "./home/tabs";
 
-// The clinic link's entry: book, sign in or create an account. With online
-// booking switched off, the clinic's contacts instead.
-export default async function ClinicEntryPage({
-  params,
-}: PageProps<"/[slug]">) {
-  const clinic = await requireClinic((await params).slug);
-  if (!clinic.onlineBookingEnabled) return <Unavailable clinic={clinic} />;
+// She can review once a completed appointment exists; only a signed-in client
+// with a record in this clinic can.
+async function clientCanReview(slug: string, clinicId: string) {
   const user = await getClientUser();
+  if (!user) return false;
+  const context = await getClientContext(slug, user.id);
+  if (!context?.patientId) return false;
+  return canReview({
+    clinicId,
+    patientId: context.patientId,
+    userId: user.id,
+    emailVerified: user.emailVerified,
+  });
+}
+
+// The clinic link's home: photos area and owner, tabs (services, photos,
+// loyalty, products, about) and the sections below them.
+export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
+  const { slug } = await params;
+  const clinic = await requireClinic(slug);
+  const page = await getClinicPage(slug);
+  if (!page) notFound();
+  const mayReview = await clientCanReview(slug, clinic.id);
+
+  const now = new Date();
+  const today = DateTime.fromJSDate(now, { zone: page.timezone }).weekday % 7;
+
+  const tabs: TabItem[] = [
+    { id: "servicos", label: "Serviços", content: <ServicesTab page={page} /> },
+    { id: "fotos", label: "Fotos", content: <PhotosTab /> },
+  ];
+  if (page.loyalty) {
+    tabs.push({
+      id: "fidelidade",
+      label: "Fidelidade",
+      content: <LoyaltyTab loyalty={page.loyalty} />,
+    });
+  }
+  if (page.products.length > 0) {
+    tabs.push({
+      id: "produtos",
+      label: "Produtos",
+      content: <ProductsTab products={page.products} />,
+    });
+  }
+  tabs.push({ id: "sobre", label: "Sobre", content: <AboutTab page={page} /> });
 
   return (
     <>
-      <PageTitle
-        description={
-          user
-            ? `Olá, ${user.name}.`
-            : `Marque seu horário com ${clinicName(clinic)} pela internet.`
-        }
-      >
-        Agende seu horário
-      </PageTitle>
-      <nav aria-label="Área da cliente" className="grid gap-3">
-        <Button asChild size="lg">
-          <Link href={`/${clinic.slug}/marcar`}>Marcar horário</Link>
-        </Button>
-        {user ? (
-          <>
-            <Button asChild size="lg" variant="outline">
-              <Link href={`/${clinic.slug}/meus-horarios`}>Meus horários</Link>
-            </Button>
-            <SignOutButton slug={clinic.slug} />
-          </>
-        ) : (
-          <>
-            <Button asChild size="lg" variant="outline">
-              <Link href={`/${clinic.slug}/entrar`}>Entrar</Link>
-            </Button>
-            <Button asChild size="lg" variant="outline">
-              <Link href={`/${clinic.slug}/cadastro`}>Criar conta</Link>
-            </Button>
-          </>
-        )}
-      </nav>
+      <Hero page={page} now={now} />
+      <Tabs tabs={tabs} />
+      <Amenities amenities={page.amenities} />
+      <Reviews page={page} canReview={mayReview} />
+      <Location page={page} />
+      <Hours page={page} today={today} />
+      <PaymentMethods methods={page.paymentMethods} />
+      <Contacts page={page} />
     </>
   );
 }

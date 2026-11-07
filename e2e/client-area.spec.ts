@@ -52,7 +52,7 @@ async function query<T extends object>(sql: string, params: unknown[] = []) {
 }
 
 async function signUp(page: Page, person: typeof CLIENT) {
-  await page.goto(`/${A.slug}`);
+  await page.goto(`/${A.slug}/entrar`);
   await page.getByRole("link", { name: "Criar conta" }).click();
   await expect(page).toHaveURL(new RegExp(`/${A.slug}/cadastro`));
   await page.getByLabel("Nome").fill(person.name);
@@ -290,9 +290,7 @@ test.describe("client area", () => {
   test("no sideways scroll at 360 px", async () => {
     await client.setViewportSize({ width: 360, height: 740 });
     await client.goto(`/${A.slug}`);
-    await expect(
-      client.getByRole("link", { name: "Marcar horário" }),
-    ).toBeVisible();
+    await expect(client.getByRole("tablist")).toBeVisible();
     expect(await noSidewaysScroll(client)).toBe(true);
 
     await client.goto(`/${A.slug}/marcar`);
@@ -404,14 +402,11 @@ test.describe("client area", () => {
   }) => {
     const off = CLIENT_AREA.off;
     await page.goto(`/${off.slug}`);
-    await expect(
-      page.getByText("Agendamento online indisponível"),
-    ).toBeVisible();
     await expect(page.getByRole("link", { name: /WhatsApp/ })).toHaveAttribute(
       "href",
       `https://wa.me/${off.whatsapp.slice(1)}`,
     );
-    await expect(page.getByRole("link", { name: off.email })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: "E-mail" })).toHaveAttribute(
       "href",
       `mailto:${off.email}`,
     );
