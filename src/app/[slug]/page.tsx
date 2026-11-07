@@ -14,6 +14,7 @@ import {
   AboutTab,
   Amenities,
   Contacts,
+  hasAbout,
   Hours,
   Location,
   LoyaltyTab,
@@ -32,11 +33,12 @@ async function clientExtras(
   clinicId: string,
   loyaltyVisits: number | null,
 ) {
-  const none = { mayReview: false, progress: null };
+  const none = { mayReview: false, progress: null, needsRecord: false };
   const user = await getClientUser();
   if (!user) return none;
   const context = await getClientContext(slug, user.id);
-  if (!context?.patientId) return none;
+  // Signed in without a record in this clinic: she completes the signup.
+  if (!context?.patientId) return { ...none, needsRecord: Boolean(context) };
   const ctx = {
     clinicId,
     patientId: context.patientId,
@@ -47,7 +49,7 @@ async function clientExtras(
     canReview(ctx),
     loyaltyVisits ? getLoyaltyProgress(ctx, loyaltyVisits) : null,
   ]);
-  return { mayReview, progress };
+  return { mayReview, progress, needsRecord: false };
 }
 
 // The clinic link's home: photos area and owner, tabs (services, photos,
@@ -57,7 +59,7 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
   const clinic = await requireClinic(slug);
   const page = await getClinicPage(slug);
   if (!page) notFound();
-  const { mayReview, progress } = await clientExtras(
+  const { mayReview, progress, needsRecord } = await clientExtras(
     slug,
     clinic.id,
     page.loyalty?.visits ?? null,
@@ -66,16 +68,27 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
   const now = new Date();
   const today = DateTime.fromJSDate(now, { zone: page.timezone }).weekday % 7;
 
-  const tabs: TabItem[] = [
-    { id: "servicos", label: "Serviços", content: <ServicesTab page={page} /> },
-    { id: "fotos", label: "Fotos", content: <PhotosTab /> },
-  ];
+  // Only the Fotos tab may be empty: the others appear when they have content.
+  const tabs: TabItem[] = [];
+  if (page.services.length > 0) {
+    tabs.push({
+      id: "servicos",
+      label: "Serviços",
+      content: <ServicesTab page={page} />,
+    });
+  }
+  tabs.push({ id: "fotos", label: "Fotos", content: <PhotosTab /> });
   if (page.loyalty) {
     tabs.push({
       id: "fidelidade",
       label: "Fidelidade",
       content: (
-        <LoyaltyTab slug={slug} loyalty={page.loyalty} progress={progress} />
+        <LoyaltyTab
+          slug={slug}
+          loyalty={page.loyalty}
+          progress={progress}
+          needsRecord={needsRecord}
+        />
       ),
     });
   }
@@ -86,7 +99,13 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
       content: <ProductsTab products={page.products} />,
     });
   }
-  tabs.push({ id: "sobre", label: "Sobre", content: <AboutTab page={page} /> });
+  if (hasAbout(page)) {
+    tabs.push({
+      id: "sobre",
+      label: "Sobre",
+      content: <AboutTab page={page} />,
+    });
+  }
 
   return (
     <>

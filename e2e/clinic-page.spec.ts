@@ -312,6 +312,10 @@ test.describe("página inicial da clínica", () => {
     const tabs = page.getByRole("tablist");
     await expect(tabs.getByRole("tab", { name: "Produtos" })).toHaveCount(0);
     await expect(tabs.getByRole("tab", { name: "Fidelidade" })).toHaveCount(0);
+    // Only Fotos may be empty: no services, no about text, no tab.
+    await expect(tabs.getByRole("tab", { name: "Serviços" })).toHaveCount(0);
+    await expect(tabs.getByRole("tab", { name: "Sobre" })).toHaveCount(0);
+    await expect(tabs.getByRole("tab")).toHaveCount(1);
     await tabs.getByRole("tab", { name: "Fotos" }).click();
     await expect(
       page.getByRole("tabpanel").getByText("Fotos em breve"),
@@ -335,6 +339,40 @@ test.describe("página inicial da clínica", () => {
       "https://wa.me/5511987650102",
     );
     await expect(contact).toHaveAttribute("target", "_blank");
+  });
+
+  test("booking page with online booking off shows the contact, signed out", async ({
+    page,
+  }) => {
+    await page.goto(`/${OFFLINE.slug}/marcar`);
+    await expect(page).toHaveURL(new RegExp(`/${OFFLINE.slug}/marcar$`));
+    await expect(
+      page.getByRole("heading", { name: "Agendamento online indisponível" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("main").getByRole("link", { name: /WhatsApp/ }),
+    ).toHaveAttribute("href", "https://wa.me/5511987650102");
+  });
+
+  test("a new client keeps the chosen service through the signup link", async ({
+    page,
+  }) => {
+    const next = `/${FULL.slug}/marcar?servico=${serviceId}`;
+    await page.goto(`/${FULL.slug}/entrar?next=${encodeURIComponent(next)}`);
+    await expect(
+      page.getByRole("link", { name: "Criar conta" }),
+    ).toHaveAttribute(
+      "href",
+      `/${FULL.slug}/cadastro?next=${encodeURIComponent(next)}`,
+    );
+    // A foreign next is dropped on the way.
+    await page.goto(
+      `/${FULL.slug}/cadastro?next=${encodeURIComponent("https://evil.test")}`,
+    );
+    await expect(page.getByRole("link", { name: "Entrar" })).toHaveAttribute(
+      "href",
+      `/${FULL.slug}/entrar?next=${encodeURIComponent(`/${FULL.slug}/marcar`)}`,
+    );
   });
 
   test("Agendar on a service carries it to the booking page", async ({

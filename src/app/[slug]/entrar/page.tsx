@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -37,7 +37,12 @@ export default async function ClientLoginPage({
         </Link>
         <p className="text-muted-foreground">
           Ainda não tem conta?{" "}
-          <Link href={`/${clinic.slug}/cadastro`} className={linkClass}>
+          <Link
+            href={
+              `/${clinic.slug}/cadastro?next=${encodeURIComponent(next)}` as Route
+            }
+            className={linkClass}
+          >
             Criar conta
           </Link>
         </p>

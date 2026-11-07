@@ -2,7 +2,7 @@ import { DateTime } from "luxon";
 import type { Metadata } from "next";
 
 import { listBookableServices } from "@/modules/booking/booking";
-import { requireClient } from "@/modules/clients/session";
+import { requireClient, requireClinic } from "@/modules/clients/session";
 
 import { ResendVerification } from "../resend-verification";
 import { ClinicContacts, PageTitle, priceLabel, Unavailable } from "../ui";
@@ -23,6 +23,12 @@ export default async function BookPage({
       ? servico
       : undefined;
   const back = wanted ? `/${slug}/marcar?servico=${wanted}` : `/${slug}/marcar`;
+  // Online booking off: the contact message, signed in or not (a visitor
+  // is not sent to sign in for a page she could not use).
+  const publicClinic = await requireClinic(slug);
+  if (!publicClinic.onlineBookingEnabled) {
+    return <Unavailable clinic={publicClinic} />;
+  }
   const { ctx, clinic, user } = await requireClient(slug, back);
   if (!clinic.onlineBookingEnabled) return <Unavailable clinic={clinic} />;
 

@@ -281,14 +281,8 @@ export function Contacts({ page }: { page: ClinicPage }) {
 
 // ---- Tab contents ----
 
+// Shown only when the clinic has services (the home page drops the tab).
 export function ServicesTab({ page }: { page: ClinicPage }) {
-  if (page.services.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Nenhum serviço disponível no momento.
-      </p>
-    );
-  }
   return (
     <div className="grid gap-3">
       {!page.onlineBookingEnabled && !page.whatsappPhone ? (
@@ -359,11 +353,15 @@ export function LoyaltyTab({
   slug,
   loyalty,
   progress,
+  needsRecord,
 }: {
   slug: string;
   loyalty: NonNullable<ClinicPage["loyalty"]>;
   progress: { stamps: number; prize: boolean } | null;
+  // Signed in, but without a record in this clinic yet.
+  needsRecord: boolean;
 }) {
+  const back = encodeURIComponent(`/${slug}`);
   return (
     <div className="grid gap-3 rounded-2xl bg-primary p-4 text-primary-foreground">
       <b className="flex items-center gap-2">
@@ -402,11 +400,16 @@ export function LoyaltyTab({
             </p>
           </div>
         )
+      ) : needsRecord ? (
+        <Link
+          href={`/${slug}/cadastro?completar=1&next=${back}` as Route}
+          className="text-sm font-semibold underline underline-offset-4"
+        >
+          Complete seu cadastro para ver o seu cartão
+        </Link>
       ) : (
         <Link
-          href={
-            `/${slug}/entrar?next=${encodeURIComponent(`/${slug}`)}` as Route
-          }
+          href={`/${slug}/entrar?next=${back}` as Route}
           className="text-sm font-semibold underline underline-offset-4"
         >
           Entrar para ver o seu cartão
@@ -457,16 +460,19 @@ export function ProductsTab({
   );
 }
 
+// Whether the Sobre tab has anything to show (otherwise the page drops it).
+export function hasAbout(page: ClinicPage): boolean {
+  return Boolean(
+    page.headline ||
+    page.about ||
+    page.professionalName ||
+    page.professionalRegistration,
+  );
+}
+
 export function AboutTab({ page }: { page: ClinicPage }) {
   const hasProfessional =
     page.professionalName || page.professionalRegistration;
-  if (!page.headline && !page.about && !hasProfessional) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        A clínica ainda não preencheu esta seção.
-      </p>
-    );
-  }
   return (
     <div className="grid gap-3">
       {page.headline ? (
