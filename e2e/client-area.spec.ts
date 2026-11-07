@@ -52,7 +52,7 @@ async function query<T extends object>(sql: string, params: unknown[] = []) {
 }
 
 async function signUp(page: Page, person: typeof CLIENT) {
-  await page.goto(`/${A.slug}`);
+  await page.goto(`/${A.slug}/entrar`);
   await page.getByRole("link", { name: "Criar conta" }).click();
   await expect(page).toHaveURL(new RegExp(`/${A.slug}/cadastro`));
   await page.getByLabel("Nome").fill(person.name);
@@ -123,10 +123,13 @@ test.describe("client area", () => {
       .first();
     const chosen = (await time.textContent())!.trim();
     await time.click();
-    await expect(
-      page.getByRole("heading", { name: "Confirme o horário" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Confirmar horário" }).click();
+    // The sheet summarises the booking before she confirms.
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByText(A.service)).toBeVisible();
+    await expect(sheet.getByText(`${chosen} – `)).toBeVisible();
+    await expect(sheet.getByText(/R\$\s*150,00/)).toBeVisible();
+    await expect(sheet.getByLabel(/observa/i)).toHaveCount(0);
+    await sheet.getByRole("button", { name: "Confirmar agendamento" }).click();
 
     await expect(
       page.getByRole("heading", { name: "Horário marcado" }),
@@ -213,6 +216,134 @@ test.describe("client area", () => {
     await expect(client.getByRole("button", { name: A.service })).toBeVisible();
   });
 
+  test("a preselected service opens straight on the days", async () => {
+    const [service] = await query<{ id: string }>(
+      `SELECT s.id FROM services s JOIN clinics c ON c.id = s.clinic_id
+       WHERE c.slug = $1`,
+      [A.slug],
+    );
+    await client.goto(`/${A.slug}/marcar?servico=${service!.id}`);
+    await expect(client.getByRole("group", { name: "Dias" })).toBeVisible();
+    await expect(client.getByText(A.service)).toBeVisible();
+    await expect(client.getByRole("button", { name: A.service })).toHaveCount(
+      0,
+    );
+  });
+
+  test("a signed-out visitor keeps the chosen service through sign-in", async ({
+    browser,
+  }) => {
+    const [service] = await query<{ id: string }>(
+      `SELECT s.id FROM services s JOIN clinics c ON c.id = s.clinic_id
+       WHERE c.slug = $1`,
+      [A.slug],
+    );
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    // The link the Agendar button of a service points to.
+    await page.goto(`/${A.slug}/marcar?servico=${service!.id}`);
+    await expect(page).toHaveURL(/\/entrar\?next=/);
+    await page.getByLabel("E-mail").fill(CLIENT.email);
+    await page.getByLabel("Senha").fill(NEW_PASSWORD);
+    await page.getByRole("button", { name: "Entrar" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/${A.slug}/marcar\\?servico=${service!.id}$`),
+    );
+    await expect(page.getByRole("group", { name: "Dias" })).toBeVisible();
+    await expect(page.getByRole("button", { name: A.service })).toHaveCount(0);
+    await context.close();
+  });
+
+  test("a failed load of the days shows an error on the day step", async () => {
+    await client.goto(`/${A.slug}/marcar`);
+    // Fail the Server Action calls (POSTs carrying the next-action header).
+    await client.route(`**/${A.slug}/marcar`, (route) =>
+      route.request().method() === "POST" &&
+      route.request().headers()["next-action"]
+        ? route.fulfill({ status: 500, body: "boom" })
+        : route.continue(),
+    );
+    await client.getByRole("button", { name: A.service }).click();
+    await expect(
+      client.getByText("Não foi possível carregar. Tente novamente."),
+    ).toBeVisible();
+    await client.unroute(`**/${A.slug}/marcar`);
+  });
+
+  test("an unknown service in the link shows the service list", async () => {
+    await client.goto(
+      `/${A.slug}/marcar?servico=00000000-0000-4000-8000-000000000000`,
+    );
+    await expect(client.getByRole("button", { name: A.service })).toBeVisible();
+    await expect(client.getByRole("group", { name: "Dias" })).toHaveCount(0);
+  });
+
+  test("day strip dims days past the limit and the arrows cross a month", async () => {
+    await client.goto(`/${A.slug}/marcar`);
+    await client.getByRole("button", { name: A.service }).click();
+    const days = client.getByRole("group", { name: "Dias" });
+    await expect(days).toBeVisible();
+    const month = client.getByTestId("strip-month");
+    const previous = client.getByRole("button", { name: "Dias anteriores" });
+    const next = client.getByRole("button", { name: "Próximos dias" });
+    await expect(previous).toBeDisabled();
+
+    // The clinic books 30 days ahead: paging to the end reaches dimmed days
+    // and, unless today is the 1st, a different month.
+    const months = new Set([(await month.textContent())!]);
+    while (await next.isEnabled()) {
+      await next.click();
+      await expect(days).toHaveAttribute("aria-busy", "false");
+      months.add((await month.textContent())!);
+    }
+    await expect(days.getByRole("button", { disabled: true })).not.toHaveCount(
+      0,
+    );
+    if (new Date().getDate() !== 1) expect(months.size).toBeGreaterThan(1);
+    await expect(previous).toBeEnabled();
+  });
+
+  test("period chips jump to their group of times", async () => {
+    await client.goto(`/${A.slug}/marcar`);
+    await client.getByRole("button", { name: A.service }).click();
+    await client
+      .getByRole("group", { name: "Dias" })
+      .getByRole("button", { disabled: false })
+      .last()
+      .click();
+    // A later day (today may be past its morning): 06:00-22:00 fills all three.
+    for (const label of ["Manhã", "Tarde", "Noite"]) {
+      await expect(
+        client.getByRole("group", { name: new RegExp(`^${label}`) }),
+      ).toBeVisible();
+    }
+    await client.getByRole("button", { name: "Noite", exact: true }).click();
+    await expect(
+      client.getByRole("group", { name: /^Noite/ }),
+    ).toBeInViewport();
+  });
+
+  test("the sheet closes on Escape and on the close button", async () => {
+    await client.goto(`/${A.slug}/marcar`);
+    await client.getByRole("button", { name: A.service }).click();
+    await client
+      .getByRole("group", { name: "Dias" })
+      .getByRole("button", { disabled: false })
+      .first()
+      .click();
+    const slots = client.getByRole("group", { name: "Horários livres" });
+    await slots.getByRole("button").first().click();
+    const sheet = client.getByRole("dialog");
+    await expect(sheet).toBeVisible();
+    await client.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+
+    await slots.getByRole("button").first().click();
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole("button", { name: "Fechar" }).click();
+    await expect(sheet).toHaveCount(0);
+  });
+
   test("client of clinic A opening clinic B's link sees none of A's appointments", async () => {
     await client.goto(`/${B.slug}/meus-horarios`);
     await expect(client).toHaveURL(
@@ -290,9 +421,7 @@ test.describe("client area", () => {
   test("no sideways scroll at 360 px", async () => {
     await client.setViewportSize({ width: 360, height: 740 });
     await client.goto(`/${A.slug}`);
-    await expect(
-      client.getByRole("link", { name: "Marcar horário" }),
-    ).toBeVisible();
+    await expect(client.getByRole("tablist")).toBeVisible();
     expect(await noSidewaysScroll(client)).toBe(true);
 
     await client.goto(`/${A.slug}/marcar`);
@@ -324,19 +453,91 @@ test.describe("client area", () => {
     expect(await logo().getAttribute("src")).toContain("fundo-escuro");
   });
 
+  test("clinic link shows the bottom navigation", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(`/${A.slug}`);
+    const nav = page.getByRole("navigation", { name: "Navegação" });
+    const links = [
+      { name: "Início", href: `/${A.slug}` },
+      { name: "Agendar", href: `/${A.slug}/marcar` },
+      { name: "Meus horários", href: `/${A.slug}/meus-horarios` },
+      { name: "Perfil", href: `/${A.slug}/entrar` },
+    ];
+    for (const { name, href } of links) {
+      const link = nav.getByRole("link", { name });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute("href", href);
+      // An icon, never an emoji.
+      await expect(link.locator("svg")).toHaveCount(1);
+    }
+    expect(await noSidewaysScroll(page)).toBe(true);
+  });
+
+  test("profile shows her name and e-mail and the nav points to it", async () => {
+    await client.goto(`/${A.slug}/perfil`);
+    await expect(client.getByRole("heading", { name: "Perfil" })).toBeVisible();
+    await expect(client.getByText(CLIENT.name)).toBeVisible();
+    await expect(client.getByText(CLIENT.email)).toBeVisible();
+    await expect(client.getByRole("button", { name: "Sair" })).toBeVisible();
+    await expect(
+      client
+        .getByRole("navigation", { name: "Navegação" })
+        .getByRole("link", { name: "Perfil" }),
+    ).toHaveAttribute("href", `/${A.slug}/perfil`);
+  });
+
+  test("owner photo route serves only an active clinic's photo", async ({
+    request,
+  }) => {
+    const [media] = await query<{ id: string }>(
+      `INSERT INTO media (clinic_id, kind, mime_type, data, byte_size, width, height)
+       SELECT id, 'photo', 'image/png', '\\x89504e47'::bytea, 4, 1, 1
+       FROM clinics WHERE slug = $1 RETURNING id`,
+      [A.slug],
+    );
+    try {
+      await query(
+        "UPDATE clinics SET owner_photo_media_id = $1 WHERE slug = $2",
+        [media!.id, A.slug],
+      );
+      const withPhoto = await request.get(`/${A.slug}/foto`);
+      expect(withPhoto.status()).toBe(200);
+      expect(withPhoto.headers()["content-type"]).toContain("image/");
+      expect(withPhoto.headers()["cache-control"]).toBe("public, max-age=300");
+
+      // Deactivated clinic: not served.
+      await query("UPDATE clinics SET is_active = false WHERE slug = $1", [
+        A.slug,
+      ]);
+      expect((await request.get(`/${A.slug}/foto`)).status()).toBe(404);
+      await query("UPDATE clinics SET is_active = true WHERE slug = $1", [
+        A.slug,
+      ]);
+
+      // A clinic without a photo.
+      expect((await request.get(`/${B.slug}/foto`)).status()).toBe(404);
+    } finally {
+      await query("UPDATE clinics SET is_active = true WHERE slug = $1", [
+        A.slug,
+      ]);
+      await query(
+        "UPDATE clinics SET owner_photo_media_id = NULL WHERE slug = $1",
+        [A.slug],
+      );
+      await query("DELETE FROM media WHERE id = $1", [media!.id]);
+    }
+  });
+
   test("a clinic without online booking shows its contacts; unknown and reserved links are not found", async ({
     page,
   }) => {
     const off = CLIENT_AREA.off;
     await page.goto(`/${off.slug}`);
-    await expect(
-      page.getByText("Agendamento online indisponível"),
-    ).toBeVisible();
     await expect(page.getByRole("link", { name: /WhatsApp/ })).toHaveAttribute(
       "href",
       `https://wa.me/${off.whatsapp.slice(1)}`,
     );
-    await expect(page.getByRole("link", { name: off.email })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: "E-mail" })).toHaveAttribute(
       "href",
       `mailto:${off.email}`,
     );

@@ -4,7 +4,15 @@ import { aliasedTable, and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 
 import { inClinic, type Tx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { appointments, auditLogs, patients, quotes, sales } from "@/db/schema";
+import {
+  appointments,
+  auditLogs,
+  loyaltyRedemptions,
+  patients,
+  quotes,
+  reviews,
+  sales,
+} from "@/db/schema";
 
 // The owner's answer to a provisional record: a client who signed up online
 // with the phone of a patient the clinic already had (register_client_patient,
@@ -115,8 +123,8 @@ async function lockPair(tx: Tx, clinicId: string, provisionalId: string) {
 }
 
 // "É a mesma": in one transaction, the provisional record's appointments,
-// quotes, sales and history move to the existing record, which takes the
-// client's account; the provisional record is deleted. Refused when the
+// quotes, sales, reviews, loyalty rewards and history move to the existing
+// record, which takes the client's account; the provisional record is deleted. Refused when the
 // existing record already has an account. An anonymized existing record has
 // no personal data left to match, so it counts as not found.
 export async function confirmLink(
@@ -162,6 +170,27 @@ export async function confirmLink(
       .set({ patientId: existingId })
       .where(
         and(eq(sales.clinicId, clinicId), eq(sales.patientId, provisionalId)),
+      );
+    // Her reviews and the rewards she received follow her: both reference
+    // the patient ON DELETE restrict, and the panel may change only their
+    // patient_id (migration 0018).
+    await tx
+      .update(reviews)
+      .set({ patientId: existingId })
+      .where(
+        and(
+          eq(reviews.clinicId, clinicId),
+          eq(reviews.patientId, provisionalId),
+        ),
+      );
+    await tx
+      .update(loyaltyRedemptions)
+      .set({ patientId: existingId })
+      .where(
+        and(
+          eq(loyaltyRedemptions.clinicId, clinicId),
+          eq(loyaltyRedemptions.patientId, provisionalId),
+        ),
       );
     // Its history (owner edits) now belongs to the existing record. The panel
     // may change only entity_id of audit_logs (migration 0015).

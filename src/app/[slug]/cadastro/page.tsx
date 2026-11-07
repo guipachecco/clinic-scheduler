@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -44,11 +44,13 @@ export default async function SignupPage({
       <PageTitle description="Você usa o e-mail e a senha para entrar e marcar seus horários.">
         Criar conta
       </PageTitle>
-      <SignupForm slug={clinic.slug} />
+      <SignupForm slug={clinic.slug} next={next} />
       <p className="text-center text-sm text-muted-foreground">
         Já tem conta?{" "}
         <Link
-          href={`/${clinic.slug}/entrar`}
+          href={
+            `/${clinic.slug}/entrar?next=${encodeURIComponent(next)}` as Route
+          }
           className="font-semibold text-primary underline underline-offset-4"
         >
           Entrar

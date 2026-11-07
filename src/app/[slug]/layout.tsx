@@ -4,8 +4,13 @@ import Link from "next/link";
 import { BrandImage } from "@/components/brand-image";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getTheme } from "@/lib/theme-server";
-import { findClinic, requireClinic } from "@/modules/clients/session";
+import {
+  findClinic,
+  getClientUser,
+  requireClinic,
+} from "@/modules/clients/session";
 
+import { BottomNav } from "./bottom-nav";
 import { clinicName } from "./ui";
 
 export async function generateMetadata({
@@ -24,22 +29,27 @@ export async function generateMetadata({
     : {};
 }
 
-// The clinic link (/<slug>) that the owner shares: the Zemana brand with the
-// clinic's name, one column made for a 360 px phone. Unknown, deactivated
-// and reserved names are not found (src/modules/clients/session.ts).
+// The clinic link (/<slug>) that the owner shares: a compact header with the
+// Zemana mark and the clinic's name, one column made for a 360 px phone and a
+// bottom navigation. Unknown, deactivated and reserved names are not found
+// (src/modules/clients/session.ts).
 export default async function ClientLayout({
   children,
   params,
 }: LayoutProps<"/[slug]">) {
   const clinic = await requireClinic((await params).slug);
   const theme = await getTheme();
+  const user = await getClientUser();
 
   return (
     <div className="flex flex-1 flex-col bg-background">
       <header className="border-b bg-card">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-4">
-          <Link href={`/${clinic.slug}`} className="grid min-w-0 gap-1.5">
-            <BrandImage kind="horizontal" size={128} />
+        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-3">
+          <Link
+            href={`/${clinic.slug}`}
+            className="flex min-w-0 items-center gap-2.5"
+          >
+            <BrandImage kind="symbol" size={28} className="shrink-0" />
             <span className="truncate font-heading text-lg font-semibold">
               {clinicName(clinic)}
             </span>
@@ -50,9 +60,11 @@ export default async function ClientLayout({
           />
         </div>
       </header>
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 py-6">
+      {/* Bottom padding keeps the content clear of the fixed navigation. */}
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pt-6 pb-28">
         {children}
       </main>
+      <BottomNav slug={clinic.slug} signedIn={user !== null} />
     </div>
   );
 }

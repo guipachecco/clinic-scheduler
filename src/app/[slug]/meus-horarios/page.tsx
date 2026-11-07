@@ -1,5 +1,5 @@
 import { DateTime } from "luxon";
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
 } from "@/modules/booking/booking";
 import { requireClient } from "@/modules/clients/session";
 
+import { Icon } from "../icons";
 import { clinicName, PageTitle, whatsappUrl } from "../ui";
 
 export const metadata: Metadata = { title: "Meus horários" };
@@ -43,7 +44,11 @@ export default async function MyAppointmentsPage({
         {upcoming.length === 0 ? (
           <p className="text-muted-foreground">Nenhum horário marcado.</p>
         ) : (
-          <AppointmentList items={upcoming} timezone={clinic.timezone} />
+          <AppointmentList
+            items={upcoming}
+            timezone={clinic.timezone}
+            slug={clinic.slug}
+          />
         )}
         <Button asChild size="lg" variant="outline">
           <Link href={`/${clinic.slug}/marcar`}>Marcar outro horário</Link>
@@ -69,7 +74,11 @@ export default async function MyAppointmentsPage({
           <h2 id="anteriores" className="font-heading text-lg font-semibold">
             Horários anteriores
           </h2>
-          <AppointmentList items={past} timezone={clinic.timezone} />
+          <AppointmentList
+            items={past}
+            timezone={clinic.timezone}
+            slug={clinic.slug}
+          />
         </section>
       ) : null}
     </>
@@ -79,9 +88,11 @@ export default async function MyAppointmentsPage({
 function AppointmentList({
   items,
   timezone,
+  slug,
 }: {
   items: MyAppointment[];
   timezone: string;
+  slug: string;
 }) {
   return (
     <ul className="grid gap-2">
@@ -92,9 +103,10 @@ function AppointmentList({
         return (
           <li
             key={item.id}
-            className="grid gap-0.5 rounded-2xl border bg-card px-4 py-3"
+            className="grid gap-1 rounded-2xl border bg-card px-4 py-3 shadow-sm"
           >
-            <span className="font-semibold break-words">
+            <span className="flex items-center gap-2 font-semibold break-words">
+              <Icon name="calendar" className="size-4 shrink-0 text-primary" />
               {item.serviceName}
             </span>
             <span className="text-sm">
@@ -110,6 +122,19 @@ function AppointmentList({
             >
               {STATUS_TEXT[item.status]}
             </span>
+            {item.status === "completed" ? (
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="mt-1 w-fit"
+              >
+                <Link href={`/${slug}/avaliar` as Route}>
+                  <Icon name="star" />
+                  Avaliar
+                </Link>
+              </Button>
+            ) : null}
           </li>
         );
       })}

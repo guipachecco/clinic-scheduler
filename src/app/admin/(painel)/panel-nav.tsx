@@ -6,7 +6,14 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-type NavIcon = "home" | "calendar" | "person" | "services" | "clock" | "money";
+type NavIcon =
+  | "home"
+  | "calendar"
+  | "person"
+  | "services"
+  | "clock"
+  | "money"
+  | "page";
 
 type NavItem = {
   href: Route;
@@ -51,6 +58,12 @@ const ICON_PATHS: Record<NavIcon, React.ReactNode> = {
       <rect x="3" y="6" width="18" height="12" rx="2" />
       <circle cx="12" cy="12" r="2.5" />
       <path d="M6.5 9.5v5M17.5 9.5v5" />
+    </>
+  ),
+  page: (
+    <>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M8.5 8h7M8.5 12h7M8.5 16h4" />
     </>
   ),
 };

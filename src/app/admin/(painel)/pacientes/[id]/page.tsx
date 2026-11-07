@@ -22,6 +22,7 @@ import { PendingLinkNotice } from "../pending-link-notice";
 import { AnonymizeForm } from "./anonymize-form";
 import { AppointmentHistory } from "./appointment-history";
 import { PatientFinance } from "./patient-finance";
+import { PatientLoyalty } from "./patient-loyalty";
 
 // No patient data in the title: it would reach the browser history.
 export const metadata: Metadata = { title: "Paciente" };
@@ -131,6 +132,7 @@ export default async function PatientPage({
 
       <AppointmentHistory patientId={patient.id} canSchedule />
       <PatientFinance patientId={patient.id} canQuote />
+      <PatientLoyalty patientId={patient.id} />
 
       <details className="rounded-2xl border p-4 md:p-6">
         <summary className="flex h-11 cursor-pointer items-center rounded-md text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">

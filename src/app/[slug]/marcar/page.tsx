@@ -2,7 +2,7 @@ import { DateTime } from "luxon";
 import type { Metadata } from "next";
 
 import { listBookableServices } from "@/modules/booking/booking";
-import { requireClient } from "@/modules/clients/session";
+import { requireClient, requireClinic } from "@/modules/clients/session";
 
 import { ResendVerification } from "../resend-verification";
 import { ClinicContacts, PageTitle, priceLabel, Unavailable } from "../ui";
@@ -13,9 +13,23 @@ export const metadata: Metadata = { title: "Marcar horário" };
 
 export default async function BookPage({
   params,
+  searchParams,
 }: PageProps<"/[slug]/marcar">) {
   const { slug } = await params;
-  const { ctx, clinic, user } = await requireClient(slug, `/${slug}/marcar`);
+  const { servico } = await searchParams;
+  // Keep a chosen service through sign-in (safeNext only accepts a uuid).
+  const wanted =
+    typeof servico === "string" && /^[0-9a-f-]{36}$/i.test(servico)
+      ? servico
+      : undefined;
+  const back = wanted ? `/${slug}/marcar?servico=${wanted}` : `/${slug}/marcar`;
+  // Online booking off: the contact message, signed in or not (a visitor
+  // is not sent to sign in for a page she could not use).
+  const publicClinic = await requireClinic(slug);
+  if (!publicClinic.onlineBookingEnabled) {
+    return <Unavailable clinic={publicClinic} />;
+  }
+  const { ctx, clinic, user } = await requireClient(slug, back);
   if (!clinic.onlineBookingEnabled) return <Unavailable clinic={clinic} />;
 
   // She may sign in before confirming; booking waits for the confirmation.
@@ -59,6 +73,7 @@ export default async function BookPage({
       <BookingFlow
         slug={clinic.slug}
         services={services}
+        initialServiceId={wanted}
         today={today.toFormat("yyyy-MM-dd")}
         lastDay={today
           .plus({ days: clinic.maxAdvanceDays })

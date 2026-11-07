@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -19,6 +20,7 @@ import {
   type CompleteValues,
   type SignupValues,
 } from "@/modules/clients/forms";
+import { safeNext } from "@/modules/clients/safe-next";
 
 import { TextField } from "../text-field";
 
@@ -40,8 +42,11 @@ function applyFieldErrors<T extends FieldValues>(
   return formError;
 }
 
-export function SignupForm({ slug }: { slug: string }) {
+// `next` is where she goes once the account exists (validated again here:
+// only a path of this clinic, else the booking page).
+export function SignupForm({ slug, next }: { slug: string; next: string }) {
   const router = useRouter();
+  const destination = safeNext(slug, next) ?? `/${slug}/marcar`;
   const [formError, setFormError] = useState<string | null>(null);
   const {
     register,
@@ -71,10 +76,12 @@ export function SignupForm({ slug }: { slug: string }) {
     });
     if (error) {
       // The account exists: she can sign in on the next page.
-      router.push(`/${slug}/entrar`);
+      router.push(
+        `/${slug}/entrar?next=${encodeURIComponent(destination)}` as Route,
+      );
       return;
     }
-    router.replace(`/${slug}/marcar`);
+    router.replace(destination as Route);
     router.refresh();
   }
 

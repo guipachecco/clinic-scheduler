@@ -88,3 +88,12 @@ export const TEST_ADMIN_PATIENT_LINKS = {
   name: "Dona das Fichas Online",
   password: "senha-de-teste-fichas-online-bem-longa",
 };
+
+// Owner used by the clinic page suite ("Minha página").
+export const TEST_ADMIN_CLINIC_PAGE = {
+  role: "admin" as const,
+  clinicSlug: "grais",
+  email: "pagina@example.test",
+  name: "Administradora da Página",
+  password: "senha-de-teste-pagina-bem-longa",
+};
