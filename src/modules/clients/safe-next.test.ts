@@ -35,7 +35,7 @@ describe("safeNext", () => {
       "/clinica//evil.test",
       "/outra/marcar",
       "/clinicax",
-      "/clinica\evil",
+      "/clinica\\evil",
       "/clinica/%2e%2e/x",
       `//clinica/marcar?servico=${ID}`,
       undefined,

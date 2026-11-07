@@ -53,7 +53,8 @@ export type ClinicPage = PublicClinic & {
   reviewSummary: { average: number | null; total: number };
 };
 
-const REVIEWS_SHOWN = 50;
+// The page shows the 10 newest; the summary counts them all.
+const REVIEWS_SHOWN = 10;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Stands for "nobody" in client_context (see clients/context.ts).

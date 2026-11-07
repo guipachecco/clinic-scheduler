@@ -252,6 +252,17 @@ export async function listReviews(clinicId: string): Promise<PanelReview[]> {
   });
 }
 
+// The clinic's time zone, to show the review dates on its own calendar.
+export async function getClinicTimezone(clinicId: string): Promise<string> {
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ timezone: clinics.timezone })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId)),
+  );
+  return row?.timezone ?? "America/Sao_Paulo";
+}
+
 // Hides or shows a review; false when it is not in this clinic. actorUserId
 // is the signed-in owner's id from the session.
 export async function setReviewHidden(

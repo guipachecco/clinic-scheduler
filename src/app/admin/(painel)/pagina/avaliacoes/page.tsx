@@ -3,22 +3,25 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/modules/auth/session";
-import { listReviews } from "@/modules/clinic-page/panel";
+import { getClinicTimezone, listReviews } from "@/modules/clinic-page/panel";
 
 import { ReviewVisibilityButton } from "./review-actions";
 
 export const metadata: Metadata = { title: "Avaliações" };
 
-const dateFormat = new Intl.DateTimeFormat("pt-BR", {
-  timeZone: "America/Sao_Paulo",
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
 export default async function ReviewsPage() {
   const { clinicId } = await requireAdmin();
-  const reviews = await listReviews(clinicId);
+  const [reviews, timeZone] = await Promise.all([
+    listReviews(clinicId),
+    getClinicTimezone(clinicId),
+  ]);
+  // Dates on the clinic's own calendar.
+  const dateFormat = new Intl.DateTimeFormat("pt-BR", {
+    timeZone,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 
   return (
     <div className="grid max-w-3xl gap-6">
