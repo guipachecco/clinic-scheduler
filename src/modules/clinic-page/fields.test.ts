@@ -38,6 +38,20 @@ describe("parseInstagram", () => {
   it("refuses other hosts, spaces and empty input", () => {
     expect(parseInstagram("https://evil.com/x")).toBeNull();
     expect(parseInstagram("a b")).toBeNull();
+    for (const input of [
+      "https://www.instagram.com/p/Cabc123/",
+      "https://instagram.com/reel/xyz",
+      "instagram.com/reels/xyz",
+      "https://instagram.com/explore/tags/x",
+      "https://instagram.com/stories/user/1",
+      "https://instagram.com/accounts/login",
+      "https://instagram.com/tv/abc",
+      "https://instagram.com",
+      "https://www.instagram.com/",
+      "instagram.com",
+    ]) {
+      expect(parseInstagram(input), input).toBeNull();
+    }
     expect(parseInstagram("")).toBeNull();
   });
 });

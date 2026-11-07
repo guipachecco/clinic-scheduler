@@ -34,12 +34,28 @@ const HANDLE = /^[A-Za-z0-9._]{1,30}$/;
 const INSTAGRAM_URL =
   /^(?:https?:\/\/)?(?:www\.|m\.)?instagram\.com\/([^/?#\s]+)\/?(?:[?#].*)?$/i;
 
+const NOT_PROFILES = new Set([
+  "p",
+  "reel",
+  "reels",
+  "explore",
+  "stories",
+  "accounts",
+  "tv",
+]);
+
 // Turns "@handle", "handle" or an instagram.com link into the bare handle.
 // Null for anything else (other hosts, spaces, empty).
 export function parseInstagram(input: string): string | null {
   let value = input.trim();
   const link = INSTAGRAM_URL.exec(value);
-  if (link) value = link[1]!;
+  if (link) {
+    // Links to posts, reels, etc. are not profiles.
+    if (NOT_PROFILES.has(link[1]!.toLowerCase())) return null;
+    value = link[1]!;
+  } else if (/^(?:https?:\/\/)?(?:www\.|m\.)?instagram\.com\/?$/i.test(value)) {
+    return null;
+  }
   value = value.replace(/^@/, "");
   return HANDLE.test(value) ? value : null;
 }

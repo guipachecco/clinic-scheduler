@@ -24,7 +24,7 @@ import {
   getOwnerPhoto,
 } from "@/modules/clinic-page/public";
 
-import { CLINIC } from "../helpers/clinic";
+import { CLINIC, otherClinic } from "../helpers/clinic";
 
 // The clinic page module (public reads, client writes, owner panel). Every
 // record is fictitious; e-mails end in @modulo-pagina.example.test and the
@@ -33,6 +33,7 @@ import { CLINIC } from "../helpers/clinic";
 const DOMAIN = "@modulo-pagina.example.test";
 const TAG = "Modulo Pagina";
 const MINUTE = 60_000;
+const SPARE_SLUG = "clinica-modulo-pagina";
 
 let slug: string;
 let original: typeof clinics.$inferSelect;
@@ -92,7 +93,12 @@ async function cleanup() {
     }
     await db.delete(users).where(inArray(users.id, userIds));
   }
-  await db.delete(products).where(eq(products.clinicId, CLINIC));
+  await db.delete(products).where(like(products.name, `%${TAG}%`));
+  const [spare] = await db
+    .select({ id: clinics.id })
+    .from(clinics)
+    .where(eq(clinics.slug, SPARE_SLUG));
+  if (spare) await db.delete(products).where(eq(products.clinicId, spare.id));
   await db.delete(paymentMethods).where(like(paymentMethods.name, `%${TAG}%`));
   await db.delete(services).where(eq(services.slug, "servico-modulo-pagina"));
   await db
@@ -192,6 +198,13 @@ afterAll(async () => {
       loyaltyEnabled: original.loyaltyEnabled,
       loyaltyVisits: original.loyaltyVisits,
       loyaltyReward: original.loyaltyReward,
+      headline: original.headline,
+      about: original.about,
+      whatsappPhone: original.whatsappPhone,
+      contactEmail: original.contactEmail,
+      address: original.address,
+      mapsUrl: original.mapsUrl,
+      onlineBookingEnabled: original.onlineBookingEnabled,
     })
     .where(eq(clinics.id, CLINIC));
   await cleanup();
@@ -246,10 +259,10 @@ describe("clinic page module", () => {
   });
 
   it("adds the example products once", async () => {
-    await db.delete(products).where(eq(products.clinicId, CLINIC));
-    expect(await panel.addExampleProducts(CLINIC)).toBe(3);
-    expect(await panel.addExampleProducts(CLINIC)).toBe(0);
-    const list = await panel.listProducts(CLINIC);
+    const throwaway = await otherClinic(SPARE_SLUG);
+    expect(await panel.addExampleProducts(throwaway)).toBe(3);
+    expect(await panel.addExampleProducts(throwaway)).toBe(0);
+    const list = await panel.listProducts(throwaway);
     expect(list.map((p) => p.priceCents).sort()).toEqual([6990, 7990, 9500]);
   });
 
@@ -323,17 +336,5 @@ describe("clinic page module", () => {
       loyaltyVisits: 5,
       loyaltyReward: "Outro brinde",
     });
-    await db
-      .update(clinics)
-      .set({
-        headline: original.headline,
-        about: original.about,
-        whatsappPhone: original.whatsappPhone,
-        contactEmail: original.contactEmail,
-        address: original.address,
-        mapsUrl: original.mapsUrl,
-        onlineBookingEnabled: original.onlineBookingEnabled,
-      })
-      .where(eq(clinics.id, CLINIC));
   });
 });
