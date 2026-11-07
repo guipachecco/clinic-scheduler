@@ -2,17 +2,20 @@
 
 import { DateTime } from "luxon";
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { FormError } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 import { book, type Confirmation, loadDays, loadSlots } from "./actions";
+import { ConfirmSheet } from "./confirm-sheet";
+import { DayStrip, dayLabel, STRIP_SPAN, stripDays } from "./day-strip";
+import { SlotGroups } from "./slot-groups";
 
-// Service → day → time → confirm, then the confirmation. Dates are local to
-// the clinic (yyyy-mm-dd); slots are ISO strings carrying the clinic's
-// offset, so their HH:mm is already the clinic's time.
+// Service → day strip → times by period → confirm sheet, then the
+// confirmation. Dates are local to the clinic (yyyy-mm-dd); slots are ISO
+// strings carrying the clinic's offset, so their HH:mm is already the
+// clinic's time.
 
 export type ServiceOption = {
   id: string;
@@ -22,7 +25,7 @@ export type ServiceOption = {
   price: string | null;
 };
 
-type Step = "service" | "day" | "time" | "confirm" | "done";
+type Step = "service" | "day" | "done";
 
 const TAKEN = "Esse horário acabou de ser preenchido";
 const FAILURES = {
@@ -34,34 +37,32 @@ const FAILURES = {
   unverified: "Confirme seu e-mail para marcar horários.",
 } as const;
 const GENERIC_ERROR = "Não foi possível carregar. Tente novamente.";
-const WEEKDAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
-const timeOf = (slot: string) => slot.slice(11, 16);
 const monthOf = (date: string) => date.slice(0, 7);
-const local = (date: string) => DateTime.fromISO(date).setLocale("pt-BR");
-
-function dayLabel(date: string) {
-  return local(date).toFormat("cccc, d 'de' LLLL");
-}
 
 export function BookingFlow({
   slug,
   services,
   today,
   lastDay,
+  initialServiceId,
 }: {
   slug: string;
   services: ServiceOption[];
   today: string;
   lastDay: string;
+  initialServiceId?: string;
 }) {
-  const [step, setStep] = useState<Step>("service");
-  const [service, setService] = useState<ServiceOption | null>(null);
-  const [month, setMonth] = useState(monthOf(today));
-  const [days, setDays] = useState<string[]>([]);
+  const initial = services.find((item) => item.id === initialServiceId) ?? null;
+  const [step, setStep] = useState<Step>(initial ? "day" : "service");
+  const [service, setService] = useState<ServiceOption | null>(initial);
+  const [start, setStart] = useState(today);
+  // Days with free times, by month (yyyy-mm) already fetched.
+  const [available, setAvailable] = useState<Record<string, string[]>>({});
   const [day, setDay] = useState<string | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
   const [slot, setSlot] = useState<string | null>(null);
+  const [trigger, setTrigger] = useState<HTMLElement | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -77,23 +78,24 @@ export function BookingFlow({
     });
   }
 
-  async function showMonth(target: ServiceOption, value: string) {
-    let list = await loadDays(slug, target.id, value);
-    // Nothing left this month: open the next one, when it is still bookable.
-    const next = local(`${value}-01`).plus({ months: 1 }).toFormat("yyyy-MM");
-    if (
-      list.length === 0 &&
-      value === monthOf(today) &&
-      next <= monthOf(lastDay)
-    ) {
-      const later = await loadDays(slug, target.id, next);
-      if (later.length > 0) {
-        value = next;
-        list = later;
-      }
-    }
-    setMonth(value);
-    setDays(list);
+  // Fetches the months a week of the strip touches that are not loaded yet.
+  async function loadWeek(
+    target: ServiceOption,
+    from: string,
+    known: Record<string, string[]>,
+  ) {
+    const days = stripDays(from);
+    const months = [monthOf(days[0]!), monthOf(days[STRIP_SPAN - 1]!)].filter(
+      (value, index, all) => all.indexOf(value) === index && !(value in known),
+    );
+    const fetched = await Promise.all(
+      months.map(
+        async (value) =>
+          [value, await loadDays(slug, target.id, value)] as const,
+      ),
+    );
+    setAvailable({ ...known, ...Object.fromEntries(fetched) });
+    setStart(from);
   }
 
   function chooseService(target: ServiceOption) {
@@ -101,20 +103,27 @@ export function BookingFlow({
       setService(target);
       setDay(null);
       setSlot(null);
-      await showMonth(target, monthOf(today));
+      setSlots([]);
+      await loadWeek(target, today, {});
       setStep("day");
     });
   }
 
-  function changeMonth(delta: number) {
+  // A service preselected by the link: load its first week once.
+  useEffect(() => {
+    // Fetch-on-mount: the state is set after the request, not in the effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (initial) run(() => loadWeek(initial, today, {}));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function shift(delta: number) {
     if (!service) return;
-    const value = local(`${month}-01`)
-      .plus({ months: delta })
-      .toFormat("yyyy-MM");
-    run(async () => {
-      setDays(await loadDays(slug, service.id, value));
-      setMonth(value);
-    });
+    const target = DateTime.fromISO(start)
+      .plus({ days: delta })
+      .toFormat("yyyy-MM-dd");
+    // Never before today; the strip may end past the last day (dimmed).
+    run(() => loadWeek(service, target < today ? today : target, available));
   }
 
   function chooseDay(value: string) {
@@ -123,14 +132,18 @@ export function BookingFlow({
       setDay(value);
       setSlot(null);
       setSlots(await loadSlots(slug, service.id, value));
-      setStep("time");
     });
   }
 
-  function chooseSlot(value: string) {
+  function chooseSlot(value: string, from: HTMLElement) {
     setError(null);
+    setTrigger(from);
     setSlot(value);
-    setStep("confirm");
+  }
+
+  function closeSheet() {
+    setSlot(null);
+    setError(null);
   }
 
   function confirm() {
@@ -148,15 +161,16 @@ export function BookingFlow({
       if (result.reason === "taken") {
         // Back to the refreshed list of that day.
         setSlots(await loadSlots(slug, service.id, day));
-        setDays(await loadDays(slug, service.id, monthOf(day)));
+        const month = monthOf(day);
+        const fresh = await loadDays(slug, service.id, month);
+        setAvailable((known) => ({ ...known, [month]: fresh }));
         setSlot(null);
-        setStep("time");
       }
       setError(FAILURES[result.reason]);
     });
   }
 
-  if (step === "done" && confirmation && service && slot) {
+  if (step === "done" && confirmation && service) {
     return (
       <Done
         slug={slug}
@@ -166,13 +180,15 @@ export function BookingFlow({
     );
   }
 
+  const open = new Set(Object.values(available).flat());
+
   return (
     <div className="grid gap-6" aria-busy={pending}>
-      {step === "service" ? (
+      {step === "service" || !service ? (
         <section aria-labelledby="passo-servico" className="grid gap-3">
-          <StepTitle id="passo-servico" number={1}>
+          <h2 id="passo-servico" className="font-heading text-lg font-semibold">
             Escolha o serviço
-          </StepTitle>
+          </h2>
           <ul className="grid gap-3">
             {services.map((item) => (
               <li key={item.id}>
@@ -194,128 +210,73 @@ export function BookingFlow({
               </li>
             ))}
           </ul>
+          <FormError message={error} />
         </section>
       ) : (
-        <Summary label="Serviço" onChange={() => setStep("service")}>
-          {service?.name}
-        </Summary>
-      )}
-
-      {step === "day" && service ? (
-        <section aria-labelledby="passo-dia" className="grid gap-3">
-          <StepTitle id="passo-dia" number={2}>
-            Escolha o dia
-          </StepTitle>
-          <Calendar
-            month={month}
-            days={days}
-            canGoBack={month > monthOf(today)}
-            canGoForward={month < monthOf(lastDay)}
-            disabled={pending}
-            onMonth={changeMonth}
-            onDay={chooseDay}
-          />
-        </section>
-      ) : null}
-
-      {(step === "time" || step === "confirm") && day ? (
-        <Summary label="Dia" onChange={() => setStep("day")}>
-          {dayLabel(day)}
-        </Summary>
-      ) : null}
-
-      {step === "time" && day ? (
-        <section aria-labelledby="passo-horario" className="grid gap-3">
-          <StepTitle id="passo-horario" number={3}>
-            Escolha o horário
-          </StepTitle>
-          <FormError message={error} />
-          {slots.length === 0 ? (
-            <p className="text-muted-foreground">
-              Nenhum horário livre neste dia. Escolha outro dia.
-            </p>
-          ) : (
-            <div
-              role="group"
-              aria-label="Horários livres"
-              className="grid grid-cols-3 gap-2"
-            >
-              {slots.map((value) => (
-                <Button
-                  key={value}
-                  type="button"
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() => chooseSlot(value)}
-                >
-                  {timeOf(value)}
-                </Button>
-              ))}
-            </div>
-          )}
-        </section>
-      ) : null}
-
-      {step === "confirm" && service && day && slot ? (
-        <section
-          aria-labelledby="passo-confirmar"
-          className="grid gap-4 rounded-2xl border bg-card p-4"
-        >
-          <StepTitle id="passo-confirmar" number={4}>
-            Confirme o horário
-          </StepTitle>
-          <dl className="grid gap-1">
-            <dt className="text-sm text-muted-foreground">Serviço</dt>
-            <dd className="font-semibold">{service.name}</dd>
-            <dt className="text-sm text-muted-foreground">Quando</dt>
-            <dd className="font-semibold">
-              {dayLabel(day)}, às {timeOf(slot)}
-            </dd>
-            <dt className="text-sm text-muted-foreground">Duração</dt>
-            <dd>{service.durationMinutes} min</dd>
-            {service.price ? (
-              <>
-                <dt className="text-sm text-muted-foreground">Valor</dt>
-                <dd>{service.price}</dd>
-              </>
+        <>
+          <Summary label="Serviço" onChange={() => setStep("service")}>
+            {service.name}
+          </Summary>
+          <section aria-labelledby="passo-dia" className="grid gap-3">
+            <h2 id="passo-dia" className="font-heading text-lg font-semibold">
+              Escolha o dia
+            </h2>
+            <DayStrip
+              start={start}
+              today={today}
+              lastDay={lastDay}
+              open={open}
+              selected={day}
+              disabled={pending}
+              onShift={shift}
+              onDay={chooseDay}
+            />
+            {Object.keys(available).length > 0 &&
+            !stripDays(start).some((date) => open.has(date)) ? (
+              <p className="text-sm text-muted-foreground">
+                Nenhum dia livre nesta semana. Veja os próximos dias.
+              </p>
             ) : null}
-          </dl>
-          <FormError message={error} />
-          <Button type="button" size="lg" disabled={pending} onClick={confirm}>
-            {pending ? "Marcando..." : "Confirmar horário"}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => setStep("time")}
-          >
-            Escolher outro horário
-          </Button>
-        </section>
-      ) : null}
-
-      {step === "day" || step === "service" ? (
-        <FormError message={error} />
-      ) : null}
+          </section>
+          {day ? (
+            <section aria-labelledby="passo-horario" className="grid gap-3">
+              <h2
+                id="passo-horario"
+                className="font-heading text-lg font-semibold"
+              >
+                Escolha o horário
+              </h2>
+              {slot ? null : <FormError message={error} />}
+              {slots.length === 0 ? (
+                <p className="text-muted-foreground">
+                  Nenhum horário livre neste dia. Escolha outro dia.
+                </p>
+              ) : (
+                <SlotGroups
+                  slots={slots}
+                  disabled={pending}
+                  onSlot={chooseSlot}
+                />
+              )}
+            </section>
+          ) : null}
+          {slot && day ? (
+            <ConfirmSheet
+              serviceName={service.name}
+              dayText={dayLabel(day)}
+              slot={slot}
+              minutes={service.durationMinutes}
+              price={service.price}
+              error={error}
+              pending={pending}
+              onConfirm={confirm}
+              onClose={closeSheet}
+              returnFocus={trigger}
+            />
+          ) : null}
+        </>
+      )}
     </div>
-  );
-}
-
-function StepTitle({
-  id,
-  number,
-  children,
-}: {
-  id: string;
-  number: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <h2 id={id} className="font-heading text-lg font-semibold">
-      <span className="text-muted-foreground">{number}. </span>
-      {children}
-    </h2>
   );
 }
 
@@ -337,101 +298,6 @@ function Summary({
       <Button type="button" variant="link" size="sm" onClick={onChange}>
         Trocar
       </Button>
-    </div>
-  );
-}
-
-function Calendar({
-  month,
-  days,
-  canGoBack,
-  canGoForward,
-  disabled,
-  onMonth,
-  onDay,
-}: {
-  month: string;
-  days: string[];
-  canGoBack: boolean;
-  canGoForward: boolean;
-  disabled: boolean;
-  onMonth: (delta: number) => void;
-  onDay: (date: string) => void;
-}) {
-  const first = local(`${month}-01`);
-  const open = new Set(days);
-  // Sunday first, as on Brazilian calendars (Luxon: Monday 1 ... Sunday 7).
-  const blanks = first.weekday % 7;
-  const cells: (string | null)[] = [
-    ...Array.from({ length: blanks }, () => null),
-    ...Array.from({ length: first.daysInMonth ?? 30 }, (_, index) =>
-      first.plus({ days: index }).toFormat("yyyy-MM-dd"),
-    ),
-  ];
-
-  return (
-    <div className="grid gap-3 rounded-2xl border bg-card p-3">
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={!canGoBack || disabled}
-          onClick={() => onMonth(-1)}
-          aria-label="Mês anterior"
-        >
-          ‹
-        </Button>
-        <p className="font-semibold capitalize" aria-live="polite">
-          {first.toFormat("LLLL 'de' yyyy")}
-        </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={!canGoForward || disabled}
-          onClick={() => onMonth(1)}
-          aria-label="Próximo mês"
-        >
-          ›
-        </Button>
-      </div>
-      <div
-        aria-hidden="true"
-        className="grid grid-cols-7 text-center text-xs text-muted-foreground"
-      >
-        {WEEKDAYS.map((name, index) => (
-          <span key={index}>{name}</span>
-        ))}
-      </div>
-      <div role="group" aria-label="Dias" className="grid grid-cols-7 gap-1">
-        {cells.map((date, index) =>
-          date ? (
-            <button
-              key={date}
-              type="button"
-              disabled={!open.has(date) || disabled}
-              onClick={() => onDay(date)}
-              aria-label={dayLabel(date)}
-              className={cn(
-                "flex aspect-square min-h-10 items-center justify-center rounded-lg text-sm font-semibold outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                open.has(date)
-                  ? "bg-primary/10 text-foreground hover:bg-primary hover:text-primary-foreground"
-                  : "text-muted-foreground/50",
-              )}
-            >
-              {Number(date.slice(8))}
-            </button>
-          ) : (
-            <span key={`blank-${index}`} />
-          ),
-        )}
-      </div>
-      {days.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          Nenhum dia livre neste mês.
-        </p>
-      ) : null}
     </div>
   );
 }

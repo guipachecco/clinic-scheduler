@@ -13,8 +13,10 @@ export const metadata: Metadata = { title: "Marcar horário" };
 
 export default async function BookPage({
   params,
+  searchParams,
 }: PageProps<"/[slug]/marcar">) {
   const { slug } = await params;
+  const { servico } = await searchParams;
   const { ctx, clinic, user } = await requireClient(slug, `/${slug}/marcar`);
   if (!clinic.onlineBookingEnabled) return <Unavailable clinic={clinic} />;
 
@@ -59,6 +61,7 @@ export default async function BookPage({
       <BookingFlow
         slug={clinic.slug}
         services={services}
+        initialServiceId={typeof servico === "string" ? servico : undefined}
         today={today.toFormat("yyyy-MM-dd")}
         lastDay={today
           .plus({ days: clinic.maxAdvanceDays })

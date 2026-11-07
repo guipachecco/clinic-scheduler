@@ -123,10 +123,13 @@ test.describe("client area", () => {
       .first();
     const chosen = (await time.textContent())!.trim();
     await time.click();
-    await expect(
-      page.getByRole("heading", { name: "Confirme o horário" }),
-    ).toBeVisible();
-    await page.getByRole("button", { name: "Confirmar horário" }).click();
+    // The sheet summarises the booking before she confirms.
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByText(A.service)).toBeVisible();
+    await expect(sheet.getByText(`${chosen} – `)).toBeVisible();
+    await expect(sheet.getByText(/R\$\s*150,00/)).toBeVisible();
+    await expect(sheet.getByLabel(/observa/i)).toHaveCount(0);
+    await sheet.getByRole("button", { name: "Confirmar agendamento" }).click();
 
     await expect(
       page.getByRole("heading", { name: "Horário marcado" }),
@@ -211,6 +214,94 @@ test.describe("client area", () => {
     await signIn(client, A.slug, NEW_PASSWORD);
     await expect(client).toHaveURL(new RegExp(`/${A.slug}/marcar$`));
     await expect(client.getByRole("button", { name: A.service })).toBeVisible();
+  });
+
+  test("a preselected service opens straight on the days", async () => {
+    const [service] = await query<{ id: string }>(
+      `SELECT s.id FROM services s JOIN clinics c ON c.id = s.clinic_id
+       WHERE c.slug = $1`,
+      [A.slug],
+    );
+    await client.goto(`/${A.slug}/marcar?servico=${service!.id}`);
+    await expect(client.getByRole("group", { name: "Dias" })).toBeVisible();
+    await expect(client.getByText(A.service)).toBeVisible();
+    await expect(client.getByRole("button", { name: A.service })).toHaveCount(
+      0,
+    );
+  });
+
+  test("an unknown service in the link shows the service list", async () => {
+    await client.goto(
+      `/${A.slug}/marcar?servico=00000000-0000-4000-8000-000000000000`,
+    );
+    await expect(client.getByRole("button", { name: A.service })).toBeVisible();
+    await expect(client.getByRole("group", { name: "Dias" })).toHaveCount(0);
+  });
+
+  test("day strip dims days past the limit and the arrows cross a month", async () => {
+    await client.goto(`/${A.slug}/marcar`);
+    await client.getByRole("button", { name: A.service }).click();
+    const days = client.getByRole("group", { name: "Dias" });
+    await expect(days).toBeVisible();
+    const month = client.getByTestId("strip-month");
+    const previous = client.getByRole("button", { name: "Dias anteriores" });
+    const next = client.getByRole("button", { name: "Próximos dias" });
+    await expect(previous).toBeDisabled();
+
+    // The clinic books 30 days ahead: paging to the end reaches dimmed days
+    // and, unless today is the 1st, a different month.
+    const months = new Set([(await month.textContent())!]);
+    while (await next.isEnabled()) {
+      await next.click();
+      await expect(days).toHaveAttribute("aria-busy", "false");
+      months.add((await month.textContent())!);
+    }
+    await expect(days.getByRole("button", { disabled: true })).not.toHaveCount(
+      0,
+    );
+    if (new Date().getDate() !== 1) expect(months.size).toBeGreaterThan(1);
+    await expect(previous).toBeEnabled();
+  });
+
+  test("period chips jump to their group of times", async () => {
+    await client.goto(`/${A.slug}/marcar`);
+    await client.getByRole("button", { name: A.service }).click();
+    await client
+      .getByRole("group", { name: "Dias" })
+      .getByRole("button", { disabled: false })
+      .last()
+      .click();
+    // A later day (today may be past its morning): 06:00-22:00 fills all three.
+    for (const label of ["Manhã", "Tarde", "Noite"]) {
+      await expect(
+        client.getByRole("group", { name: new RegExp(`^${label}`) }),
+      ).toBeVisible();
+    }
+    await client.getByRole("button", { name: "Noite", exact: true }).click();
+    await expect(
+      client.getByRole("group", { name: /^Noite/ }),
+    ).toBeInViewport();
+  });
+
+  test("the sheet closes on Escape and on the close button", async () => {
+    await client.goto(`/${A.slug}/marcar`);
+    await client.getByRole("button", { name: A.service }).click();
+    await client
+      .getByRole("group", { name: "Dias" })
+      .getByRole("button", { disabled: false })
+      .first()
+      .click();
+    const slots = client.getByRole("group", { name: "Horários livres" });
+    await slots.getByRole("button").first().click();
+    const sheet = client.getByRole("dialog");
+    await expect(sheet).toBeVisible();
+    await client.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+
+    await slots.getByRole("button").first().click();
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole("button", { name: "Fechar" }).click();
+    await expect(sheet).toHaveCount(0);
   });
 
   test("client of clinic A opening clinic B's link sees none of A's appointments", async () => {
