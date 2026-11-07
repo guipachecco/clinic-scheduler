@@ -66,8 +66,10 @@ export function ConfirmSheet({
 }) {
   const sheet = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
+  const busy = useRef(pending);
   useEffect(() => {
     close.current = onClose;
+    busy.current = pending;
   });
 
   useEffect(() => {
@@ -76,7 +78,7 @@ export function ConfirmSheet({
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        close.current();
+        if (!busy.current) close.current();
         return;
       }
       if (event.key !== "Tab" || !node) return;
@@ -108,7 +110,9 @@ export function ConfirmSheet({
       <div
         aria-hidden="true"
         className="absolute inset-0 bg-black/50"
-        onClick={onClose}
+        onClick={() => {
+          if (!pending) onClose();
+        }}
       />
       <div
         ref={sheet}
@@ -124,6 +128,7 @@ export function ConfirmSheet({
           <button
             type="button"
             aria-label="Fechar"
+            disabled={pending}
             onClick={onClose}
             className="flex size-10 items-center justify-center rounded-full outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >

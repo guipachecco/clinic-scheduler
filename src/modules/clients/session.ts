@@ -2,7 +2,6 @@ import "server-only";
 
 import { isIP } from "node:net";
 
-import type { Route } from "next";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
@@ -17,6 +16,7 @@ import {
   getPublicClinic,
   type PublicClinic,
 } from "./context";
+import { safeNext } from "./safe-next";
 
 // The client side of a clinic link (/<slug>/...). Every read goes through the
 // client modules (app_client, definer functions); the user id always comes
@@ -61,15 +61,7 @@ export async function getClientUser(): Promise<ClientUser | null> {
   return { id, name, email, emailVerified };
 }
 
-// A path on this clinic's pages, safe to send her back to after signing in.
-export function safeNext(slug: string, next: unknown): Route | null {
-  if (typeof next !== "string") return null;
-  const base = `/${slug}`;
-  if (next !== base && !next.startsWith(`${base}/`)) return null;
-  // Only plain path characters: no "//", backslashes or schemes.
-  if (!/^\/[a-z0-9\-/]*$/.test(next) || next.includes("//")) return null;
-  return next as Route;
-}
+export { safeNext };
 
 // Call at the top of every client page and Server Action that reads or
 // writes her data. `next` is the page to come back to after signing in.

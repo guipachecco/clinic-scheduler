@@ -230,6 +230,46 @@ test.describe("client area", () => {
     );
   });
 
+  test("a signed-out visitor keeps the chosen service through sign-in", async ({
+    browser,
+  }) => {
+    const [service] = await query<{ id: string }>(
+      `SELECT s.id FROM services s JOIN clinics c ON c.id = s.clinic_id
+       WHERE c.slug = $1`,
+      [A.slug],
+    );
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    // The link the Agendar button of a service points to.
+    await page.goto(`/${A.slug}/marcar?servico=${service!.id}`);
+    await expect(page).toHaveURL(/\/entrar\?next=/);
+    await page.getByLabel("E-mail").fill(CLIENT.email);
+    await page.getByLabel("Senha").fill(NEW_PASSWORD);
+    await page.getByRole("button", { name: "Entrar" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/${A.slug}/marcar\\?servico=${service!.id}$`),
+    );
+    await expect(page.getByRole("group", { name: "Dias" })).toBeVisible();
+    await expect(page.getByRole("button", { name: A.service })).toHaveCount(0);
+    await context.close();
+  });
+
+  test("a failed load of the days shows an error on the day step", async () => {
+    await client.goto(`/${A.slug}/marcar`);
+    // Fail the Server Action calls (POSTs carrying the next-action header).
+    await client.route(`**/${A.slug}/marcar`, (route) =>
+      route.request().method() === "POST" &&
+      route.request().headers()["next-action"]
+        ? route.fulfill({ status: 500, body: "boom" })
+        : route.continue(),
+    );
+    await client.getByRole("button", { name: A.service }).click();
+    await expect(
+      client.getByText("Não foi possível carregar. Tente novamente."),
+    ).toBeVisible();
+    await client.unroute(`**/${A.slug}/marcar`);
+  });
+
   test("an unknown service in the link shows the service list", async () => {
     await client.goto(
       `/${A.slug}/marcar?servico=00000000-0000-4000-8000-000000000000`,

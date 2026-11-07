@@ -17,7 +17,13 @@ export default async function BookPage({
 }: PageProps<"/[slug]/marcar">) {
   const { slug } = await params;
   const { servico } = await searchParams;
-  const { ctx, clinic, user } = await requireClient(slug, `/${slug}/marcar`);
+  // Keep a chosen service through sign-in (safeNext only accepts a uuid).
+  const wanted =
+    typeof servico === "string" && /^[0-9a-f-]{36}$/i.test(servico)
+      ? servico
+      : undefined;
+  const back = wanted ? `/${slug}/marcar?servico=${wanted}` : `/${slug}/marcar`;
+  const { ctx, clinic, user } = await requireClient(slug, back);
   if (!clinic.onlineBookingEnabled) return <Unavailable clinic={clinic} />;
 
   // She may sign in before confirming; booking waits for the confirmation.
@@ -61,7 +67,7 @@ export default async function BookPage({
       <BookingFlow
         slug={clinic.slug}
         services={services}
-        initialServiceId={typeof servico === "string" ? servico : undefined}
+        initialServiceId={wanted}
         today={today.toFormat("yyyy-MM-dd")}
         lastDay={today
           .plus({ days: clinic.maxAdvanceDays })

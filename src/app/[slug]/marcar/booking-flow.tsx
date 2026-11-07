@@ -142,6 +142,7 @@ export function BookingFlow({
   }
 
   function closeSheet() {
+    if (pending) return;
     setSlot(null);
     setError(null);
   }
@@ -231,6 +232,7 @@ export function BookingFlow({
               onShift={shift}
               onDay={chooseDay}
             />
+            {day || slot ? null : <FormError message={error} />}
             {Object.keys(available).length > 0 &&
             !stripDays(start).some((date) => open.has(date)) ? (
               <p className="text-sm text-muted-foreground">
