@@ -13,7 +13,7 @@ test("home page loads in Portuguese with the security headers", async ({
   const response = await page.goto("/");
   expect(response?.status()).toBe(200);
   await expect(
-    page.getByRole("heading", { name: "Site em construção" }),
+    page.getByRole("heading", { level: 1, name: /sem bagunça/i }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "pt-BR");
 

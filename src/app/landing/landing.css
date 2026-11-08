@@ -1,0 +1,23 @@
+/* Landing page only (imported by src/app/page.tsx). */
+
+/* The ticker band scrolls sideways; the list is doubled so the loop is seamless. */
+@keyframes landing-ticker {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-ticker {
+    animation: landing-ticker 32s linear infinite;
+  }
+}
+
+/* With reduced motion every animated element shows its final, still state,
+   whatever inline style the animation library wrote. */
+@media (prefers-reduced-motion: reduce) {
+  [data-motion] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
