@@ -11,12 +11,14 @@ import {
   paymentSchema,
   quoteFormSchema,
   reasonSchema,
+  receiptSchema,
   reviseSchema,
   scheduleSessionsSchema,
   type ApproveInput,
   type ExpenseInput,
   type PaymentInput,
   type QuoteFormInput,
+  type ReceiptInput,
   type ReviseInput,
   type ScheduleSessionsInput,
 } from "@/modules/finance/fields";
@@ -27,6 +29,7 @@ import {
   setQuoteStatus,
   updateQuote,
 } from "@/modules/finance/quotes";
+import { createReceipt, reverseReceipt } from "@/modules/finance/receipts";
 import {
   cancelSale,
   receivePayment,
@@ -152,6 +155,30 @@ export async function reversePaymentAction(
     return { ok: false, formError: GENERIC_ERROR };
   }
   return run(() => reversePayment(clinicId, paymentId, parsed.data, user.id));
+}
+
+// --------------------------------------------------------------- receipts
+
+export async function createReceiptAction(
+  input: ReceiptInput,
+): Promise<ActionResult> {
+  const { clinicId, user } = await requireAdmin();
+  const parsed = receiptSchema.safeParse(input);
+  if (!parsed.success) return invalid(parsed.error);
+  return run(() => createReceipt(clinicId, parsed.data, user.id));
+}
+
+export async function reverseReceiptAction(
+  receiptId: string,
+  reason: string,
+): Promise<ActionResult> {
+  const { clinicId, user } = await requireAdmin();
+  const parsed = reasonSchema.safeParse(reason);
+  if (!parsed.success) return invalid(parsed.error);
+  if (!idSchema.safeParse(receiptId).success) {
+    return { ok: false, formError: GENERIC_ERROR };
+  }
+  return run(() => reverseReceipt(clinicId, receiptId, parsed.data, user.id));
 }
 
 export async function cancelSaleAction(

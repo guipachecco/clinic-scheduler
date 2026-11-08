@@ -13,8 +13,15 @@ import { installmentState } from "./money";
 // reversal (or an expense cancellation) counts on the day it was made.
 
 export type CashEntry = {
-  // payment, reversal, expense, expense_cancellation
-  kind: "payment" | "reversal" | "expense" | "expense_cancellation";
+  // Money in: payment (an installment), receipt (outside a sale) and their
+  // reversals; money out: expense and its cancellation.
+  kind:
+    | "payment"
+    | "reversal"
+    | "receipt"
+    | "receipt_reversal"
+    | "expense"
+    | "expense_cancellation";
   id: string;
   date: string;
   // Positive for money in, negative for money out.
@@ -24,6 +31,8 @@ export type CashEntry = {
   saleId: string | null;
   // Registered on a later day than `date` (a back-dated entry).
   backdated: boolean;
+  // A receipt not reversed yet: the cash book offers "Estornar".
+  canReverse: boolean;
 };
 
 export type Receivable = {
@@ -54,12 +63,14 @@ export async function listCash(
       label: string;
       sale_id: string | null;
       backdated: boolean;
+      can_reverse: boolean;
     }>(sql`
     select * from (
       select 'payment' as kind, p.id, p.paid_on::text as date,
         p.amount_cents, m.name as method_name,
         'Parcela ' || i.number || ' · orçamento ' || q.number as label,
-        i.sale_id, (p.created_at at time zone ${tz})::date > p.paid_on as backdated
+        i.sale_id, (p.created_at at time zone ${tz})::date > p.paid_on as backdated,
+        false as can_reverse
       from payments p
       join installments i on i.id = p.installment_id
       join sales s on s.id = i.sale_id
@@ -71,7 +82,7 @@ export async function listCash(
       select 'reversal', p.id, (p.reversed_at at time zone ${tz})::date::text,
         -p.amount_cents, m.name,
         'Estorno da parcela ' || i.number || ' · orçamento ' || q.number,
-        i.sale_id, false
+        i.sale_id, false, false
       from payments p
       join installments i on i.id = p.installment_id
       join sales s on s.id = i.sale_id
@@ -81,9 +92,29 @@ export async function listCash(
         and (p.reversed_at at time zone ${tz})::date >= ${range.from}::date
         and (p.reversed_at at time zone ${tz})::date < ${range.to}::date
       union all
+      select 'receipt', r.id, r.received_on::text, r.amount_cents, m.name,
+        r.description || coalesce(' · ' || case when pt.anonymized_at is null
+          then pt.name else ${ANONYMIZED_NAME} end, ''),
+        null, (r.created_at at time zone ${tz})::date > r.received_on,
+        r.reversed_at is null
+      from receipts r
+      join payment_methods m on m.id = r.payment_method_id
+      left join patients pt on pt.id = r.patient_id
+      where r.clinic_id = ${clinicId}
+        and r.received_on >= ${range.from}::date and r.received_on < ${range.to}::date
+      union all
+      select 'receipt_reversal', r.id, (r.reversed_at at time zone ${tz})::date::text,
+        -r.amount_cents, m.name, 'Estorno · ' || r.description, null, false,
+        false
+      from receipts r
+      join payment_methods m on m.id = r.payment_method_id
+      where r.clinic_id = ${clinicId} and r.reversed_at is not null
+        and (r.reversed_at at time zone ${tz})::date >= ${range.from}::date
+        and (r.reversed_at at time zone ${tz})::date < ${range.to}::date
+      union all
       select 'expense', e.id, e.spent_on::text, -e.amount_cents, m.name,
         c.name || coalesce(' · ' || e.description, ''), e.sale_id,
-        (e.created_at at time zone ${tz})::date > e.spent_on
+        (e.created_at at time zone ${tz})::date > e.spent_on, false
       from expenses e
       join expense_categories c on c.id = e.category_id
       join payment_methods m on m.id = e.payment_method_id
@@ -92,7 +123,7 @@ export async function listCash(
       union all
       select 'expense_cancellation', e.id,
         (e.cancelled_at at time zone ${tz})::date::text, e.amount_cents, m.name,
-        'Despesa cancelada · ' || c.name, e.sale_id, false
+        'Despesa cancelada · ' || c.name, e.sale_id, false, false
       from expenses e
       join expense_categories c on c.id = e.category_id
       join payment_methods m on m.id = e.payment_method_id
@@ -112,6 +143,7 @@ export async function listCash(
     label: row.label,
     saleId: row.sale_id,
     backdated: row.backdated,
+    canReverse: row.can_reverse,
   }));
 }
 
@@ -188,7 +220,11 @@ export async function financeSummary(
     listReceivables(clinicId, input.today),
   ]);
   const incoming = cash.filter(
-    (entry) => entry.kind === "payment" || entry.kind === "reversal",
+    (entry) =>
+      entry.kind === "payment" ||
+      entry.kind === "reversal" ||
+      entry.kind === "receipt" ||
+      entry.kind === "receipt_reversal",
   );
   const byMethod = new Map<string, number>();
   for (const entry of incoming) {

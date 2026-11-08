@@ -357,6 +357,68 @@ export const payments = pgTable(
   ],
 );
 
+// Money received outside a sale: a single appointment paid on the spot
+// ("Receber" on the appointment) or anything else ("Nova entrada"), such as a
+// product. Reversed receipts stay, struck through, and stop counting; an
+// appointment has at most one receipt that counts.
+export const receipts = pgTable(
+  "receipts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: clinicId(),
+    appointmentId: uuid("appointment_id"),
+    patientId: uuid("patient_id"),
+    // What was paid for, as shown in the cash book (the service's name when
+    // it comes from an appointment).
+    description: text("description").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    paymentMethodId: uuid("payment_method_id").notNull(),
+    // The day the money came in, as the owner says (may be in the past).
+    receivedOn: date("received_on", { mode: "string" }).notNull(),
+    notes: text("notes"),
+    createdByUserId: actor("created_by_user_id"),
+    createdAt: createdAt(),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    reversedByUserId: actor("reversed_by_user_id"),
+    reversalReason: text("reversal_reason"),
+  },
+  (t) => [
+    foreignKey({
+      name: "receipts_appointment_fk",
+      columns: [t.clinicId, t.appointmentId],
+      foreignColumns: [appointments.clinicId, appointments.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "receipts_patient_fk",
+      columns: [t.clinicId, t.patientId],
+      foreignColumns: [patients.clinicId, patients.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "receipts_method_fk",
+      columns: [t.clinicId, t.paymentMethodId],
+      foreignColumns: [paymentMethods.clinicId, paymentMethods.id],
+    }).onDelete("restrict"),
+    // One receipt that counts per appointment; a reversal frees it.
+    uniqueIndex("receipts_appointment_active_idx")
+      .on(t.appointmentId)
+      .where(sql`${t.appointmentId} is not null and ${t.reversedAt} is null`),
+    index("receipts_received_on_idx").on(t.clinicId, t.receivedOn),
+    check("receipts_amount_check", sql`${t.amountCents} > 0`),
+    check(
+      "receipts_description_check",
+      sql`char_length(${t.description}) between 1 and 80`,
+    ),
+    check(
+      "receipts_notes_check",
+      sql`${t.notes} is null or char_length(${t.notes}) <= 200`,
+    ),
+    check(
+      "receipts_reversal_check",
+      sql`(${t.reversedAt} is null) = (${t.reversalReason} is null)`,
+    ),
+  ],
+);
+
 export const expenses = pgTable(
   "expenses",
   {
