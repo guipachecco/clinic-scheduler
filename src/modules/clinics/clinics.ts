@@ -72,6 +72,16 @@ export async function getClinicBySlug(
   return row ?? null;
 }
 
+// The addresses of the clinics whose page is public, for the sitemap.
+export async function listActiveClinicSlugs(): Promise<string[]> {
+  const rows = await platformDb
+    .select({ slug: clinics.slug })
+    .from(clinics)
+    .where(eq(clinics.isActive, true))
+    .orderBy(asc(clinics.slug));
+  return rows.map((row) => row.slug);
+}
+
 export async function listClinics(): Promise<ClinicSummary[]> {
   return platformDb
     .select(summaryColumns)

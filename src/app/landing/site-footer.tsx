@@ -26,6 +26,20 @@ export function SiteFooter() {
           <Link href="/admin/entrar" className={linkClass}>
             É profissional? Entre no painel
           </Link>
+          <span className="flex gap-4 text-sm">
+            <Link
+              href="/privacidade"
+              className="inline-flex min-h-11 items-center text-muted-foreground underline underline-offset-4"
+            >
+              Privacidade
+            </Link>
+            <Link
+              href="/termos"
+              className="inline-flex min-h-11 items-center text-muted-foreground underline underline-offset-4"
+            >
+              Termos de uso
+            </Link>
+          </span>
         </nav>
       </div>
     </footer>

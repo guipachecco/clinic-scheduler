@@ -1,10 +1,15 @@
 import { DateTime } from "luxon";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 
+import { JsonLd } from "@/app/json-ld";
+import { SITE_URL } from "@/app/site-url";
 import {
   canReview,
   getClinicPage,
   getLoyaltyProgress,
+  type ClinicPage,
 } from "@/modules/clinic-page/public";
 import { getClientContext } from "@/modules/clients/context";
 import { getClientUser, requireClinic } from "@/modules/clients/session";
@@ -25,6 +30,64 @@ import {
   ServicesTab,
 } from "./home/sections";
 import { Tabs, type TabItem } from "./home/tabs";
+import { clinicName, instagramUrl } from "./ui";
+
+// The metadata and the page read the same clinic once per request.
+const loadPage = cache(getClinicPage);
+
+// What a search result and a shared link show: the owner's headline, else the
+// start of her "about" text, else a sentence built from the clinic's name.
+function describe(page: ClinicPage): string {
+  const name = clinicName(page);
+  const text = page.headline?.trim() || page.about?.trim();
+  if (!text) {
+    const area = page.areaLabel ? ` (${page.areaLabel})` : "";
+    return `Veja os serviços, horários e avaliações de ${name}${area} e agende online.`;
+  }
+  const flat = text.replace(/\s+/g, " ");
+  return flat.length > 160 ? `${flat.slice(0, 157).trimEnd()}...` : flat;
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps<"/[slug]">): Promise<Metadata> {
+  const { slug } = await params;
+  const page = await loadPage(slug);
+  if (!page) return {};
+  const description = describe(page);
+  return {
+    description,
+    alternates: { canonical: `/${page.slug}` },
+    openGraph: {
+      type: "website",
+      locale: "pt_BR",
+      siteName: "Zemana",
+      title: clinicName(page),
+      description,
+    },
+  };
+}
+
+// Structured data for search engines: the clinic as a local business.
+// Ratings are left out on purpose: Google does not show self-published review
+// stars for a business on its own page.
+function clinicJsonLd(page: ClinicPage) {
+  const url = `${SITE_URL}/${page.slug}`;
+  return {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "@id": `${url}#business`,
+    name: clinicName(page),
+    url,
+    description: describe(page),
+    ...(page.address ? { address: page.address } : {}),
+    ...(page.whatsappPhone ? { telephone: page.whatsappPhone } : {}),
+    ...(page.hasOwnerPhoto ? { image: `${url}/foto` } : {}),
+    ...(page.instagramHandle
+      ? { sameAs: [instagramUrl(page.instagramHandle)] }
+      : {}),
+  };
+}
 
 // What the page shows only to a signed-in client with a record in this
 // clinic: whether she can review and her loyalty card. Both are read as her.
@@ -57,7 +120,7 @@ async function clientExtras(
 export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
   const { slug } = await params;
   const clinic = await requireClinic(slug);
-  const page = await getClinicPage(slug);
+  const page = await loadPage(slug);
   if (!page) notFound();
   const { mayReview, progress, needsRecord } = await clientExtras(
     slug,
@@ -117,6 +180,7 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
       <Hours page={page} today={today} />
       <PaymentMethods methods={page.paymentMethods} />
       <Contacts page={page} />
+      <JsonLd data={clinicJsonLd(page)} />
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 
@@ -8,9 +9,11 @@ import "./globals.css";
 import { getTheme } from "@/lib/theme-server";
 import { cn } from "@/lib/utils";
 
+import { SITE_URL } from "./site-url";
+
 export const metadata: Metadata = {
   // Makes the shared image (src/app/opengraph-image.tsx) an absolute URL.
-  metadataBase: new URL("https://zemana.com.br"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Agendamentos",
     template: "%s | Agendamentos",
@@ -34,7 +37,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="pt-BR"
       className={cn("h-full antialiased", theme === "dark" && "dark")}
     >
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        {/* Page views without cookies (Vercel Web Analytics). Only on Vercel
+            (VERCEL=1): its script lives at /_vercel/insights, which a local
+            build does not serve. It is added by a nonced script, so
+            'strict-dynamic' lets it run. */}
+        {process.env.VERCEL === "1" && <Analytics />}
+      </body>
     </html>
   );
 }

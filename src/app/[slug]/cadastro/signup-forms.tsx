@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Route } from "next";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -27,6 +28,26 @@ import { TextField } from "../text-field";
 import { completeRegistration, signUp } from "./actions";
 
 const GENERIC_ERROR = "Não foi possível concluir. Tente novamente.";
+
+const legalLinkClass =
+  "font-semibold text-primary underline underline-offset-4";
+
+// Under the buttons that create the account or the clinic record.
+function LegalNotice() {
+  return (
+    <p className="text-center text-xs text-muted-foreground">
+      Ao continuar, você concorda com os{" "}
+      <Link href="/termos" target="_blank" className={legalLinkClass}>
+        Termos de uso
+      </Link>{" "}
+      e com a{" "}
+      <Link href="/privacidade" target="_blank" className={legalLinkClass}>
+        Política de privacidade
+      </Link>
+      .
+    </p>
+  );
+}
 
 // Puts a Server Action's field errors on the form; returns the form-level one.
 function applyFieldErrors<T extends FieldValues>(
@@ -124,6 +145,7 @@ export function SignupForm({ slug, next }: { slug: string; next: string }) {
       <Button type="submit" size="lg" disabled={isSubmitting}>
         {isSubmitting ? "Criando..." : "Criar conta"}
       </Button>
+      <LegalNotice />
     </form>
   );
 }
@@ -180,6 +202,7 @@ export function CompleteForm({
       <Button type="submit" size="lg" disabled={isSubmitting}>
         {isSubmitting ? "Salvando..." : "Continuar"}
       </Button>
+      <LegalNotice />
     </form>
   );
 }
