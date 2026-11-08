@@ -201,6 +201,16 @@ test("a new client signs up from /entrar through the clinic list", async ({
   await expect(page.getByText("Olá, Nova")).toBeVisible();
   await expect(page.getByText("Zemana Entrar Clínica A")).toBeVisible();
   await expect(page.getByText("Nenhum horário marcado")).toBeVisible();
+  // Not confirmed yet: the page asks for it and offers to send it again.
+  await expect(
+    page.getByRole("heading", { name: "Confirme seu e-mail" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(`Enviamos um link para ${newcomer.email}`),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Reenviar e-mail" }),
+  ).toBeVisible();
 
   // Her clinic is no longer offered when she adds another one.
   await page.getByRole("link", { name: "Adicionar outra clínica" }).click();
