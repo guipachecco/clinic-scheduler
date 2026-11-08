@@ -64,6 +64,20 @@ export async function generateMetadata({
       siteName: "Zemana",
       title: clinicName(page),
       description,
+      // The cover makes the shared link show the space; without photos the
+      // Zemana image of the root layout stays.
+      ...(page.photos[0]
+        ? {
+            images: [
+              {
+                url: `/${page.slug}/fotos/${page.photos[0].id}`,
+                width: page.photos[0].width,
+                height: page.photos[0].height,
+                alt: `Espaço de ${clinicName(page)}`,
+              },
+            ],
+          }
+        : {}),
     },
   };
 }
@@ -82,7 +96,16 @@ function clinicJsonLd(page: ClinicPage) {
     description: describe(page),
     ...(page.address ? { address: page.address } : {}),
     ...(page.whatsappPhone ? { telephone: page.whatsappPhone } : {}),
-    ...(page.hasOwnerPhoto ? { image: `${url}/foto` } : {}),
+    ...(page.photos.length > 0 || page.hasOwnerPhoto
+      ? {
+          image: [
+            ...page.photos
+              .slice(0, 3)
+              .map((photo) => `${url}/fotos/${photo.id}`),
+            ...(page.hasOwnerPhoto ? [`${url}/foto`] : []),
+          ],
+        }
+      : {}),
     ...(page.instagramHandle
       ? { sameAs: [instagramUrl(page.instagramHandle)] }
       : {}),
@@ -140,7 +163,11 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
       content: <ServicesTab page={page} />,
     });
   }
-  tabs.push({ id: "fotos", label: "Fotos", content: <PhotosTab /> });
+  tabs.push({
+    id: "fotos",
+    label: "Fotos",
+    content: <PhotosTab page={page} />,
+  });
   if (page.loyalty) {
     tabs.push({
       id: "fidelidade",

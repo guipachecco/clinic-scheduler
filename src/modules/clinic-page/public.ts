@@ -28,6 +28,9 @@ export type ClinicPage = PublicClinic & {
   hasOwnerPhoto: boolean;
   loyalty: { visits: number; reward: string } | null;
   paymentMethods: string[];
+  // In page order; the first one is the cover. Images come from
+  // /<slug>/fotos/<id>.
+  photos: { id: string; width: number; height: number }[];
   hours: DayHours[];
   services: {
     id: string;
@@ -181,6 +184,14 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
     );
     const summary = summaryResult.rows[0];
 
+    const photoRows = await tx.execute<{
+      id: string;
+      width: number;
+      height: number;
+    }>(
+      sql`select id, width, height from client_clinic_photos(${clinicId}::uuid)`,
+    );
+
     const {
       ownerPhotoMediaId,
       loyaltyEnabled,
@@ -197,6 +208,11 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
           ? { visits: loyaltyVisits, reward: loyaltyReward }
           : null,
       paymentMethods: methods.rows.map((row) => row.name),
+      photos: photoRows.rows.map((row) => ({
+        id: row.id,
+        width: Number(row.width),
+        height: Number(row.height),
+      })),
       hours,
       services: serviceRows.map((row) => ({
         ...row,
@@ -218,6 +234,23 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
         total: Number(summary?.total ?? 0),
       },
     };
+  });
+}
+
+// One photo of an active clinic's page; null when it is not one of them.
+export async function getClinicPhoto(
+  slug: string,
+  photoId: string,
+): Promise<{ mimeType: string; data: Buffer } | null> {
+  if (!UUID.test(photoId)) return null;
+  return clientDb.transaction(async (tx) => {
+    const clinicId = await enterClinic(tx, slug);
+    if (!clinicId) return null;
+    const result = await tx.execute<{ mime_type: string; data: Buffer }>(
+      sql`select mime_type, data from client_clinic_photo(${clinicId}::uuid, ${photoId}::uuid)`,
+    );
+    const row = result.rows[0];
+    return row ? { mimeType: row.mime_type, data: row.data } : null;
   });
 }
 

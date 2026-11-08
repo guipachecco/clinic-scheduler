@@ -498,6 +498,33 @@ export const patients = pgTable(
   ],
 );
 
+// Photos of the clinic's space and work, shown on its public page in
+// position order; the first one is the cover. The image itself lives in
+// media. Clients read them only through the definer functions of migration
+// 0020, never this table.
+export const clinicPhotos = pgTable(
+  "clinic_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    mediaId: uuid("media_id").notNull(),
+    position: integer("position").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("clinic_photos_clinic_position_idx").on(t.clinicId, t.position),
+    unique("clinic_photos_media_unique").on(t.mediaId),
+    foreignKey({
+      name: "clinic_photos_media_fk",
+      columns: [t.clinicId, t.mediaId],
+      foreignColumns: [media.clinicId, media.id],
+    }).onDelete("restrict"),
+    check("clinic_photos_position_check", sql`${t.position} >= 0`),
+  ],
+);
+
 // Products the clinic sells, listed on its public page. Clients see only the
 // active ones (policy products_client, migration 0017).
 export const products = pgTable(

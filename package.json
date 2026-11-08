@@ -22,7 +22,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/db-migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "admin": "tsx --env-file-if-exists=.env scripts/admin.ts"
+    "admin": "tsx --env-file-if-exists=.env scripts/admin.ts",
+    "photos": "tsx --conditions=react-server --env-file-if-exists=.env scripts/photos.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "^5.3.0",

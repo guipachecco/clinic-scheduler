@@ -141,6 +141,13 @@
       "when": 1794111930357,
       "tag": "0019_client_my_clinics",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1794140962074,
+      "tag": "0020_clinic_photos",
+      "breakpoints": true
     }
   ]
 }
