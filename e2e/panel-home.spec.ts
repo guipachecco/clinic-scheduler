@@ -151,11 +151,8 @@ test.describe("início do painel", () => {
     await withOwner(cleanUp);
   });
 
-  test.beforeEach(() => {
-    test.skip(!seeded, "needs the upcoming appointments on the same local day");
-  });
-
   test("home shows today's numbers, next client and list", async () => {
+    test.skip(!seeded, "needs the upcoming appointments on the same local day");
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto("/admin");
     await expect(
@@ -168,7 +165,7 @@ test.describe("início do painel", () => {
     await expect(hoje).toContainText("3");
     await expect(hoje).toContainText("hoje");
     await expect(page.getByTestId("stat-site")).toContainText("1");
-    await expect(page.getByTestId("stat-previsto")).toContainText("R$ 360,00");
+    await expect(page.getByTestId("stat-previsto")).toContainText("R$ 360");
 
     const next = page.getByRole("region", { name: "Próxima" });
     await expect(next).toContainText(PATIENTS.next.name);
@@ -197,6 +194,7 @@ test.describe("início do painel", () => {
   });
 
   test("Agendar does not cover the last list item", async () => {
+    test.skip(!seeded, "needs the upcoming appointments on the same local day");
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto("/admin");
     const button = page.getByRole("link", { name: "Agendar" });
@@ -221,6 +219,65 @@ test.describe("início do painel", () => {
     expect(overlaps).toBe(false);
     // It floats above the bottom bar, not over it.
     expect(fab.y + fab.height).toBeLessThanOrEqual(bar.y);
+  });
+
+  test("a large previsto fits its tile at 360 px", async () => {
+    test.skip(
+      !seeded || DateTime.now().setZone(ZONE).hour >= 21,
+      "needs room for extra appointments on the same local day",
+    );
+    const start = DateTime.now().setZone(ZONE).startOf("minute");
+    await withOwner(async (client) => {
+      const {
+        rows: [clinic],
+      } = await client.query<{ id: string }>(
+        "SELECT id FROM clinics WHERE slug = $1",
+        [PANEL_HOME_CLINIC_SLUG],
+      );
+      // Eight more priced appointments: 360 + 960 = R$ 1.320.
+      for (let i = 0; i < 8; i++) {
+        const at = start.plus({ minutes: 160 + i * 5 });
+        await client.query(
+          `INSERT INTO appointments (id, clinic_id, patient_id, service_id,
+             service_name, service_duration_minutes, starts_at, ends_at,
+             occupied_from, occupied_until, status, source, confirmed_at)
+           VALUES ($1, $2, $3, $4, $5, 5, $6, $7, $6, $7, 'confirmed', 'admin', now())`,
+          [
+            ID(20 + i),
+            clinic!.id,
+            PATIENTS.done.id,
+            SERVICE_ID,
+            SERVICE_NAME,
+            at.toJSDate(),
+            at.plus({ minutes: 5 }).toJSDate(),
+          ],
+        );
+      }
+    });
+    try {
+      await page.setViewportSize({ width: 360, height: 800 });
+      await page.goto("/admin");
+      const tile = page.getByTestId("stat-previsto");
+      await expect(tile).toContainText("R$ 1.320");
+      const fits = await tile.evaluate((el) =>
+        Array.from(el.querySelectorAll("*")).every(
+          (child) => child.scrollWidth <= el.clientWidth,
+        ),
+      );
+      expect(fits).toBe(true);
+      expect(
+        await tile.evaluate((el) => el.scrollWidth <= el.clientWidth),
+      ).toBe(true);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(360);
+    } finally {
+      await withOwner((client) =>
+        client.query("DELETE FROM appointments WHERE id = ANY($1)", [
+          Array.from({ length: 8 }, (_, i) => ID(20 + i)),
+        ]),
+      );
+    }
   });
 
   test("old placeholder text is gone", async () => {

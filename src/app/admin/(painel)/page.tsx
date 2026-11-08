@@ -47,9 +47,11 @@ function Stat({
   return (
     <div
       data-testid={`stat-${id}`}
-      className="grid rounded-2xl border bg-card px-3 py-2.5 shadow-xs"
+      className="grid min-w-0 rounded-2xl border bg-card px-2.5 py-2.5 shadow-xs"
     >
-      <span className="font-heading text-xl font-extrabold">{value}</span>
+      <span className="font-heading text-base font-extrabold break-words sm:text-xl">
+        {value}
+      </span>
       <span className="text-xs text-muted-foreground">{label}</span>
     </div>
   );
@@ -101,13 +103,15 @@ export default async function PanelHomePage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div
+        className={`grid gap-2 ${summary.previsto ? "grid-cols-[1fr_1fr_1.5fr]" : "grid-cols-2"}`}
+      >
         <Stat id="hoje" value={String(summary.count)} label="hoje" />
         <Stat id="site" value={String(summary.online)} label="pelo site" />
         {summary.previsto ? (
           <Stat
             id="previsto"
-            value={`${formatCents(summary.previsto.cents)}${summary.previsto.partial ? "+" : ""}`}
+            value={`${formatCents(Math.round(summary.previsto.cents / 100) * 100).replace(",00", "")}${summary.previsto.partial ? "+" : ""}`}
             label="previsto"
           />
         ) : null}
