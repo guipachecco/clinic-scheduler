@@ -5,7 +5,6 @@ import { requireAdmin } from "@/modules/auth/session";
 import { getClinicBranding } from "@/modules/branding/branding";
 import { greeting } from "@/modules/dashboard/day";
 import { getPanelHome } from "@/modules/dashboard/dashboard";
-import { listPendingLinks } from "@/modules/patients/links";
 import { formatCents } from "@/modules/services/fields";
 
 import { PendingLinkNotice } from "./pacientes/pending-link-notice";
@@ -42,12 +41,11 @@ export default async function PanelHomePage() {
   // Pages render in parallel with their layout, so each page checks again.
   const session = await requireAdmin();
   const now = new Date();
-  const [home, branding, pendingLinks] = await Promise.all([
+  const [home, branding] = await Promise.all([
     getPanelHome(session.clinicId, now),
     getClinicBranding(session.clinicId),
-    listPendingLinks(session.clinicId),
   ]);
-  const { today, summary, next, nextDayFirst, alerts } = home;
+  const { today, summary, next, nextDayFirst, alerts, pendingLinks } = home;
 
   const firstName = session.user.name.trim().split(/\s+/)[0] ?? "";
   const dateLabel = new Intl.DateTimeFormat("pt-BR", {

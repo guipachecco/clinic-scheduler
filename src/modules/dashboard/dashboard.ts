@@ -203,6 +203,7 @@ export async function getPanelHome(
   next: DayItem | null;
   nextDayFirst: DayItem | null;
   alerts: number;
+  pendingLinks: Awaited<ReturnType<typeof listPendingLinks>>;
 }> {
   const zone = await getClinicTimezone(clinicId);
   const date = DateTime.fromJSDate(now, { zone }).toISODate()!;
@@ -235,5 +236,6 @@ export async function getPanelHome(
     next,
     nextDayFirst,
     alerts: links.length + requested,
+    pendingLinks: links,
   };
 }

@@ -223,7 +223,7 @@ test.describe("início do painel", () => {
 
   test("a large previsto fits its tile at 360 px", async () => {
     test.skip(
-      !seeded || DateTime.now().setZone(ZONE).hour >= 21,
+      !seeded || DateTime.now().setZone(ZONE).hour >= 20,
       "needs room for extra appointments on the same local day",
     );
     const start = DateTime.now().setZone(ZONE).startOf("minute");

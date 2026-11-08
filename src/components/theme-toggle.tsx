@@ -19,7 +19,15 @@ export function ThemeToggle({
   // Adds a visible "Tema escuro" text beside the icon.
   showLabel?: boolean;
 }) {
-  const [theme, setTheme] = useState(initialTheme);
+  // Seed from the DOM when it exists so a remounted toggle (the phone "Mais"
+  // sheet) reflects the current theme; on the server use the prop.
+  const [theme, setTheme] = useState<Theme>(() =>
+    typeof document === "undefined"
+      ? initialTheme
+      : document.documentElement.classList.contains("dark")
+        ? "dark"
+        : "light",
+  );
   const isDark = theme === "dark";
 
   function toggle() {

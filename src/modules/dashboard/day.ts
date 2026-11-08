@@ -42,6 +42,8 @@ export function freeIntervals(input: {
   const { date, zone, stepMinutes } = input;
   const day = DateTime.fromISO(date, { zone });
   if (!day.isValid || stepMinutes <= 0) return [];
+  // Past days: the free time already went by.
+  if (date < DateTime.fromJSDate(input.now, { zone }).toISODate()!) return [];
 
   // Luxon: 1 = Monday ... 7 = Sunday; the database uses 0 = Sunday.
   const intervals =

@@ -70,6 +70,34 @@ test.describe("painel no celular", () => {
     await expect(dialog).toBeHidden();
   });
 
+  test("theme button in Mais reflects the current theme after reopening", async () => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto("/admin");
+    const bar = page.getByRole("navigation", { name: "Navegação do painel" });
+    const dialog = page.getByRole("dialog", { name: "Mais" });
+    const theme = dialog.getByRole("button", { name: "Tema escuro" });
+    const html = page.locator("html");
+    const wasDark = await html.evaluate((el) => el.classList.contains("dark"));
+    try {
+      await bar.getByRole("button", { name: "Mais" }).click();
+      await expect(theme).toHaveAttribute("aria-pressed", String(wasDark));
+      await theme.click();
+      await expect(theme).toHaveAttribute("aria-pressed", String(!wasDark));
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+
+      await bar.getByRole("button", { name: "Mais" }).click();
+      await expect(theme).toHaveAttribute("aria-pressed", String(!wasDark));
+      await theme.click();
+      await expect(theme).toHaveAttribute("aria-pressed", String(wasDark));
+      await expect(html).toHaveClass(wasDark ? /dark/ : /^(?!.*dark)/);
+    } finally {
+      await page.evaluate(() => {
+        document.cookie = "theme=; path=/; max-age=0";
+      });
+    }
+  });
+
   test("Mais stays closed when coming back to the page it was opened on", async () => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto("/admin");

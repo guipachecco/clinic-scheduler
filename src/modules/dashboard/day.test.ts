@@ -61,6 +61,17 @@ describe("freeIntervals", () => {
     ]);
   });
 
+  it("returns nothing for a day that already passed", () => {
+    expect(
+      freeIntervals({
+        ...base,
+        items: [],
+        blocks: [],
+        now: at("2026-11-10", "08:00"),
+      }),
+    ).toEqual([]);
+  });
+
   it("drops time before now rounded up to the step on today", () => {
     expect(freeIntervals({ ...base, items, blocks, now: t("11:10") })).toEqual([
       span("11:30", "12:00"),

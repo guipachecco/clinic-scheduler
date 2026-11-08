@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
+import { DateTime } from "luxon";
 
 import type { DayAgenda } from "@/modules/dashboard/dashboard";
 import { nextItem } from "@/modules/dashboard/day";
@@ -36,6 +37,7 @@ export function PhoneAgenda({
 
   return (
     <div className="grid gap-4 pb-24">
+      <h1 className="sr-only">Agenda</h1>
       {requested.length > 0 ? (
         <Link
           href={"#pedidos" as Route}
@@ -71,7 +73,11 @@ export function PhoneAgenda({
           items={items}
           free={status ? [] : free}
           date={date}
-          highlightId={nextItem(items, now)?.id ?? null}
+          highlightId={
+            date === DateTime.fromJSDate(now, { zone }).toISODate()
+              ? (nextItem(items, now)?.id ?? null)
+              : null
+          }
           zone={zone}
         />
       ) : status ? null : (

@@ -61,7 +61,7 @@ export function DayStrip({
           <Arrow direction="next" />
         </Link>
       </div>
-      <ul className="grid grid-cols-7 gap-1">
+      <ul className="grid grid-cols-7 gap-0.5">
         {days.map((day) => {
           const iso = day.toISODate()!;
           const selected = iso === date;
