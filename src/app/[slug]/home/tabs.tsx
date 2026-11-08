@@ -34,7 +34,7 @@ export function Tabs({ tabs }: { tabs: TabItem[] }) {
       <div
         role="tablist"
         aria-label="Seções da clínica"
-        className="flex gap-1 overflow-x-auto border-b"
+        className="flex [scrollbar-width:none] gap-1 overflow-x-auto border-b [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab, index) => {
           const selected = tab.id === active;
@@ -53,9 +53,9 @@ export function Tabs({ tabs }: { tabs: TabItem[] }) {
               onClick={() => setActive(tab.id)}
               onKeyDown={(event) => onKeyDown(event, index)}
               className={cn(
-                "-mb-px h-11 shrink-0 border-b-2 px-3 text-sm font-semibold whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                "-mb-px h-11 shrink-0 border-b-[3px] px-3 font-heading text-[15px] font-bold whitespace-nowrap outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
                 selected
-                  ? "border-primary text-primary"
+                  ? "border-highlight text-foreground"
                   : "border-transparent text-muted-foreground",
               )}
             >

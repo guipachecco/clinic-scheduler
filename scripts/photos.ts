@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { basename, extname } from "node:path";
 
 import { endPools } from "../src/db/client";
+import { saveOwnerPhoto } from "../src/modules/branding/photo";
 import {
   addClinicPhoto,
   listClinicPhotos,
@@ -16,7 +17,8 @@ const USAGE = `Uso:
   pnpm photos list <endereço>              lista as fotos da página, na ordem (a primeira é a capa)
   pnpm photos add <endereço> <arquivo...>  adiciona fotos no fim da lista
   pnpm photos remove <endereço> <id>       remove uma foto
-  pnpm photos order <endereço> <id...>     põe todas as fotos nesta ordem`;
+  pnpm photos order <endereço> <id...>     põe todas as fotos nesta ordem
+  pnpm photos owner <endereço> <arquivo>   troca a foto da dona (a do círculo)`;
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -88,6 +90,25 @@ async function main() {
       }
       console.log("Foto removida.");
       await list(clinicId);
+      return;
+    }
+    case "owner": {
+      const clinicId = await clinicIdOf(slug);
+      const [file] = rest;
+      if (!file) throw new CommandError(USAGE);
+      const mimeType = MIME_BY_EXTENSION[extname(file).toLowerCase()];
+      if (!mimeType) {
+        throw new CommandError(`${basename(file)}: use JPEG, PNG ou WebP.`);
+      }
+      const result = await saveOwnerPhoto(
+        clinicId,
+        { bytes: await readFile(file), mimeType },
+        null,
+      );
+      if (!result.ok) {
+        throw new CommandError(`${basename(file)}: ${result.formError}`);
+      }
+      console.log("Foto da dona salva.");
       return;
     }
     case "order": {

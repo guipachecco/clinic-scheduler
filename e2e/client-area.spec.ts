@@ -542,10 +542,12 @@ test.describe("client area", () => {
   }) => {
     const off = CLIENT_AREA.off;
     await page.goto(`/${off.slug}`);
-    await expect(page.getByRole("link", { name: /WhatsApp/ })).toHaveAttribute(
-      "href",
-      `https://wa.me/${off.whatsapp.slice(1)}`,
-    );
+    // Both the contacts and the page's fixed button lead to the WhatsApp.
+    for (const name of ["WhatsApp", "Chamar no WhatsApp"]) {
+      await expect(
+        page.getByRole("link", { name, exact: true }),
+      ).toHaveAttribute("href", `https://wa.me/${off.whatsapp.slice(1)}`);
+    }
     await expect(page.getByRole("link", { name: "E-mail" })).toHaveAttribute(
       "href",
       `mailto:${off.email}`,

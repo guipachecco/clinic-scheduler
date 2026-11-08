@@ -390,8 +390,12 @@ test.describe("página inicial da clínica", () => {
       .getByRole("listitem")
       .filter({ hasText: OFFLINE.service });
     await expect(item).toBeVisible();
-    await expect(main.getByRole("link", { name: "Agendar" })).toHaveCount(0);
-    const contact = item.getByRole("link", { name: "Fale com a clínica" });
+    await expect(main.getByRole("link", { name: /Agendar/ })).toHaveCount(0);
+    await expect(
+      main.getByRole("link", { name: "Marcar horário" }),
+    ).toHaveCount(0);
+    // The page's one action becomes the clinic's WhatsApp.
+    const contact = main.getByRole("link", { name: "Chamar no WhatsApp" });
     await expect(contact).toHaveAttribute(
       "href",
       "https://wa.me/5511987650102",
@@ -438,10 +442,14 @@ test.describe("página inicial da clínica", () => {
   }) => {
     await page.goto(`/${FULL.slug}`);
     const item = page.getByRole("listitem").filter({ hasText: FULL.service });
-    await expect(item.getByRole("link", { name: "Agendar" })).toHaveAttribute(
+    await expect(item.getByRole("link", { name: /^Agendar / })).toHaveAttribute(
       "href",
       `/${FULL.slug}/marcar?servico=${serviceId}`,
     );
+    // And the page's one strong action opens the booking.
+    await expect(
+      page.getByRole("main").getByRole("link", { name: "Marcar horário" }),
+    ).toHaveAttribute("href", `/${FULL.slug}/marcar`);
   });
 
   test("client with a completed appointment reviews", async ({ browser }) => {
