@@ -196,7 +196,8 @@ function LiveStory() {
       data-mode="scroll"
       className="relative h-[440svh]"
     >
-      <div className="sticky top-0 flex h-svh flex-col items-center justify-center gap-5 overflow-hidden px-4 pb-6">
+      {/* Sticks below the fixed site header (--site-header-h, landing.css). */}
+      <div className="sticky top-(--site-header-h) flex h-[calc(100svh-var(--site-header-h))] flex-col items-center justify-center gap-5 overflow-hidden px-4 pb-6">
         <div className="relative grid h-12 w-full max-w-[26rem] place-items-center">
           <motion.div
             className="absolute"
@@ -224,7 +225,7 @@ function LiveStory() {
             </Caption>
           </motion.div>
         </div>
-        <div className="relative w-[min(86vw,26rem,56svh)]">
+        <div className="relative w-[min(86vw,26rem,52svh)]">
           <motion.div
             aria-hidden={shows("phone")}
             style={{ x: paperX, rotate: paperRotate }}

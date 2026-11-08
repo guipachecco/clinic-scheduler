@@ -1,5 +1,11 @@
 /* Landing page only (imported by src/app/page.tsx). */
 
+/* Height of the site header, which stays on top while the page scrolls; the
+   story's sticky stage starts right below it. */
+:root {
+  --site-header-h: 4.5rem;
+}
+
 /* The ticker band scrolls sideways; the list is doubled so the loop is seamless. */
 @keyframes landing-ticker {
   to {

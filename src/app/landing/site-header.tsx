@@ -28,8 +28,8 @@ export function SiteHeader() {
   const isClient = isBrowser && data?.user.role === "client";
 
   return (
-    <header className="border-b-[3px] border-foreground/10 bg-background">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+    <header className="sticky top-0 z-40 h-(--site-header-h) border-b-[3px] border-foreground/10 bg-background">
+      <div className="mx-auto flex h-full w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
         <Link
           href="/"
           aria-label="Zemana, página inicial"

@@ -309,7 +309,7 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
                 <b className="block">{service.name}</b>
                 <span className="text-sm text-muted-foreground">
                   {price ? (
-                    <span className="font-semibold text-status-confirmed-foreground">
+                    <span className="font-semibold text-primary">
                       {price}
                     </span>
                   ) : null}
@@ -460,7 +460,7 @@ export function ProductsTab({
           <div className="min-w-0">
             <b className="block">{product.name}</b>
             {product.priceCents !== null ? (
-              <span className="text-sm font-semibold text-status-confirmed-foreground">
+              <span className="text-sm font-semibold text-primary">
                 {money.format(product.priceCents / 100)}
               </span>
             ) : null}
