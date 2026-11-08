@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { connection } from "next/server";
 
 import "@fontsource-variable/bricolage-grotesque";
@@ -14,6 +14,11 @@ export const metadata: Metadata = {
     template: "%s | Agendamentos",
   },
   description: "Agendamento online de serviços da clínica.",
+};
+
+// Lets fixed bars use env(safe-area-inset-*) on notched phones.
+export const viewport: Viewport = {
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

@@ -28,9 +28,13 @@ export function MobileNav({
   theme: Theme;
 }) {
   const pathname = usePathname();
-  // The sheet remembers the page it was opened on, so any navigation closes it.
-  const [openedOn, setOpenedOn] = useState<string | null>(null);
-  const open = openedOn === pathname;
+  // Any navigation closes the sheet (state adjusted during render).
+  const [open, setOpen] = useState(false);
+  const [lastPath, setLastPath] = useState(pathname);
+  if (lastPath !== pathname) {
+    setLastPath(pathname);
+    setOpen(false);
+  }
   const moreActive = moreItems.some((item) => isActive(pathname, item.href));
   const moreButton = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
@@ -44,7 +48,7 @@ export function MobileNav({
     // Escape closes; Tab stays inside the sheet.
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setOpenedOn(null);
+        setOpen(false);
         return;
       }
       if (event.key !== "Tab" || !sheet) return;
@@ -109,7 +113,7 @@ export function MobileNav({
               type="button"
               aria-haspopup="dialog"
               aria-expanded={open}
-              onClick={() => setOpenedOn(pathname)}
+              onClick={() => setOpen(true)}
               className="flex h-16 w-full flex-col items-center justify-center gap-0.5 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
             >
               <BarIcon
@@ -135,7 +139,7 @@ export function MobileNav({
         <div className="fixed inset-0 z-40 md:hidden">
           <div
             aria-hidden="true"
-            onClick={() => setOpenedOn(null)}
+            onClick={() => setOpen(false)}
             className="absolute inset-0 animate-[sheet-fade_150ms_ease-out] bg-black/40 motion-reduce:animate-none"
           />
           <div

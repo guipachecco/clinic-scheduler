@@ -39,7 +39,7 @@ export default async function PanelLayout({
   const switchClinic = session.isRoot ? (
     <Link
       href="/admin/clinicas"
-      className="text-xs font-medium underline underline-offset-2"
+      className="text-xs font-medium underline underline-offset-2 max-md:-my-2 max-md:inline-flex max-md:min-h-11 max-md:items-center"
     >
       Trocar de clínica
     </Link>

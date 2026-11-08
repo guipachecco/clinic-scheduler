@@ -70,6 +70,19 @@ test.describe("painel no celular", () => {
     await expect(dialog).toBeHidden();
   });
 
+  test("Mais stays closed when coming back to the page it was opened on", async () => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto("/admin");
+    const bar = page.getByRole("navigation", { name: "Navegação do painel" });
+    await bar.getByRole("button", { name: "Mais" }).click();
+    const dialog = page.getByRole("dialog", { name: "Mais" });
+    await dialog.getByRole("link", { name: "Minha página" }).click();
+    await expect(page).toHaveURL(/\/admin\/pagina$/);
+    await bar.getByRole("link", { name: "Início" }).click();
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(dialog).toBeHidden();
+  });
+
   test("computer keeps the sidebar", async () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/admin");
