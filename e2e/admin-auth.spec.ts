@@ -89,7 +89,11 @@ test("first access requires setting up 2FA before the panel opens", async ({
 
   await expect(page).toHaveURL(/\/admin$/);
   await expect(
-    page.getByRole("heading", { name: `Olá, ${TEST_ADMIN.name}` }),
+    page.getByRole("heading", {
+      name: new RegExp(
+        `^(Bom dia|Boa tarde|Boa noite), ${TEST_ADMIN.name.split(" ")[0]}$`,
+      ),
+    }),
   ).toBeVisible();
 
   const nav = page.getByRole("navigation", { name: "Menu principal" });
@@ -139,7 +143,11 @@ test("later sign-ins ask for the authenticator code", async ({ page }) => {
   await page.getByRole("button", { name: "Verificar" }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(
-    page.getByRole("heading", { name: `Olá, ${TEST_ADMIN.name}` }),
+    page.getByRole("heading", {
+      name: new RegExp(
+        `^(Bom dia|Boa tarde|Boa noite), ${TEST_ADMIN.name.split(" ")[0]}$`,
+      ),
+    }),
   ).toBeVisible();
 
   // The panel shell must not scroll sideways on a phone.

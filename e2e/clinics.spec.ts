@@ -73,7 +73,7 @@ test.describe("clinicas", () => {
       .getByRole("button", { name: "Abrir painel" })
       .click();
     await expect(page).toHaveURL(/\/admin$/);
-    await expect(page.getByText(NEW_CLINIC).first()).toBeVisible();
+    await expect(page.getByText(NEW_CLINIC).last()).toBeVisible();
     await page.goto("/admin/servicos");
     await expect(
       page.getByRole("heading", { name: "Outros", level: 2 }),
