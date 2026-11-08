@@ -17,6 +17,7 @@ import {
   TEST_ADMIN_CLINIC_PAGE,
   TEST_ADMIN_FINANCE,
   PANEL_HOME_CLINIC_SLUG,
+  TEST_ADMIN_AGENDA_PHONE,
   TEST_ADMIN_PANEL_HOME,
   TEST_ADMIN_PANEL_MOBILE,
   TEST_ADMIN_PATIENT_LINKS,
@@ -61,6 +62,7 @@ export default async function globalSetup() {
     await createAdmin(TEST_ADMIN_PATIENT_LINKS);
     await createAdmin(TEST_ADMIN_PANEL_MOBILE);
     await createAdmin(TEST_ADMIN_PANEL_HOME);
+    await createAdmin(TEST_ADMIN_AGENDA_PHONE);
     await createAdmin(TEST_ROOT);
     await createAdmin(TEST_ROOT_BRANDING);
   } finally {

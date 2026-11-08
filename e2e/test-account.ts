@@ -117,3 +117,14 @@ export const TEST_ADMIN_PANEL_HOME = {
   name: "Karol Teste do Início",
   password: "senha-de-teste-painel-inicio-bem-longa",
 };
+
+// Owner used by the phone agenda suite. It shares the panel home clinic (it
+// has its own account so each suite sets up its own 2FA) and only touches
+// dates far in the future.
+export const TEST_ADMIN_AGENDA_PHONE = {
+  role: "admin" as const,
+  clinicSlug: PANEL_HOME_CLINIC_SLUG,
+  email: "agenda-celular@example.test",
+  name: "Dona da Agenda no Celular",
+  password: "senha-de-teste-agenda-celular-bem-longa",
+};

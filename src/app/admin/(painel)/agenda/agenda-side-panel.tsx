@@ -6,7 +6,7 @@ import type {
 } from "@/modules/appointments/appointments";
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 
-import { RequestedList } from "./requested-list";
+import { RequestedList, type RequestedListItem } from "./requested-list";
 
 // The summary beside the calendar: requests waiting for confirmation and
 // today's active appointments. Rendered from the page's server data.
@@ -37,6 +37,22 @@ function whenLabel(iso: string, now: DateTime) {
 
 function minutesOf(event: CalendarEvent) {
   return Math.round((Date.parse(event.end) - Date.parse(event.start)) / 60_000);
+}
+
+// The requested rows with their "quando" detail, shared with the phone agenda.
+export function toRequestedListItems(
+  requested: RequestedItem[],
+  now: Date,
+): RequestedListItem[] {
+  const localNow = DateTime.fromJSDate(now, {
+    zone: CLINIC_TIME_ZONE,
+  }).setLocale("pt-BR");
+  return requested.map((event) => ({
+    id: event.id,
+    patientLabel: event.patientLabel,
+    detail: `${event.serviceLabel} · ${whenLabel(event.start, localNow)}`,
+    requiresApproval: event.requiresApproval,
+  }));
 }
 
 const cardClass = "grid gap-3.5 rounded-2xl border bg-card p-5";
@@ -70,14 +86,7 @@ export function AgendaSidePanel({
             </span>
           ) : null}
         </div>
-        <RequestedList
-          items={requested.map((event) => ({
-            id: event.id,
-            patientLabel: event.patientLabel,
-            detail: `${event.serviceLabel} · ${whenLabel(event.start, localNow)}`,
-            requiresApproval: event.requiresApproval,
-          }))}
-        />
+        <RequestedList items={toRequestedListItems(requested, now)} />
       </section>
 
       <section aria-labelledby="agenda-today" className={cardClass}>
