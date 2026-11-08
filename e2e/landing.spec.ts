@@ -147,6 +147,37 @@ test("reduced motion shows the page static and readable", async ({
     await card.scrollIntoViewIfNeeded();
     await expect(card).toHaveCSS("opacity", "1");
   }
+  // The ticker band becomes a short still row that fits the phone.
+  const ticker = page.getByTestId("ticker-static");
+  await expect(ticker).toBeVisible();
+  const box = (await ticker.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(360);
+  await context.close();
+});
+
+test("feature cards show without JavaScript", async ({ browser }) => {
+  const context = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: { width: 360, height: 800 },
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+  for (const title of [
+    "Agendamento pelo link",
+    "Agenda e fichas",
+    "Financeiro",
+    "Página da clínica",
+  ]) {
+    const heading = page.getByRole("heading", { level: 3, name: title });
+    await heading.scrollIntoViewIfNeeded();
+    await expect(heading).toBeVisible();
+  }
+  const cards = page.getByTestId("feature-card");
+  await expect(cards).toHaveCount(4);
+  for (const card of await cards.all()) {
+    await expect(card).toHaveCSS("opacity", "1");
+  }
   await context.close();
 });
 

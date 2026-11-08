@@ -1,21 +1,35 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
+import { inView, motion, useAnimate, useReducedMotion } from "motion/react";
+import { useEffect } from "react";
 
-// The landing page's small animations. Every element marked `data-motion` is
-// forced static by landing.css under prefers-reduced-motion, so the page reads
-// the same before JavaScript knows the preference; useReducedMotion() also
-// stops the endless loops there.
+// The landing page's small animations. The server HTML always shows every
+// element in its final, still place (so the page reads fine without
+// JavaScript or before hydration); entrances only start after mount. Elements
+// marked `data-motion` are also forced still by landing.css under
+// prefers-reduced-motion, and useReducedMotion() skips the animations there.
 
-// The hero logo: drops in with a springy bounce, then floats gently.
+// The hero logo: drops in with a springy bounce once mounted, then floats.
 export function BouncingLogo({ children }: { children: React.ReactNode }) {
   const reduce = useReducedMotion();
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+
+  useEffect(() => {
+    if (reduce || !scope.current) return;
+    const controls = animate(
+      scope.current,
+      { y: [-60, 0], scale: [0.7, 1], rotate: [-12, -4] },
+      { type: "spring", stiffness: 320, damping: 11, delay: 0.15 },
+    );
+    return () => controls.stop();
+  }, [reduce, animate, scope]);
+
   return (
     <motion.div
+      ref={scope}
       data-motion=""
-      initial={{ y: -60, scale: 0.7, rotate: -12 }}
+      initial={false}
       animate={{ y: 0, scale: 1, rotate: -4 }}
-      transition={{ type: "spring", stiffness: 320, damping: 11, delay: 0.15 }}
     >
       <motion.div
         data-motion=""
@@ -48,7 +62,9 @@ export function SpinningRing({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Rises into place the first time it scrolls into view.
+// Rises into place the first time it scrolls into view. Rendered visible; only
+// once mounted, and only if it is still below the fold, it is hidden and then
+// animated in, so nothing already on screen ever disappears.
 export function RiseIn({
   children,
   delay = 0,
@@ -60,17 +76,36 @@ export function RiseIn({
   className?: string;
   testId?: string;
 }) {
+  const reduce = useReducedMotion();
+  const [scope, animate] = useAnimate<HTMLDivElement>();
+
+  useEffect(() => {
+    const element = scope.current;
+    if (reduce || !element) return;
+    if (element.getBoundingClientRect().top < window.innerHeight) return;
+    animate(element, { opacity: 0, y: 40 }, { duration: 0 });
+    const stop = inView(
+      element,
+      () => {
+        animate(
+          element,
+          { opacity: 1, y: 0 },
+          { type: "spring", stiffness: 240, damping: 20, delay },
+        );
+        stop();
+      },
+      { amount: 0.2 },
+    );
+    return () => {
+      stop();
+      // Leave the card visible if the effect is torn down mid-way.
+      animate(element, { opacity: 1, y: 0 }, { duration: 0 });
+    };
+  }, [reduce, animate, scope, delay]);
+
   return (
-    <motion.div
-      data-motion=""
-      data-testid={testId}
-      className={className}
-      initial={{ opacity: 0, y: 40 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.2 }}
-      transition={{ type: "spring", stiffness: 240, damping: 20, delay }}
-    >
+    <div ref={scope} data-motion="" data-testid={testId} className={className}>
       {children}
-    </motion.div>
+    </div>
   );
 }

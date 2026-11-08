@@ -112,14 +112,25 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="relative left-1/2 z-10 -mb-6 w-[112%] -translate-x-1/2 -rotate-2 overflow-hidden border-y-[3px] border-[#2a0081] bg-[#ffd3f0] py-3 text-[#2a0081]">
-        <div className="landing-ticker flex w-max">
+      {/* Decorative: the same items are in the features section. */}
+      <div
+        aria-hidden="true"
+        className="relative left-1/2 z-10 -mb-6 w-[112%] -translate-x-1/2 -rotate-2 overflow-hidden border-y-[3px] border-[#2a0081] bg-[#ffd3f0] py-3 text-[#2a0081]"
+      >
+        {/* Under reduced motion: a short, still row that fits a 360 px phone. */}
+        <div
+          data-testid="ticker-static"
+          className={`${displayClass} mx-auto hidden w-fit items-center justify-center gap-3 text-xl whitespace-nowrap motion-reduce:flex sm:gap-5 sm:text-3xl`}
+        >
+          Agenda
+          <Sparkle className="size-4 sm:size-5" />
+          Fichas
+          <Sparkle className="size-4 sm:size-5" />
+          Financeiro
+        </div>
+        <div className="landing-ticker flex w-max motion-reduce:hidden">
           {[0, 1].map((copy) => (
-            <ul
-              key={copy}
-              aria-hidden={copy === 1 ? true : undefined}
-              className="flex shrink-0 items-center"
-            >
+            <ul key={copy} className="flex shrink-0 items-center">
               {TICKER.map((item) => (
                 <li
                   key={item}
