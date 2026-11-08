@@ -818,6 +818,7 @@ describe("client access", () => {
       "payment_methods",
       "audit_logs",
       "media",
+      "clinic_photos",
       "reviews",
       "loyalty_redemptions",
       "users",
@@ -889,6 +890,8 @@ describe("client access", () => {
       [
         "client_business_hours",
         "client_busy_intervals",
+        "client_clinic_photo",
+        "client_clinic_photos",
         "client_context",
         "client_loyalty_progress",
         "client_my_clinics",

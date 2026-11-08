@@ -14,24 +14,38 @@ function initials(name: string) {
     .join("");
 }
 
-// Top of the clinic page: the space's photos area (empty for now), the
-// owner's photo or initials, the name, the area and the open/closed line.
+// Top of the clinic page: the cover (the first photo of the space, or an empty
+// area without photos), the owner's photo or initials, the name, the area and
+// the open/closed line.
 export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
   const name = clinicName(page);
   const status = openStatus(page.hours, page.timezone, now);
+  const cover = page.photos[0];
 
   return (
     <header className="grid gap-0">
-      <div
-        className="flex h-36 flex-col items-center justify-center gap-1 rounded-2xl border bg-muted text-muted-foreground"
-        style={{
-          backgroundImage:
-            "repeating-linear-gradient(45deg, transparent 0 10px, color-mix(in srgb, currentColor 6%, transparent) 10px 20px)",
-        }}
-      >
-        <Icon name="image" className="size-6 shrink-0" />
-        <span className="text-sm">Fotos em breve</span>
-      </div>
+      {cover ? (
+        // eslint-disable-next-line @next/next/no-img-element -- served by the /fotos route handler
+        <img
+          src={`/${page.slug}/fotos/${cover.id}`}
+          alt={`Espaço de ${name}`}
+          width={cover.width}
+          height={cover.height}
+          fetchPriority="high"
+          className="h-44 w-full rounded-2xl bg-muted object-cover"
+        />
+      ) : (
+        <div
+          className="flex h-36 flex-col items-center justify-center gap-1 rounded-2xl border bg-muted text-muted-foreground"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(45deg, transparent 0 10px, color-mix(in srgb, currentColor 6%, transparent) 10px 20px)",
+          }}
+        >
+          <Icon name="image" className="size-6 shrink-0" />
+          <span className="text-sm">Fotos em breve</span>
+        </div>
+      )}
       <div className="relative -mt-8 flex items-end gap-3 px-3">
         {page.hasOwnerPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element -- served by the /foto route handler

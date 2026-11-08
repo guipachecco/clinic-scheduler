@@ -6,10 +6,17 @@ import { AMENITY_LABELS } from "@/modules/clinic-page/fields";
 import type { ClinicPage } from "@/modules/clinic-page/public";
 
 import { AMENITY_ICONS, Icon, type IconName } from "../icons";
-import { instagramUrl, mapsLink, priceLabel, whatsappUrl } from "../ui";
+import {
+  clinicName,
+  instagramUrl,
+  mapsLink,
+  priceLabel,
+  whatsappUrl,
+} from "../ui";
 
 import { CopyPhone } from "./copy-phone";
 import { WEEKDAY_NAMES } from "./open-status";
+import { PhotoGallery } from "./photo-gallery";
 
 function Section({
   title,
@@ -338,7 +345,16 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
   );
 }
 
-export function PhotosTab() {
+export function PhotosTab({ page }: { page: ClinicPage }) {
+  if (page.photos.length > 0) {
+    return (
+      <PhotoGallery
+        slug={page.slug}
+        clinicName={clinicName(page)}
+        photos={page.photos}
+      />
+    );
+  }
   return (
     <div className="flex flex-col items-center gap-2 rounded-xl border bg-card p-6 text-center text-muted-foreground">
       <Icon name="image" className="size-6 shrink-0" />

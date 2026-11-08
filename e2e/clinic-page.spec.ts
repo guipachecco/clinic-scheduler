@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
+import sharp from "sharp";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
@@ -64,6 +65,8 @@ async function removeClinics(client: Client) {
     )
   ).rows.map((row) => row.id);
   for (const table of [
+    "clinic_photos",
+    "media",
     "reviews",
     "audit_logs",
     "loyalty_redemptions",
@@ -321,6 +324,61 @@ test.describe("página inicial da clínica", () => {
       page.getByRole("tabpanel").getByText("Fotos em breve"),
     ).toBeVisible();
     await expect(page.getByText("Fechado hoje")).toBeVisible();
+  });
+
+  test("photos fill the cover and the Fotos tab, which opens them full screen", async ({
+    page,
+  }) => {
+    // Two photos of the BARE clinic, straight in the database (the upload
+    // itself is covered by the integration tests).
+    const ids = await withDb(async (client) => {
+      const {
+        rows: [clinic],
+      } = await client.query<{ id: string }>(
+        "SELECT id FROM clinics WHERE slug = $1",
+        [BARE.slug],
+      );
+      const created: string[] = [];
+      for (const [position, color] of ["#c08060", "#406080"].entries()) {
+        const data = await sharp({
+          create: { width: 400, height: 300, channels: 3, background: color },
+        })
+          .webp()
+          .toBuffer();
+        const {
+          rows: [mediaRow],
+        } = await client.query<{ id: string }>(
+          `INSERT INTO media (clinic_id, kind, mime_type, data, byte_size, width, height)
+           VALUES ($1, 'photo', 'image/webp', $2, $3, 400, 300) RETURNING id`,
+          [clinic!.id, data, data.length],
+        );
+        const {
+          rows: [photo],
+        } = await client.query<{ id: string }>(
+          `INSERT INTO clinic_photos (clinic_id, media_id, position)
+           VALUES ($1, $2, $3) RETURNING id`,
+          [clinic!.id, mediaRow!.id, position],
+        );
+        created.push(photo!.id);
+      }
+      return created;
+    });
+
+    await page.goto(`/${BARE.slug}`);
+    const cover = page.getByRole("img", { name: /^Espaço de / });
+    await expect(cover).toHaveAttribute("src", `/${BARE.slug}/fotos/${ids[0]}`);
+    await expect(page.getByText("Fotos em breve")).toHaveCount(0);
+    const image = await page.request.get(`/${BARE.slug}/fotos/${ids[1]}`);
+    expect(image.headers()["content-type"]).toBe("image/webp");
+
+    await page.getByRole("tab", { name: "Fotos" }).click();
+    await page.getByRole("button", { name: "Ver foto 1 de 2" }).click();
+    const viewer = page.getByRole("dialog");
+    await expect(viewer.getByText("1 de 2")).toBeVisible();
+    await viewer.getByRole("button", { name: "Próxima foto" }).click();
+    await expect(viewer.getByText("2 de 2")).toBeVisible();
+    await viewer.getByRole("button", { name: "Fechar" }).click();
+    await expect(viewer).toBeHidden();
   });
 
   test("online booking off shows contact instead of Agendar", async ({
