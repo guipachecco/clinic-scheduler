@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { Route } from "next";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -20,10 +21,10 @@ const EXPIRED =
   "O link venceu ou já foi usado. Peça um novo em Esqueci minha senha.";
 
 export function NewPasswordForm({
-  slug,
+  signInHref,
   token,
 }: {
-  slug: string;
+  signInHref: string;
   token: string;
 }) {
   const [done, setDone] = useState(false);
@@ -55,7 +56,7 @@ export function NewPasswordForm({
       <div role="status" className="grid gap-3 rounded-2xl border bg-card p-4">
         <p>Senha alterada. Entre com a nova senha.</p>
         <Button asChild size="lg">
-          <Link href={`/${slug}/entrar`}>Entrar</Link>
+          <Link href={signInHref as Route}>Entrar</Link>
         </Button>
       </div>
     );

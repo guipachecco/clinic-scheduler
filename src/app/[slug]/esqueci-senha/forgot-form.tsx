@@ -16,7 +16,7 @@ import { TextField } from "../text-field";
 const SENT =
   "Se existir uma conta com esse e-mail, enviamos um link para criar uma nova senha. Confira também a caixa de spam.";
 
-export function ForgotPasswordForm({ slug }: { slug: string }) {
+export function ForgotPasswordForm({ redirectTo }: { redirectTo: string }) {
   const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const {
@@ -27,11 +27,11 @@ export function ForgotPasswordForm({ slug }: { slug: string }) {
 
   async function onSubmit(values: ForgotValues) {
     setFormError(null);
-    // Through Better Auth's endpoint (rate limited). The e-mail links to this
-    // clinic's page (src/modules/clients/auth-emails.ts).
+    // Through Better Auth's endpoint (rate limited). `redirectTo` is the
+    // new-password page of a clinic or of Zemana (auth-emails.ts).
     const { error } = await authClient.requestPasswordReset({
       email: values.email,
-      redirectTo: `/${slug}/nova-senha`,
+      redirectTo,
     });
     if (error) {
       setFormError(authErrorMessage(error));

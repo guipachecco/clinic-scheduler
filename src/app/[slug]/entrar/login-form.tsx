@@ -15,7 +15,14 @@ import { loginSchema, type LoginValues } from "@/modules/clients/forms";
 import { TextField } from "../text-field";
 
 // Signs in through Better Auth's endpoint, so its rate limit applies.
-export function ClientLoginForm({ next }: { next: string }) {
+export function ClientLoginForm({
+  next,
+  panelMessage = "Essa conta entra pelo painel da clínica.",
+}: {
+  next: string;
+  // Shown to a two-factor (panel) account.
+  panelMessage?: string;
+}) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const {
@@ -33,7 +40,7 @@ export function ClientLoginForm({ next }: { next: string }) {
     }
     // Panel accounts have two-factor sign-in: they belong in the panel.
     if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
-      setFormError("Essa conta entra pelo painel da clínica.");
+      setFormError(panelMessage);
       return;
     }
     router.replace(next as Route);

@@ -27,6 +27,9 @@ type AuthEmailInput = {
 
 type ClinicPage = { slug: string; name: string };
 
+// The callbackURL the Zemana "Esqueci minha senha" page asks for.
+const ZEMANA_RESET_CALLBACK = "/nova-senha";
+
 const baseUrl = () => env.BETTER_AUTH_URL.replace(/\/+$/, "");
 
 function callbackOf(url: string): string | null {
@@ -106,7 +109,21 @@ export async function sendResetPasswordEmail(input: AuthEmailInput) {
 async function deliverResetPasswordEmail({ user, url, token }: AuthEmailInput) {
   // Panel accounts change their password with `pnpm admin`, never by e-mail.
   if (user.role !== "client") return;
-  const clinic = await clinicPageFromCallback(callbackOf(url));
+  const callback = callbackOf(url);
+  // The Zemana pages (no clinic): the same e-mail without a clinic name.
+  if (callback === ZEMANA_RESET_CALLBACK) {
+    await sendEmail({
+      to: user.email,
+      ...resetPasswordEmail({
+        baseUrl: baseUrl(),
+        url: `${baseUrl()}${ZEMANA_RESET_CALLBACK}?token=${encodeURIComponent(token)}`,
+        userName: user.name,
+        clinicName: null,
+      }),
+    });
+    return;
+  }
+  const clinic = await clinicPageFromCallback(callback);
   // The new password is typed on a clinic page; without one there is no page
   // to send the client to.
   if (!clinic) {

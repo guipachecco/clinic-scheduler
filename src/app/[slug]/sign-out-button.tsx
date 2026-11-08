@@ -1,19 +1,20 @@
 "use client";
 
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
-export function SignOutButton({ slug }: { slug: string }) {
+export function SignOutButton({ to }: { to: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
   async function signOut() {
     setPending(true);
     await authClient.signOut();
-    router.replace(`/${slug}`);
+    router.replace(to as Route);
     router.refresh();
   }
 

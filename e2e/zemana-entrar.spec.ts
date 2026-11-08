@@ -1,0 +1,210 @@
+import { expect, test, type Page } from "@playwright/test";
+import { Client } from "pg";
+
+import { E2E_DATABASE_URL } from "../playwright.config";
+
+import { clearRateLimits, readOutbox, waitForEmailLink } from "./helpers";
+import { TEST_ADMIN } from "./test-account";
+
+// The Zemana client pages (/entrar, /minhas-clinicas, /esqueci-senha,
+// /nova-senha). Clinics and people are seeded straight into the e2e database
+// with their own slugs and e-mails, and removed afterwards. Every record is
+// fictitious.
+test.describe.configure({ mode: "serial" });
+
+const PREFIX = "zemana-entrar-";
+const DOMAIN = "@zemana-entrar.example.test";
+const SLUGS = { a: `${PREFIX}a`, b: `${PREFIX}b`, other: `${PREFIX}outra` };
+const PASSWORD = TEST_ADMIN.password;
+const NEW_PASSWORD = "nova-senha-da-cliente-zemana-longa";
+
+const people = {
+  client: { name: "Cliente Zemana", email: `cliente${DOMAIN}` },
+  empty: { name: "Cliente Sem Clinica", email: `sem-clinica${DOMAIN}` },
+  neighbour: { name: "Outra Cliente", email: `outra${DOMAIN}` },
+  panel: { name: "Dona do Painel Zemana", email: `painel${DOMAIN}` },
+};
+
+async function withDb<T>(run: (db: Client) => Promise<T>) {
+  const db = new Client({ connectionString: E2E_DATABASE_URL });
+  await db.connect();
+  try {
+    return await run(db);
+  } finally {
+    await db.end();
+  }
+}
+
+async function cleanUp(db: Client) {
+  await db.query(
+    `DELETE FROM patients WHERE clinic_id IN
+       (SELECT id FROM clinics WHERE slug LIKE $1)`,
+    [`${PREFIX}%`],
+  );
+  await db.query("DELETE FROM users WHERE email LIKE $1", [`%${DOMAIN}`]);
+  await db.query("DELETE FROM clinics WHERE slug LIKE $1", [`${PREFIX}%`]);
+}
+
+async function signInAt(page: Page, email: string, password: string) {
+  await page.goto("/entrar");
+  await page.getByLabel("E-mail").fill(email);
+  await page.getByLabel("Senha").fill(password);
+  await page.getByRole("button", { name: "Entrar" }).click();
+}
+
+test.beforeAll(async () => {
+  await clearRateLimits();
+  await withDb(async (db) => {
+    await cleanUp(db);
+    // Same password as the e2e admin: reuse its stored hash.
+    const {
+      rows: [admin],
+    } = await db.query<{ password: string }>(
+      `SELECT a.password FROM accounts a JOIN users u ON u.id = a.user_id
+       WHERE u.email = $1`,
+      [TEST_ADMIN.email],
+    );
+    const clinicIds: Record<string, string> = {};
+    for (const [key, name, area] of [
+      ["a", "Zemana Entrar Clínica A", "Estética"],
+      ["b", "Zemana Entrar Clínica B", "Massagem"],
+      ["other", "Zemana Entrar Clínica Alheia", "Podologia"],
+    ] as const) {
+      const {
+        rows: [clinic],
+      } = await db.query<{ id: string }>(
+        `INSERT INTO clinics (slug, name, area_label) VALUES ($1, $2, $3)
+         RETURNING id`,
+        [SLUGS[key], name, area],
+      );
+      clinicIds[key] = clinic!.id;
+    }
+    const userIds: Record<string, string> = {};
+    for (const [key, person] of Object.entries(people)) {
+      const panel = key === "panel";
+      const {
+        rows: [user],
+      } = await db.query<{ id: string }>(
+        `INSERT INTO users (name, email, email_verified, role, clinic_id,
+           two_factor_enabled)
+         VALUES ($1, $2, true, $3, $4, $5) RETURNING id`,
+        [
+          person.name,
+          person.email,
+          panel ? "admin" : "client",
+          panel ? clinicIds.a : null,
+          panel,
+        ],
+      );
+      userIds[key] = user!.id;
+      await db.query(
+        `INSERT INTO accounts (user_id, account_id, provider_id, password)
+         VALUES ($1::uuid, $1::text, 'credential', $2)`,
+        [user!.id, admin!.password],
+      );
+    }
+    const records: [string, string][] = [
+      [clinicIds.a!, userIds.client!],
+      [clinicIds.b!, userIds.client!],
+      [clinicIds.other!, userIds.neighbour!],
+    ];
+    for (const [clinicId, userId] of records) {
+      await db.query(
+        `INSERT INTO patients (clinic_id, user_id, name, name_normalized, phone)
+         VALUES ($1, $2, 'Ficha Zemana', 'ficha zemana', '+5511987658800')`,
+        [clinicId, userId],
+      );
+    }
+  });
+});
+
+test.afterAll(async () => {
+  await withDb(cleanUp);
+});
+
+test("client signs in at /entrar and sees only her clinics", async ({
+  page,
+}) => {
+  await signInAt(page, people.client.email, PASSWORD);
+  await expect(page).toHaveURL(/\/minhas-clinicas$/);
+  await expect(
+    page.getByRole("heading", { name: "Suas clínicas" }),
+  ).toBeVisible();
+  await expect(page.getByText("Zemana Entrar Clínica A")).toBeVisible();
+  await expect(page.getByText("Zemana Entrar Clínica B")).toBeVisible();
+  await expect(page.getByText("Zemana Entrar Clínica Alheia")).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Agendar" }).first(),
+  ).toHaveAttribute("href", `/${SLUGS.a}/marcar`);
+  await expect(
+    page.getByRole("link", { name: "Meus horários" }).first(),
+  ).toHaveAttribute("href", `/${SLUGS.a}/meus-horarios`);
+
+  // Already signed in: /entrar goes back to the list.
+  await page.goto("/entrar");
+  await expect(page).toHaveURL(/\/minhas-clinicas$/);
+
+  await page.getByRole("button", { name: "Sair" }).click();
+  await expect(page).toHaveURL(/\/entrar$/);
+});
+
+test("client without clinics sees the empty message", async ({ page }) => {
+  await signInAt(page, people.empty.email, PASSWORD);
+  await expect(page).toHaveURL(/\/minhas-clinicas$/);
+  await expect(
+    page.getByText(
+      "Você ainda não é cliente de nenhuma clínica. Peça o link para a sua profissional.",
+    ),
+  ).toBeVisible();
+});
+
+test("panel account is sent to the panel", async ({ page }) => {
+  await signInAt(page, people.panel.email, PASSWORD);
+  await expect(page.getByText("Essa conta entra pelo painel.")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "É profissional? Entre no painel" }),
+  ).toHaveAttribute("href", "/admin/entrar");
+  await expect(page).toHaveURL(/\/entrar$/);
+});
+
+test("forgot password from Zemana e-mails a /nova-senha link", async ({
+  page,
+}) => {
+  await page.goto("/entrar");
+  await page.getByRole("link", { name: "Esqueci minha senha" }).click();
+  await expect(page).toHaveURL(/\/esqueci-senha$/);
+  await page.getByLabel("E-mail").fill(people.client.email);
+  await page.getByRole("button", { name: "Enviar link" }).click();
+  await expect(
+    page.getByText("Se existir uma conta com esse e-mail"),
+  ).toBeVisible();
+
+  const link = await waitForEmailLink(
+    people.client.email,
+    "/nova-senha?token=",
+  );
+  const mail = (await readOutbox())
+    .filter((message) => message.to === people.client.email)
+    .at(-1)!;
+  expect(mail.subject).toBe("Troque sua senha da Zemana");
+
+  await page.goto(link);
+  await page.getByLabel("Nova senha", { exact: true }).fill(NEW_PASSWORD);
+  await page.getByLabel("Repita a nova senha").fill(NEW_PASSWORD);
+  await page.getByRole("button", { name: "Salvar nova senha" }).click();
+  await expect(page.getByText("Senha alterada")).toBeVisible();
+  await page.getByRole("link", { name: "Entrar" }).click();
+  await expect(page).toHaveURL(/\/entrar$/);
+
+  await page.getByLabel("E-mail").fill(people.client.email);
+  await page.getByLabel("Senha").fill(NEW_PASSWORD);
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await expect(page).toHaveURL(/\/minhas-clinicas$/);
+});
+
+test("reserved paths are not clinics", async ({ page }) => {
+  const response = await page.goto("/minhas-clinicas");
+  await expect(page).toHaveURL(/\/entrar$/);
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { name: "Entrar" })).toBeVisible();
+});

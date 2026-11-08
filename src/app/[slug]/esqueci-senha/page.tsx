@@ -17,7 +17,7 @@ export default async function ForgotPasswordPage({
       <PageTitle description="Enviamos um link para você criar uma nova senha.">
         Esqueci minha senha
       </PageTitle>
-      <ForgotPasswordForm slug={clinic.slug} />
+      <ForgotPasswordForm redirectTo={`/${clinic.slug}/nova-senha`} />
     </>
   );
 }

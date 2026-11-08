@@ -27,7 +27,7 @@ export default async function ProfilePage({
           <span className="font-semibold break-all">{user.email}</span>
         </div>
       </section>
-      <SignOutButton slug={slug} />
+      <SignOutButton to={`/${slug}`} />
     </>
   );
 }
