@@ -3,7 +3,12 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { clearRateLimits, readOutbox, waitForEmailLink } from "./helpers";
+import {
+  clearRateLimits,
+  readOutbox,
+  signInWithFreshTwoFactor,
+  waitForEmailLink,
+} from "./helpers";
 import { TEST_ADMIN } from "./test-account";
 
 // The Zemana client pages (/entrar, /minhas-clinicas, /esqueci-senha,
@@ -23,6 +28,8 @@ const people = {
   empty: { name: "Cliente Sem Clinica", email: `sem-clinica${DOMAIN}` },
   neighbour: { name: "Outra Cliente", email: `outra${DOMAIN}` },
   panel: { name: "Dona do Painel Zemana", email: `painel${DOMAIN}` },
+  // Panel owner without 2FA yet, for the signed-in redirect test.
+  owner: { name: "Dona Logada Zemana", email: `dona-logada${DOMAIN}` },
 };
 
 async function withDb<T>(run: (db: Client) => Promise<T>) {
@@ -81,7 +88,7 @@ test.beforeAll(async () => {
     }
     const userIds: Record<string, string> = {};
     for (const [key, person] of Object.entries(people)) {
-      const panel = key === "panel";
+      const panel = key === "panel" || key === "owner";
       const {
         rows: [user],
       } = await db.query<{ id: string }>(
@@ -93,7 +100,7 @@ test.beforeAll(async () => {
           person.email,
           panel ? "admin" : "client",
           panel ? clinicIds.a : null,
-          panel,
+          key === "panel",
         ],
       );
       userIds[key] = user!.id;
@@ -207,4 +214,14 @@ test("reserved paths are not clinics", async ({ page }) => {
   await expect(page).toHaveURL(/\/entrar$/);
   expect(response?.status()).toBe(200);
   await expect(page.getByRole("heading", { name: "Entrar" })).toBeVisible();
+});
+
+test("signed-in panel owner is sent to the panel from /entrar and /minhas-clinicas", async ({
+  page,
+}) => {
+  await signInWithFreshTwoFactor(page, { ...people.owner, password: PASSWORD });
+  await page.goto("/entrar");
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.goto("/minhas-clinicas");
+  await expect(page).toHaveURL(/\/admin$/);
 });

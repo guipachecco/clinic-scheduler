@@ -188,6 +188,12 @@ describe("sessions and e-mails", () => {
     });
     expect(await readOutbox()).toEqual([]);
 
+    // The Zemana reset page is for clients too: a panel account gets nothing.
+    await auth.api.requestPasswordReset({
+      body: { email: `dona-reset${DOMAIN}`, redirectTo: "/nova-senha" },
+    });
+    expect(await readOutbox()).toEqual([]);
+
     await auth.api.requestPasswordReset({
       body: { email: `reset${DOMAIN}`, redirectTo: "/grais/nova-senha" },
     });
@@ -344,6 +350,16 @@ describe("database rules", () => {
       code = findPgError(error)?.code;
     }
     expect(code).toBe("23514");
+  });
+
+  it("generated image routes are reserved slugs", async () => {
+    for (const slug of ["opengraph-image", "twitter-image"]) {
+      const result = await createClinic(
+        { name: "Clínica Imagem", slug },
+        randomUUID(),
+      );
+      expect(result).toMatchObject({ ok: false });
+    }
   });
 
   it("reserved slug is refused", async () => {

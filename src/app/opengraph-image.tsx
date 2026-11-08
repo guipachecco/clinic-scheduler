@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 
 // The picture shown when the Zemana site is shared (WhatsApp, Instagram):
-// brand yellow, the Zemana symbol and the headline. Generated at build time.
+// brand yellow, the Zemana symbol and the headline.
+// Rendered once at build time (static route).
 export const alt = "Zemana: sua agenda, sem bagunça.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";

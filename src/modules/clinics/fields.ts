@@ -17,6 +17,8 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "_next",
   "icon.png",
   "apple-icon.png",
+  "opengraph-image",
+  "twitter-image",
   "favicon.ico",
   "robots.txt",
   "sitemap.xml",
