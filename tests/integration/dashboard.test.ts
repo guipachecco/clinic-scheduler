@@ -223,6 +223,24 @@ beforeAll(async () => {
     end: "2026-11-12T11:00:00-03:00",
     status: "cancelled",
   });
+  // Friday: first non-cancelled one after the cancelled-only Thursday.
+  ids.friday = await seedAppointment({
+    clinic: clinicId,
+    patientId: maria!.id,
+    serviceId,
+    start: "2026-11-13T09:00:00-03:00",
+    end: "2026-11-13T10:00:00-03:00",
+    status: "confirmed",
+  });
+  // Another clinic: a requested one on Wednesday, no pending links.
+  ids.strangerRequested = await seedAppointment({
+    clinic: otherId,
+    patientId: stranger!.id,
+    serviceId: otherServiceId,
+    start: "2026-11-11T09:00:00-03:00",
+    end: "2026-11-11T10:00:00-03:00",
+    status: "requested",
+  });
   // Another clinic, same Tuesday.
   ids.stranger = await seedAppointment({
     clinic: otherId,
@@ -288,7 +306,7 @@ describe("getDayAgenda", () => {
   it("anonymizes the patient name and hides the phone", async () => {
     const day = await getDayAgenda(clinicId, "2026-11-10", NOW);
     const item = day.items.find((i) => i.id === ids.anonymized)!;
-    expect(item.patientName).toBe("Paciente anonimizada");
+    expect(item.patientName).toBe("Paciente anonimizado");
     expect(item.patientPhone).toBeNull();
   });
 
@@ -311,11 +329,42 @@ describe("getWeekMarks", () => {
     expect(await getWeekMarks(clinicId, "2026-11-10", 4)).toEqual([
       "2026-11-10",
       "2026-11-11",
+      "2026-11-13",
+    ]);
+  });
+
+  it("never marks another clinic's days", async () => {
+    expect(await getWeekMarks(otherId, "2026-11-12", 3)).toEqual([]);
+    expect(await getWeekMarks(otherId, "2026-11-10", 3)).toEqual([
+      "2026-11-10",
+      "2026-11-11",
     ]);
   });
 });
 
 describe("getPanelHome", () => {
+  it("counts alerts from each source separately", async () => {
+    // Clinic with a pending link and no requested appointment left: after Wednesday.
+    const links = await getPanelHome(
+      clinicId,
+      new Date("2026-11-12T12:00:00Z"),
+    );
+    expect(links.alerts).toBe(1);
+    // Clinic with a requested appointment and no pending link.
+    const requested = await getPanelHome(
+      otherId,
+      new Date("2026-11-10T09:00:00Z"),
+    );
+    expect(requested.alerts).toBe(1);
+  });
+
+  it("skips a day with only cancelled appointments", async () => {
+    // Wednesday 17:00 local: nothing left today; Thursday has only a cancelled one.
+    const home = await getPanelHome(clinicId, new Date("2026-11-11T20:00:00Z"));
+    expect(home.next).toBeNull();
+    expect(home.nextDayFirst?.id).toBe(ids.friday);
+  });
+
   it("picks the next appointment before the first one", async () => {
     const home = await getPanelHome(clinicId, new Date("2026-11-10T09:00:00Z"));
     expect(home.today.date).toBe("2026-11-10");

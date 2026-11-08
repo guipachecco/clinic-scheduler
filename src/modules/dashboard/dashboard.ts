@@ -7,6 +7,7 @@ import { inClinic } from "@/db/client";
 import { appointments, patients, services } from "@/db/schema";
 import { countRequestedFrom } from "@/modules/appointments/appointments";
 import { getClinicTimezone } from "@/modules/clinic-page/panel";
+import { ANONYMIZED_NAME } from "@/modules/patients/patients";
 import { listPendingLinks } from "@/modules/patients/links";
 import {
   findBlocksAndHours,
@@ -27,7 +28,6 @@ import {
 
 const MINUTE = 60_000;
 const LOOK_AHEAD_DAYS = 14;
-const ANONYMIZED_LABEL = "Paciente anonimizada";
 
 export type DayAgenda = {
   date: string;
@@ -76,7 +76,7 @@ function toItem(row: {
     online: row.source === "online",
     priceCents: row.priceCents,
     patientId: row.patientId,
-    patientName: anonymized ? ANONYMIZED_LABEL : row.name,
+    patientName: anonymized ? ANONYMIZED_NAME : row.name,
     patientPhone: anonymized ? null : row.phone,
     serviceName: row.customLabel ?? row.serviceName,
     durationMinutes: Math.round(
