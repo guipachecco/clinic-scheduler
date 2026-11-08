@@ -28,9 +28,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="grid gap-3">
+    <section className="grid gap-3 pt-2">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-heading text-lg font-semibold">{title}</h2>
+        <h2 className="font-heading text-xl font-extrabold tracking-tight">
+          {title}
+        </h2>
         {action}
       </div>
       {children}
@@ -61,13 +63,13 @@ export function Amenities({
   if (amenities.length === 0) return null;
   return (
     <Section title="Comodidades">
-      <ul className="flex flex-wrap gap-2">
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-2.5">
         {amenities.map((key) => (
-          <li
-            key={key}
-            className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm"
-          >
-            <Icon name={AMENITY_ICONS[key]} className="size-4 shrink-0" />
+          <li key={key} className="inline-flex items-center gap-2 text-sm">
+            <Icon
+              name={AMENITY_ICONS[key]}
+              className="size-5 shrink-0 text-primary"
+            />
             {AMENITY_LABELS[key]}
           </li>
         ))}
@@ -116,9 +118,9 @@ export function Reviews({
         </p>
       ) : null}
       {reviews.length > 0 ? (
-        <ul className="grid gap-2">
+        <ul className="divide-y border-y">
           {reviews.slice(0, 10).map((review) => (
-            <li key={review.id} className="rounded-xl border bg-card p-3">
+            <li key={review.id} className="py-3">
               <div className="flex items-center justify-between gap-2">
                 <b className="text-sm">{review.author}</b>
                 <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
@@ -143,7 +145,7 @@ export function Location({ page }: { page: ClinicPage }) {
   if (!page.address && !href) return null;
   return (
     <Section title="Localização">
-      <div className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3">
+      <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 text-sm">{page.address ?? "Ver no mapa"}</p>
         {href ? (
           <Button asChild size="sm" variant="outline">
@@ -202,13 +204,16 @@ export function PaymentMethods({ methods }: { methods: string[] }) {
   if (methods.length === 0) return null;
   return (
     <Section title="Formas de pagamento">
-      <ul className="flex flex-wrap gap-2">
-        {methods.map((name) => (
-          <li
-            key={name}
-            className="rounded-full border bg-card px-3 py-1.5 text-sm"
-          >
+      <ul className="flex flex-wrap gap-x-1.5 gap-y-1 text-sm">
+        {methods.map((name, index) => (
+          <li key={name}>
             {name}
+            {index < methods.length - 1 ? (
+              <span aria-hidden="true" className="text-muted-foreground">
+                {" "}
+                ·
+              </span>
+            ) : null}
           </li>
         ))}
       </ul>
@@ -288,60 +293,102 @@ export function Contacts({ page }: { page: ClinicPage }) {
 
 // ---- Tab contents ----
 
-// Shown only when the clinic has services (the home page drops the tab).
+// Shown only when the clinic has services (the home page drops the tab). A
+// plain list, one line per service: name and duration on the left, the price
+// on the right. With online booking on, the whole line opens the booking with
+// that service chosen.
 export function ServicesTab({ page }: { page: ClinicPage }) {
   return (
     <div className="grid gap-3">
-      {!page.onlineBookingEnabled && !page.whatsappPhone ? (
+      {!page.onlineBookingEnabled ? (
         <p className="text-sm text-muted-foreground">
-          Para marcar um horário, fale com a clínica pelos contatos abaixo.
+          {page.whatsappPhone
+            ? "Para marcar um horário, chame a clínica no WhatsApp."
+            : "Para marcar um horário, fale com a clínica pelos contatos abaixo."}
         </p>
       ) : null}
-      <ul className="grid gap-2">
+      <ul className="divide-y border-b">
         {page.services.map((service) => {
           const price = priceLabel(service.priceDisplay, service.priceCents);
-          return (
-            <li
-              key={service.id}
-              className="flex items-center justify-between gap-3 rounded-xl border bg-card p-3"
-            >
-              <div className="min-w-0">
-                <b className="block">{service.name}</b>
+          const body = (
+            <>
+              <span className="min-w-0 flex-1">
+                <span className="block font-heading text-base leading-snug font-bold">
+                  {service.name}
+                </span>
                 <span className="text-sm text-muted-foreground">
-                  {price ? (
-                    <span className="font-semibold text-primary">
-                      {price}
-                    </span>
-                  ) : null}
-                  {price ? " · " : ""}
                   {service.durationMinutes} min
                 </span>
-              </div>
-              {page.onlineBookingEnabled ? (
-                <Button asChild size="sm">
-                  <Link
-                    href={`/${page.slug}/marcar?servico=${service.id}` as Route}
-                  >
-                    Agendar
-                  </Link>
-                </Button>
-              ) : page.whatsappPhone ? (
-                <Button asChild size="sm" variant="outline">
-                  <a
-                    href={whatsappUrl(page.whatsappPhone)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Icon name="whatsapp" />
-                    Fale com a clínica
-                  </a>
-                </Button>
+              </span>
+              {price ? (
+                <span className="shrink-0 text-right font-heading text-base font-extrabold">
+                  {price}
+                </span>
               ) : null}
+            </>
+          );
+          return (
+            <li key={service.id}>
+              {page.onlineBookingEnabled ? (
+                <Link
+                  href={`/${page.slug}/marcar?servico=${service.id}` as Route}
+                  aria-label={`Agendar ${service.name}${price ? `, ${price}` : ""}`}
+                  className="flex min-h-16 items-center gap-3 py-3 outline-none hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                >
+                  {body}
+                  <Icon
+                    name="chevronRight"
+                    className="size-5 shrink-0 text-primary"
+                  />
+                </Link>
+              ) : (
+                <div className="flex min-h-16 items-center gap-3 py-3">
+                  {body}
+                </div>
+              )}
             </li>
           );
         })}
       </ul>
     </div>
+  );
+}
+
+// The one strong action of the page, fixed above the bottom navigation:
+// "Marcar horário", or the clinic's WhatsApp when online booking is off.
+export function BookingBar({ page }: { page: ClinicPage }) {
+  const className =
+    // Purple in the light theme, the Zemana yellow in the dark one.
+    "flex min-h-13 w-full items-center justify-center gap-2 rounded-full bg-primary font-heading text-base font-extrabold text-primary-foreground shadow-[0_0_0_4px_var(--background)] outline-none hover:bg-primary-pressed focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-highlight dark:text-highlight-foreground dark:hover:bg-highlight/90";
+  let action: React.ReactNode = null;
+  if (page.onlineBookingEnabled) {
+    action = (
+      <Link href={`/${page.slug}/marcar` as Route} className={className}>
+        Marcar horário
+      </Link>
+    );
+  } else if (page.whatsappPhone) {
+    action = (
+      <a
+        href={whatsappUrl(page.whatsappPhone)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={className}
+      >
+        <Icon name="whatsapp" />
+        Chamar no WhatsApp
+      </a>
+    );
+  }
+  if (!action) return null;
+  return (
+    <>
+      {/* Keeps the last section clear of the fixed bar. */}
+      <div aria-hidden="true" className="h-16" />
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10">
+        <div className="mx-auto w-full max-w-md px-4 pb-3">{action}</div>
+      </div>
+    </>
   );
 }
 
@@ -445,31 +492,24 @@ export function ProductsTab({
     currency: "BRL",
   });
   return (
-    <ul className="grid gap-2">
+    <ul className="divide-y border-b">
       {products.map((product) => (
-        <li
-          key={product.id}
-          className="flex items-center gap-3 rounded-xl border bg-card p-3"
-        >
-          <div
-            aria-hidden="true"
-            className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
-          >
-            <Icon name="bag" />
-          </div>
-          <div className="min-w-0">
-            <b className="block">{product.name}</b>
-            {product.priceCents !== null ? (
-              <span className="text-sm font-semibold text-primary">
-                {money.format(product.priceCents / 100)}
-              </span>
-            ) : null}
+        <li key={product.id} className="flex min-h-16 items-center gap-3 py-3">
+          <div className="min-w-0 flex-1">
+            <b className="block font-heading text-base leading-snug">
+              {product.name}
+            </b>
             {product.description ? (
               <p className="text-sm text-muted-foreground">
                 {product.description}
               </p>
             ) : null}
           </div>
+          {product.priceCents !== null ? (
+            <span className="shrink-0 font-heading text-base font-extrabold">
+              {money.format(product.priceCents / 100)}
+            </span>
+          ) : null}
         </li>
       ))}
     </ul>

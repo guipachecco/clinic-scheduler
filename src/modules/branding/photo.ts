@@ -11,10 +11,12 @@ import { reencodeImage } from "@/modules/media/reencode";
 
 const MAX_SIDE = 800;
 
+// actorUserId is the panel user, or null when the terminal command
+// (scripts/photos.ts) sets it, logged as the system.
 export async function saveOwnerPhoto(
   clinicId: string,
   input: { bytes: Buffer; mimeType: string },
-  actorUserId: string,
+  actorUserId: string | null,
 ): Promise<{ ok: true; mediaId: string } | { ok: false; formError: string }> {
   const encoded = await reencodeImage(input, {
     maxSide: MAX_SIDE,
@@ -60,7 +62,7 @@ export async function saveOwnerPhoto(
     }
     await tx.insert(auditLogs).values({
       clinicId,
-      actorType: "admin",
+      actorType: actorUserId ? "admin" : "system",
       actorUserId,
       action: "clinic.owner_photo_changed",
       entityType: "clinic",

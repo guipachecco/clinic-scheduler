@@ -18,6 +18,7 @@ import { Hero } from "./home/hero";
 import {
   AboutTab,
   Amenities,
+  BookingBar,
   Contacts,
   hasAbout,
   Hours,
@@ -207,6 +208,7 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
       <Hours page={page} today={today} />
       <PaymentMethods methods={page.paymentMethods} />
       <Contacts page={page} />
+      <BookingBar page={page} />
       <JsonLd data={clinicJsonLd(page)} />
     </>
   );
