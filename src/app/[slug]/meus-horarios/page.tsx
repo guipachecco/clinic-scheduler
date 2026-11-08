@@ -31,7 +31,14 @@ export default async function MyAppointmentsPage({
 }: PageProps<"/[slug]/meus-horarios">) {
   const { slug } = await params;
   const { ctx, clinic } = await requireClient(slug, `/${slug}/meus-horarios`);
-  const { upcoming, past } = await listMyAppointments(ctx);
+  const { upcoming: upcomingAll, past: pastAll } =
+    await listMyAppointments(ctx);
+  // Cancelled ones (upcoming or past) leave the lists and get their own.
+  const upcoming = upcomingAll.filter((item) => item.status !== "cancelled");
+  const past = pastAll.filter((item) => item.status !== "cancelled");
+  const cancelled = [...upcomingAll, ...pastAll]
+    .filter((item) => item.status === "cancelled")
+    .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   const name = clinicName(clinic);
 
   return (
@@ -81,6 +88,19 @@ export default async function MyAppointmentsPage({
           />
         </section>
       ) : null}
+
+      {cancelled.length > 0 ? (
+        <section aria-labelledby="desmarcados" className="grid gap-3">
+          <h2 id="desmarcados" className="font-heading text-lg font-semibold">
+            Desmarcados
+          </h2>
+          <AppointmentList
+            items={cancelled}
+            timezone={clinic.timezone}
+            slug={clinic.slug}
+          />
+        </section>
+      ) : null}
     </>
   );
 }
@@ -103,7 +123,11 @@ function AppointmentList({
         return (
           <li
             key={item.id}
-            className="grid gap-1 rounded-2xl border bg-card px-4 py-3 shadow-sm"
+            className={
+              item.status === "cancelled"
+                ? "grid gap-1 rounded-2xl border bg-muted/50 px-4 py-3 text-muted-foreground"
+                : "grid gap-1 rounded-2xl border bg-card px-4 py-3 shadow-sm"
+            }
           >
             <span className="flex items-center gap-2 font-semibold break-words">
               <Icon name="calendar" className="size-4 shrink-0 text-primary" />

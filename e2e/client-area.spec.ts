@@ -406,16 +406,25 @@ test.describe("client area", () => {
     await expect(
       client.getByRole("link", { name: /desmarcar|cancelar|remarcar/i }),
     ).toHaveCount(0);
+  });
 
-    // The owner cancels it: it shows as Desmarcado.
+  test("a cancelled appointment shows under Desmarcados, not Próximos horários", async () => {
+    // The owner cancels it.
     await query(
       `UPDATE appointments SET status = 'cancelled', cancelled_at = now(),
          cancelled_by = 'clinic', cancellation_reason = 'other'
        WHERE id = $1`,
       [appointmentId],
     );
-    await client.reload();
-    await expect(client.getByText("Desmarcado")).toBeVisible();
+    await client.goto(`/${A.slug}/meus-horarios`);
+    const upcoming = client.getByRole("region", { name: "Próximos horários" });
+    const cancelled = client.getByRole("region", { name: "Desmarcados" });
+    await expect(cancelled.getByText(A.service)).toBeVisible();
+    await expect(
+      cancelled.getByText("Desmarcado", { exact: true }),
+    ).toBeVisible();
+    await expect(upcoming.getByText(A.service)).toHaveCount(0);
+    await expect(upcoming.getByText("Nenhum horário marcado.")).toBeVisible();
   });
 
   test("no sideways scroll at 360 px", async () => {
