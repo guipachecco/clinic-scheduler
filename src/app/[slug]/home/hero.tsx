@@ -72,7 +72,7 @@ export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
         {page.areaLabel ? <p>{page.areaLabel}</p> : null}
         <p
           className={
-            status.open ? "font-semibold text-status-confirmed-foreground" : ""
+            status.open ? "font-semibold text-primary" : ""
           }
         >
           {status.label}

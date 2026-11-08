@@ -31,9 +31,14 @@ export default async function FinancePage() {
   return (
     <div className="grid gap-6">
       <PageTitle title="Financeiro">
-        <Button asChild>
-          <Link href="/admin/financeiro/orcamentos/novo">Novo orçamento</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/admin/financeiro/entradas/nova">Nova entrada</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/admin/financeiro/orcamentos/novo">Novo orçamento</Link>
+          </Button>
+        </div>
       </PageTitle>
       <FinanceTabs current="/admin/financeiro" />
 

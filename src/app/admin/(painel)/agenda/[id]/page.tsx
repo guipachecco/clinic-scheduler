@@ -8,6 +8,10 @@ import { getAppointment } from "@/modules/appointments/appointments";
 import { CANCELLATION_REASON_LABELS } from "@/modules/appointments/fields";
 import { requireAdmin } from "@/modules/auth/session";
 import {
+  getAppointmentBilling,
+  RECEIVABLE_STATUSES,
+} from "@/modules/finance/receipts";
+import {
   findSessionInstallment,
   listPaymentMethods,
 } from "@/modules/finance/sales";
@@ -19,7 +23,11 @@ import {
 import { listActiveServices } from "@/modules/services/services";
 
 import { AppointmentForm, type ServiceOption } from "../appointment-form";
-import { money } from "../../financeiro/ui";
+import {
+  ReceiptForm,
+  ReverseReceiptButton,
+} from "../../financeiro/receipt-forms";
+import { formatDay, money } from "../../financeiro/ui";
 import { PaymentForm } from "../../financeiro/vendas/[id]/sale-forms";
 import { StatusBadge } from "../status-badge";
 
@@ -40,10 +48,17 @@ export default async function AppointmentPage({
   const appointment = await getAppointment(clinicId, id);
   if (!appointment) notFound();
   // A package session paid per session: its open installment, to receive now.
-  const [sessionInstallment, methods] = await Promise.all([
+  // Otherwise a single appointment is received on the spot ("Receber").
+  const [sessionInstallment, methods, billing] = await Promise.all([
     findSessionInstallment(clinicId, appointment.id),
     listPaymentMethods(clinicId),
+    getAppointmentBilling(clinicId, appointment.id),
   ]);
+  const receivable =
+    !sessionInstallment &&
+    billing !== null &&
+    !billing.inPackage &&
+    (RECEIVABLE_STATUSES as readonly string[]).includes(appointment.status);
 
   const serviceText = appointment.customLabel
     ? `${appointment.customLabel} (${appointment.serviceName})`
@@ -136,6 +151,41 @@ export default async function AppointmentPage({
             methods={methods}
             today={todayLocal()}
             label="Receber agora"
+          />
+        </section>
+      ) : null}
+
+      {billing?.receipt ? (
+        <section
+          aria-labelledby="pagamento"
+          className="grid gap-3 rounded-2xl border bg-card p-4"
+        >
+          <h2 id="pagamento" className="font-heading text-lg font-semibold">
+            Pagamento
+          </h2>
+          <p>
+            Recebido: {money(billing.receipt.amountCents)} no{" "}
+            {billing.receipt.methodName} em{" "}
+            {formatDay(billing.receipt.receivedOn)}.
+          </p>
+          <ReverseReceiptButton receiptId={billing.receipt.id} />
+        </section>
+      ) : receivable ? (
+        <section
+          aria-labelledby="pagamento"
+          className="grid gap-3 rounded-2xl border bg-card p-4"
+        >
+          <h2 id="pagamento" className="font-heading text-lg font-semibold">
+            Pagamento
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Ainda não recebido. Confira o valor e a forma de pagamento.
+          </p>
+          <ReceiptForm
+            appointmentId={appointment.id}
+            defaultAmountCents={billing?.servicePriceCents}
+            methods={methods}
+            today={todayLocal()}
           />
         </section>
       ) : null}

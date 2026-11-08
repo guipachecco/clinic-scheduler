@@ -16,6 +16,7 @@ const CLINIC_ID = "00000000-0000-4000-8000-000000000100";
 const CATEGORY_ID = "00000000-0000-4000-8000-0000000000f1";
 const SERVICE_ID = "00000000-0000-4000-8000-0000000000f2";
 const PATIENT_ID = "00000000-0000-4000-8000-0000000000f3";
+const SINGLE_APPOINTMENT_ID = "00000000-0000-4000-8000-0000000000f4";
 const SERVICE = "Drenagem (teste financeiro)";
 const PATIENT = "Paula Financeira Fictícia";
 
@@ -70,8 +71,8 @@ test.describe("financeiro", () => {
   test.afterAll(async () => {
     await context.close();
     await sql(
-      `TRUNCATE sale_revisions, payments, expenses, installments, sale_sessions,
-         sale_items, sales, quote_items, quotes CASCADE`,
+      `TRUNCATE receipts, sale_revisions, payments, expenses, installments,
+         sale_sessions, sale_items, sales, quote_items, quotes CASCADE`,
     );
     await sql(`DELETE FROM appointments WHERE patient_id = $1`, [PATIENT_ID]);
     await sql(`DELETE FROM patients WHERE id = $1`, [PATIENT_ID]);
@@ -166,6 +167,68 @@ test.describe("financeiro", () => {
     await page.goto(`/admin/pacientes/${PATIENT_ID}`);
     const section = page.getByRole("region", { name: "Financeiro" });
     await expect(section).toContainText("Falta pagar: R$ 450,00");
+  });
+
+  test("receives a single appointment from its page and can reverse it", async () => {
+    // A confirmed appointment outside any package, two days after Monday.
+    const startsAt = nextMonday.plus({ days: 2 }).set({ hour: 14 });
+    const endsAt = startsAt.plus({ hours: 1 });
+    await sql(
+      `INSERT INTO appointments (id, clinic_id, patient_id, service_id, service_name,
+         service_duration_minutes, starts_at, ends_at, occupied_from, occupied_until,
+         status, source)
+       VALUES ($1, $2, $3, $4, $5, 60, $6, $7, $6, $7, 'confirmed', 'admin')`,
+      [
+        SINGLE_APPOINTMENT_ID,
+        CLINIC_ID,
+        PATIENT_ID,
+        SERVICE_ID,
+        SERVICE,
+        startsAt.toJSDate(),
+        endsAt.toJSDate(),
+      ],
+    );
+    await page.goto(`/admin/agenda/${SINGLE_APPOINTMENT_ID}`);
+    const payment = page.getByRole("region", { name: "Pagamento" });
+    await payment.getByRole("button", { name: "Receber" }).click();
+    await expect(payment.getByLabel("Valor")).toHaveValue("150,00");
+    await payment.getByLabel("Valor").fill("120,00");
+    await payment
+      .getByRole("button", { name: "Confirmar recebimento" })
+      .click();
+    await expect(payment).toContainText(/Recebido: R\$ 120,00 no .+ em /);
+
+    await page.goto("/admin/financeiro/caixa");
+    const row = page
+      .getByRole("listitem")
+      .filter({ hasText: `${SERVICE} · ${PATIENT}` });
+    await expect(row).toContainText("+ R$ 120,00");
+    page.once("dialog", (dialog) => dialog.accept("Valor lançado errado"));
+    await row.getByRole("button", { name: "Estornar" }).click();
+    await expect(
+      page.getByRole("listitem").filter({ hasText: `Estorno · ${SERVICE}` }),
+    ).toContainText("− R$ 120,00");
+
+    // Reversed: the appointment can be received again.
+    await page.goto(`/admin/agenda/${SINGLE_APPOINTMENT_ID}`);
+    await expect(
+      page
+        .getByRole("region", { name: "Pagamento" })
+        .getByRole("button", { name: "Receber" }),
+    ).toBeVisible();
+  });
+
+  test("Nova entrada records money outside the agenda", async () => {
+    await page.goto("/admin/financeiro");
+    await page.getByRole("link", { name: "Nova entrada" }).click();
+    await expect(page).toHaveURL(/\/admin\/financeiro\/entradas\/nova$/);
+    await page.getByLabel("O que foi pago").fill("Esmalte vinho (teste)");
+    await page.getByLabel("Valor").fill("18,90");
+    await page.getByRole("button", { name: "Confirmar recebimento" }).click();
+    await expect(page).toHaveURL(/\/admin\/financeiro\/caixa$/);
+    await expect(
+      page.getByRole("listitem").filter({ hasText: "Esmalte vinho (teste)" }),
+    ).toContainText("+ R$ 18,90");
   });
 
   test("the financial pages do not scroll sideways on a phone", async () => {

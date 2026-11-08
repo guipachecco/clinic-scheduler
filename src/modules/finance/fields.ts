@@ -212,6 +212,31 @@ export const paymentSchema = z.object({
 export type PaymentInput = z.input<typeof paymentSchema>;
 export type PaymentValues = z.output<typeof paymentSchema>;
 
+// A receipt: money received outside a sale. From an appointment the
+// description and the client come from it; "Nova entrada" types them.
+export const receiptSchema = z.object({
+  appointmentId: z
+    .union([z.uuid(), z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
+  patientId: z
+    .union([z.uuid(), z.literal("")])
+    .optional()
+    .transform((value) => (value ? value : null)),
+  description: z
+    .string()
+    .trim()
+    .max(80, "Use no máximo 80 caracteres.")
+    .optional()
+    .transform((value) => value ?? ""),
+  receivedOn: dateField("Informe a data."),
+  amount: moneyField(),
+  paymentMethodId: z.uuid({ error: "Escolha a forma de pagamento." }),
+  notes: optionalText(200),
+});
+export type ReceiptInput = z.input<typeof receiptSchema>;
+export type ReceiptValues = z.output<typeof receiptSchema>;
+
 export const reasonSchema = z
   .string()
   .trim()

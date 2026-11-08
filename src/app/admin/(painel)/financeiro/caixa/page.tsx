@@ -1,10 +1,12 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/modules/auth/session";
 import { listCash } from "@/modules/finance/reports";
 import { todayLocal } from "@/modules/schedule/time";
 
+import { ReverseReceiptButton } from "../receipt-forms";
 import {
   FinanceTabs,
   formatDay,
@@ -45,7 +47,11 @@ export default async function CashPage({
 
   return (
     <div className="grid gap-6">
-      <PageTitle title="Caixa" />
+      <PageTitle title="Caixa">
+        <Button asChild>
+          <Link href="/admin/financeiro/entradas/nova">Nova entrada</Link>
+        </Button>
+      </PageTitle>
       <FinanceTabs current="/admin/financeiro/caixa" />
       <nav aria-label="Mês" className="flex flex-wrap items-center gap-3">
         <Link
@@ -121,14 +127,19 @@ export default async function CashPage({
                   </span>
                 ) : null}
               </span>
-              <span
-                className={
-                  e.amountCents < 0
-                    ? "font-semibold text-destructive tabular-nums"
-                    : "font-semibold tabular-nums"
-                }
-              >
-                {signedMoney(e.amountCents)}
+              <span className="flex items-center gap-3">
+                {e.canReverse ? (
+                  <ReverseReceiptButton receiptId={e.id} />
+                ) : null}
+                <span
+                  className={
+                    e.amountCents < 0
+                      ? "font-semibold text-destructive tabular-nums"
+                      : "font-semibold tabular-nums"
+                  }
+                >
+                  {signedMoney(e.amountCents)}
+                </span>
               </span>
             </li>
           ))}
