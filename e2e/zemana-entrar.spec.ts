@@ -32,6 +32,9 @@ const people = {
   owner: { name: "Dona Logada Zemana", email: `dona-logada${DOMAIN}` },
 };
 
+// Signs up during the tests (not seeded).
+const newcomer = { name: "Nova Cliente Zemana", email: `nova${DOMAIN}` };
+
 async function withDb<T>(run: (db: Client) => Promise<T>) {
   const db = new Client({ connectionString: E2E_DATABASE_URL });
   await db.connect();
@@ -43,6 +46,11 @@ async function withDb<T>(run: (db: Client) => Promise<T>) {
 }
 
 async function cleanUp(db: Client) {
+  await db.query(
+    `DELETE FROM audit_logs WHERE clinic_id IN
+       (SELECT id FROM clinics WHERE slug LIKE $1)`,
+    [`${PREFIX}%`],
+  );
   await db.query(
     `DELETE FROM patients WHERE clinic_id IN
        (SELECT id FROM clinics WHERE slug LIKE $1)`,
@@ -80,9 +88,10 @@ test.beforeAll(async () => {
       const {
         rows: [clinic],
       } = await db.query<{ id: string }>(
-        `INSERT INTO clinics (slug, name, area_label) VALUES ($1, $2, $3)
-         RETURNING id`,
-        [SLUGS[key], name, area],
+        `INSERT INTO clinics (slug, name, area_label, online_booking_enabled)
+         VALUES ($1, $2, $3, $4) RETURNING id`,
+        // Only A takes signups from the clinic list.
+        [SLUGS[key], name, area, key === "a"],
       );
       clinicIds[key] = clinic!.id;
     }
@@ -159,10 +168,48 @@ test("client without clinics sees the empty message", async ({ page }) => {
   await signInAt(page, people.empty.email, PASSWORD);
   await expect(page).toHaveURL(/\/minhas-clinicas$/);
   await expect(
-    page.getByText(
-      "Você ainda não é cliente de nenhuma clínica. Peça o link para a sua profissional.",
-    ),
+    page.getByText("Você ainda não é cliente de nenhuma clínica."),
   ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Escolher clínica" }),
+  ).toHaveAttribute("href", "/clinicas");
+});
+
+test("a new client signs up from /entrar through the clinic list", async ({
+  page,
+}) => {
+  await page.goto("/entrar");
+  await page.getByRole("link", { name: "Criar conta" }).click();
+  await expect(page).toHaveURL(/\/clinicas$/);
+  await expect(
+    page.getByRole("heading", { name: "Escolha sua clínica" }),
+  ).toBeVisible();
+  // Online booking off: not in the list.
+  await expect(page.getByText("Zemana Entrar Clínica B")).toHaveCount(0);
+
+  await page.getByRole("link", { name: /Zemana Entrar Clínica A/ }).click();
+  await expect(page).toHaveURL(
+    new RegExp(`/${SLUGS.a}/cadastro\\?next=%2Fminhas-clinicas$`),
+  );
+  await page.getByLabel("Nome").fill(newcomer.name);
+  await page.getByLabel("Celular (WhatsApp)").fill("(11) 98765-8899");
+  await page.getByLabel("E-mail").fill(newcomer.email);
+  await page.getByLabel("Senha").fill(PASSWORD);
+  await page.getByRole("button", { name: "Criar conta" }).click();
+
+  await expect(page).toHaveURL(/\/minhas-clinicas$/);
+  await expect(page.getByText("Olá, Nova")).toBeVisible();
+  await expect(page.getByText("Zemana Entrar Clínica A")).toBeVisible();
+  await expect(page.getByText("Nenhum horário marcado")).toBeVisible();
+
+  // Her clinic is no longer offered when she adds another one.
+  await page.getByRole("link", { name: "Adicionar outra clínica" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Adicionar outra clínica" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Zemana Entrar Clínica A/ }),
+  ).toHaveCount(0);
 });
 
 test("panel account is sent to the panel", async ({ page }) => {

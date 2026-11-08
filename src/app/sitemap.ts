@@ -13,6 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const slugs = await listActiveClinicSlugs();
   return [
     { url: `${SITE_URL}/`, changeFrequency: "monthly", priority: 1 },
+    { url: `${SITE_URL}/clinicas`, changeFrequency: "weekly", priority: 0.6 },
     ...slugs.map((slug) => ({
       url: `${SITE_URL}/${slug}`,
       changeFrequency: "weekly" as const,

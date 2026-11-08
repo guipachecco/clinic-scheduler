@@ -29,6 +29,12 @@ export default async function ZemanaLoginPage() {
         <Link href="/esqueci-senha" className={authLinkClass}>
           Esqueci minha senha
         </Link>
+        <p className="text-muted-foreground">
+          Ainda não tem conta?{" "}
+          <Link href="/clinicas" className={authLinkClass}>
+            Criar conta
+          </Link>
+        </p>
         <Link href="/admin/entrar" className={authLinkClass}>
           É profissional? Entre no painel
         </Link>
