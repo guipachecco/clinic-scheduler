@@ -129,7 +129,8 @@ export function BusinessHoursForm({ initialDays }: Props) {
     getValues,
     setError,
     setFocus,
-    formState: { errors, isSubmitting },
+    trigger,
+    formState: { errors, isSubmitting, isSubmitted },
   } = form;
 
   async function onSubmit() {
@@ -163,7 +164,14 @@ export function BusinessHoursForm({ initialDays }: Props) {
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      onChange={() => setSaved(false)}
+      onChange={() => {
+        setSaved(false);
+        // An interval's errors depend on its other end and on the day's other
+        // intervals (order, overlap). Revalidating only the changed input
+        // would leave a fixed row still marked, so after the first submit
+        // every change checks the whole week again.
+        if (isSubmitted) void trigger();
+      }}
       noValidate
       className="grid gap-4"
     >

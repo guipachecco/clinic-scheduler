@@ -75,6 +75,23 @@ test.describe("expediente", () => {
     await expect(page.getByText("Expediente salvo.")).not.toBeVisible();
   });
 
+  test("fixing the other end of an interval clears its error", async () => {
+    await page.goto("/admin/expediente");
+    const start = page.getByLabel(`${MONDAY}, intervalo 2, início`);
+    const end = page.getByLabel(`${MONDAY}, intervalo 2, fim`);
+    await start.fill("13:00");
+    await end.fill("12:30");
+    await page.getByRole("button", { name: "Salvar expediente" }).click();
+    const error = page.getByText("O início deve ser antes do fim.");
+    await expect(error).toBeVisible();
+
+    // Only the end changes: the start's error must go away too.
+    await end.fill("21:00");
+    await expect(error).toHaveCount(0);
+    await page.getByRole("button", { name: "Salvar expediente" }).click();
+    await expect(page.getByRole("status")).toHaveText("Expediente salvo.");
+  });
+
   test("creates an all-day block and lists it", async () => {
     await page.goto("/admin/expediente");
     await page.getByRole("link", { name: "Bloqueios e feriados" }).click();
