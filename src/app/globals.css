@@ -153,3 +153,16 @@
     font-family: var(--font-heading);
   }
 }
+
+/* Phone "Mais" sheet entrance. */
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}

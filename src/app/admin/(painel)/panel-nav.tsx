@@ -6,16 +6,17 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-type NavIcon =
+export type NavIcon =
   | "home"
   | "calendar"
   | "person"
   | "services"
   | "clock"
   | "money"
-  | "page";
+  | "page"
+  | "more";
 
-type NavItem = {
+export type NavItem = {
   href: Route;
   label: string;
   icon: NavIcon;
@@ -60,6 +61,13 @@ const ICON_PATHS: Record<NavIcon, React.ReactNode> = {
       <path d="M6.5 9.5v5M17.5 9.5v5" />
     </>
   ),
+  more: (
+    <>
+      <circle cx="6" cy="12" r="1.2" />
+      <circle cx="12" cy="12" r="1.2" />
+      <circle cx="18" cy="12" r="1.2" />
+    </>
+  ),
   page: (
     <>
       <rect x="5" y="3" width="14" height="18" rx="2" />
@@ -68,9 +76,34 @@ const ICON_PATHS: Record<NavIcon, React.ReactNode> = {
   ),
 };
 
+export function NavIconSvg({
+  icon,
+  active = false,
+  className,
+}: {
+  icon: NavIcon;
+  active?: boolean;
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={active ? 2 : 1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      {ICON_PATHS[icon]}
+    </svg>
+  );
+}
+
 // "/admin" is the panel root, so it only matches exactly; other items also
 // match their sub-pages.
-function isActive(pathname: string, href: string) {
+export function isActive(pathname: string, href: string) {
   return href === "/admin"
     ? pathname === href
     : pathname === href || pathname.startsWith(`${href}/`);
@@ -97,18 +130,11 @@ export function PanelNav({ items }: { items: NavItem[] }) {
                     : "font-medium text-white hover:bg-white/10",
                 )}
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={active ? 2 : 1.8}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+                <NavIconSvg
+                  icon={item.icon}
+                  active={active}
                   className="size-5 shrink-0"
-                >
-                  {ICON_PATHS[item.icon]}
-                </svg>
+                />
                 {item.label}
                 {badge > 0 ? (
                   <span

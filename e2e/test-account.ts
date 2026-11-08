@@ -97,3 +97,12 @@ export const TEST_ADMIN_CLINIC_PAGE = {
   name: "Administradora da Página",
   password: "senha-de-teste-pagina-bem-longa",
 };
+
+// Owner used by the phone panel shell suite (bottom bar and "Mais" sheet).
+export const TEST_ADMIN_PANEL_MOBILE = {
+  role: "admin" as const,
+  clinicSlug: "grais",
+  email: "painel-celular@example.test",
+  name: "Administradora do Painel Celular",
+  password: "senha-de-teste-painel-celular-bem-longa",
+};

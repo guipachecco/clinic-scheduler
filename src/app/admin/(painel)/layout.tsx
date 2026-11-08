@@ -6,7 +6,8 @@ import { getTheme } from "@/lib/theme-server";
 import { countRequestedFrom } from "@/modules/appointments/appointments";
 import { requireAdmin } from "@/modules/auth/session";
 
-import { PanelNav } from "./panel-nav";
+import { MobileNav } from "./mobile-nav";
+import { PanelNav, type NavItem } from "./panel-nav";
 import { SignOutButton } from "./sign-out-button";
 
 export default async function PanelLayout({
@@ -20,6 +21,21 @@ export default async function PanelLayout({
     countRequestedFrom(session.clinicId, new Date()),
   ]);
   const initial = session.user.name.trim().charAt(0).toUpperCase();
+  const navItems: NavItem[] = [
+    { href: "/admin", label: "Início", icon: "home" },
+    {
+      href: "/admin/agenda",
+      label: "Agenda",
+      icon: "calendar",
+      badge: pendingRequests,
+      badgeLabel: "aguardando confirmação",
+    },
+    { href: "/admin/pacientes", label: "Pacientes", icon: "person" },
+    { href: "/admin/servicos", label: "Serviços", icon: "services" },
+    { href: "/admin/expediente", label: "Expediente", icon: "clock" },
+    { href: "/admin/financeiro", label: "Financeiro", icon: "money" },
+    { href: "/admin/pagina", label: "Minha página", icon: "page" },
+  ];
   const switchClinic = session.isRoot ? (
     <Link
       href="/admin/clinicas"
@@ -31,7 +47,17 @@ export default async function PanelLayout({
 
   return (
     <div className="flex flex-1 flex-col md:flex-row">
-      <aside className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 bg-brand px-4 py-3 text-brand-foreground md:sticky md:top-0 md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:items-stretch md:gap-y-6 md:px-4 md:py-6">
+      {/* Phone: compact top bar; the sections live in the bottom bar. */}
+      <header className="flex items-center justify-between gap-3 bg-brand px-4 py-2.5 text-brand-foreground md:hidden">
+        <div className="flex min-w-0 items-center gap-3">
+          <BrandImage kind="symbol" size={32} onBrand />
+          <p className="min-w-0 text-sm font-semibold break-words">
+            {session.clinic.name}
+          </p>
+        </div>
+        {switchClinic}
+      </header>
+      <aside className="hidden bg-brand px-4 py-6 text-brand-foreground md:sticky md:top-0 md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:items-stretch md:gap-y-6">
         <div className="grid min-w-0 gap-2">
           <BrandImage kind="horizontal" size={160} onBrand />
           <p className="text-sm font-semibold break-words">
@@ -39,27 +65,11 @@ export default async function PanelLayout({
           </p>
           {switchClinic}
         </div>
-        <div className="col-span-2 row-start-2 w-full min-w-0 md:col-span-1 md:row-start-auto md:min-h-0 md:w-auto md:overflow-y-auto">
-          <PanelNav
-            items={[
-              { href: "/admin", label: "Início", icon: "home" },
-              {
-                href: "/admin/agenda",
-                label: "Agenda",
-                icon: "calendar",
-                badge: pendingRequests,
-                badgeLabel: "aguardando confirmação",
-              },
-              { href: "/admin/pacientes", label: "Pacientes", icon: "person" },
-              { href: "/admin/servicos", label: "Serviços", icon: "services" },
-              { href: "/admin/expediente", label: "Expediente", icon: "clock" },
-              { href: "/admin/financeiro", label: "Financeiro", icon: "money" },
-              { href: "/admin/pagina", label: "Minha página", icon: "page" },
-            ]}
-          />
+        <div className="w-full min-w-0 md:min-h-0 md:w-auto md:overflow-y-auto">
+          <PanelNav items={navItems} />
         </div>
-        <div className="col-start-2 row-start-1 ml-auto flex min-w-0 items-center gap-3 md:mt-auto md:ml-0 md:flex-col md:items-stretch">
-          <div className="hidden min-w-0 items-center gap-2.5 rounded-xl bg-brand-muted p-3 md:flex">
+        <div className="flex min-w-0 items-center gap-3 md:mt-auto md:flex-col md:items-stretch">
+          <div className="flex min-w-0 items-center gap-2.5 rounded-xl bg-brand-muted p-3">
             <span
               aria-hidden="true"
               className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-accent font-bold text-brand-accent-foreground"
@@ -77,9 +87,15 @@ export default async function PanelLayout({
         </div>
       </aside>
       {/* A page marked data-layout="wide" (the agenda) gets more room. */}
-      <main className="mx-auto w-full max-w-5xl min-w-0 flex-1 bg-background px-4 py-8 has-[[data-layout=wide]]:max-w-[96rem] md:px-8">
+      <main className="mx-auto w-full max-w-5xl min-w-0 flex-1 bg-background px-4 pt-6 pb-32 has-[[data-layout=wide]]:max-w-[96rem] md:px-8 md:py-8">
         {children}
       </main>
+      <MobileNav
+        items={navItems.slice(0, 3)}
+        moreItems={navItems.slice(3)}
+        agendaBadge={pendingRequests}
+        theme={theme}
+      />
     </div>
   );
 }

@@ -12,9 +12,12 @@ const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 export function ThemeToggle({
   initialTheme,
   className,
+  showLabel = false,
 }: {
   initialTheme: Theme;
   className?: string;
+  // Adds a visible "Tema escuro" text beside the icon.
+  showLabel?: boolean;
 }) {
   const [theme, setTheme] = useState(initialTheme);
   const isDark = theme === "dark";
@@ -68,6 +71,7 @@ export function ThemeToggle({
           <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
         </svg>
       )}
+      {showLabel ? <span>Tema escuro</span> : null}
     </button>
   );
 }

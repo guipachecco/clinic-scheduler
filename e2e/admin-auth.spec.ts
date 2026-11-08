@@ -146,7 +146,7 @@ test("later sign-ins ask for the authenticator code", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto("/admin");
   await expect(
-    page.getByRole("navigation", { name: "Menu principal" }),
+    page.getByRole("navigation", { name: "Navegação do painel" }),
   ).toBeVisible();
   const scrollWidth = await page.evaluate(
     () => document.documentElement.scrollWidth,
