@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Icon } from "@/app/[slug]/icons";
+import { ResendVerification } from "@/app/[slug]/resend-verification";
 import { SignOutButton } from "@/app/[slug]/sign-out-button";
 import { whatsappUrl } from "@/app/[slug]/ui";
 import { Button } from "@/components/ui/button";
@@ -155,6 +156,32 @@ export default async function MyClinicsPage() {
         ) : null}
         <h1 className="text-muted-foreground">Suas clínicas</h1>
       </header>
+      {!session.user.emailVerified ? (
+        // Booking waits for the confirmation (the clinic's booking page asks
+        // too); here she learns it right after signing up. The link opens the
+        // confirmation page of her first clinic.
+        <section
+          aria-labelledby="confirmar-email"
+          className="grid gap-3 rounded-2xl border-2 border-highlight bg-card p-4"
+        >
+          <h2
+            id="confirmar-email"
+            className="font-heading text-lg font-semibold"
+          >
+            Confirme seu e-mail
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Enviamos um link para {session.user.email}. Abra o link do e-mail
+            para poder marcar horários. Se não encontrar, olhe também o spam.
+          </p>
+          {clinics[0] ? (
+            <ResendVerification
+              slug={clinics[0].slug}
+              email={session.user.email}
+            />
+          ) : null}
+        </section>
+      ) : null}
       {clinics.length === 0 ? (
         <div className="grid gap-3 rounded-2xl border bg-card p-5">
           <p className="text-muted-foreground">

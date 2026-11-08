@@ -47,7 +47,9 @@ export function ClinicCardHeader({
           </div>
         ) : null}
       </div>
-      <div className="relative -mt-7 flex items-end gap-3 px-2">
+      {/* The photo overlaps the cover by 28 px (-mt-7); the text starts
+          below the cover (pt-8), however many lines it has. */}
+      <div className="relative -mt-7 flex items-start gap-3 px-2">
         {clinic.hasPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element -- served by the /foto route handler
           <img
@@ -63,7 +65,7 @@ export function ClinicCardHeader({
             {initialsFor(clinic.name)}
           </div>
         )}
-        <div className="min-w-0 pb-0.5">
+        <div className="min-w-0 pt-8">
           <Heading className="truncate font-heading text-lg font-semibold">
             {clinic.name}
           </Heading>
