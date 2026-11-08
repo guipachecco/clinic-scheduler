@@ -566,7 +566,7 @@ test.describe("client area", () => {
 
     await page.goto("/clinica-que-nao-existe");
     await expect(page.getByText("Página não encontrada")).toBeVisible();
-    await page.goto("/entrar");
+    await page.goto("/marca");
     await expect(page.getByText("Página não encontrada")).toBeVisible();
     await page.goto(`/${off.slug}/nada-aqui`);
     await expect(page.getByText("Página não encontrada")).toBeVisible();

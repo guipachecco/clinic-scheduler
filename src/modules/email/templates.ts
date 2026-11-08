@@ -89,9 +89,10 @@ export function verificationEmail(input: TemplateInput): EmailContent {
 
 export function resetPasswordEmail(input: TemplateInput): EmailContent {
   const where = input.clinicName ? ` para marcar em ${input.clinicName}` : "";
+  // Without a clinic the request came from the Zemana pages.
   const subject = input.clinicName
     ? `Troque sua senha - ${input.clinicName}`
-    : "Troque sua senha";
+    : "Troque sua senha da Zemana";
   const paragraphs = [
     greeting(input.userName),
     `Recebemos um pedido para trocar a senha da sua conta${where}.`,

@@ -134,6 +134,13 @@
       "when": 1794092409474,
       "tag": "0018_review_patient_fixes",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1794111930357,
+      "tag": "0019_client_my_clinics",
+      "breakpoints": true
     }
   ]
 }

@@ -40,7 +40,7 @@ export default async function NewPasswordPage({
       >
         Nova senha
       </PageTitle>
-      <NewPasswordForm slug={clinic.slug} token={token} />
+      <NewPasswordForm signInHref={`/${clinic.slug}/entrar`} token={token} />
     </>
   );
 }

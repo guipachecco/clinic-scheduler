@@ -891,6 +891,7 @@ describe("client access", () => {
         "client_busy_intervals",
         "client_context",
         "client_loyalty_progress",
+        "client_my_clinics",
         "client_owner_photo",
         "client_payment_methods",
         "client_public_reviews",

@@ -9,6 +9,8 @@ import { getTheme } from "@/lib/theme-server";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
+  // Makes the shared image (src/app/opengraph-image.tsx) an absolute URL.
+  metadataBase: new URL("https://zemana.com.br"),
   title: {
     default: "Agendamentos",
     template: "%s | Agendamentos",
