@@ -24,6 +24,7 @@ const slugs = {
   c: `${PREFIX}c`,
   d: `${PREFIX}d`,
   e: `${PREFIX}e`,
+  f: `${PREFIX}f`,
 };
 let userU: string;
 let userV: string;
@@ -94,6 +95,18 @@ beforeAll(async () => {
   const c = await createClinic(slugs.c, { name: "Clínica C" });
   const d = await createClinic(slugs.d, { name: "Clínica D" });
   const e = await createClinic(slugs.e, { name: "Clínica E", isActive: false });
+  // A provisional record (pending a link to an existing patient) counts.
+  const f = await createClinic(slugs.f, { name: "Gama Provisória" });
+  const [existing] = await db
+    .insert(patients)
+    .values({
+      clinicId: f,
+      name: "Existente Minhas Clinicas",
+      nameNormalized: "existente minhas clinicas",
+      phone: "+5511900009902",
+    })
+    .returning({ id: patients.id });
+  await addPatient(f, userU, { pendingLinkPatientId: existing!.id });
   await addPatient(a, userU);
   await addPatient(b, userU);
   await addPatient(c, userV);
@@ -114,7 +127,11 @@ afterAll(async () => {
 describe("listMyClinics", () => {
   it("lists only the user's active clinics, by name", async () => {
     const list = await listMyClinics(userU);
-    expect(list.map((c) => c.slug)).toEqual([slugs.b, slugs.a]);
+    expect(list.map((c) => c.slug)).toEqual([
+      slugs.b,
+      slugs.a,
+      slugs.f,
+    ]);
     expect(list[0]).toEqual({
       slug: slugs.b,
       name: "Alfa Estética",
@@ -130,7 +147,15 @@ describe("listMyClinics", () => {
     expect((await listMyClinics(userV)).map((c) => c.slug)).toEqual([slugs.c]);
   });
 
-  it("ignores anonymized records and inactive clinics", async () => {
+  it("lists a clinic where her row is a provisional record", async () => {
+    expect((await listMyClinics(userU)).map((c) => c.slug)).toContain(slugs.f);
+  });
+
+  // The schema forces user_id to null on anonymized rows, so the
+  // anonymized_at filter in the function is defence in depth that no
+  // fixture can reach; this checks the anonymized clinic and the inactive
+  // one stay out.
+  it("leaves out a clinic with only an anonymized record and an inactive clinic", async () => {
     const found = (await listMyClinics(userU)).map((c) => c.slug);
     expect(found).not.toContain(slugs.d);
     expect(found).not.toContain(slugs.e);

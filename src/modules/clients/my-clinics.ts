@@ -20,6 +20,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // Nobody's id: no patients row has it as user_id.
 const NO_USER = "00000000-0000-0000-0000-000000000000";
 
+// userId must come from the authenticated session, never from request input:
+// the database function trusts it.
 export async function listMyClinics(userId: string): Promise<MyClinic[]> {
   if (!UUID.test(userId) || userId === NO_USER) return [];
   const result = await clientDb.execute<{

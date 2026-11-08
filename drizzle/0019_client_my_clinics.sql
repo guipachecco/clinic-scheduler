@@ -3,6 +3,9 @@
 -- belongs to no clinic, so this crosses clinics on purpose and exposes only
 -- public data: slug, display name, area label and whether the clinic has an
 -- owner photo.
+--
+-- Contract: p_user must come from the authenticated session, never from
+-- request input; the function trusts it and returns that user's clinics.
 CREATE FUNCTION client_my_clinics(p_user uuid)
 RETURNS TABLE (slug text, name text, area_label text, has_photo boolean)
 LANGUAGE sql STABLE SECURITY DEFINER
