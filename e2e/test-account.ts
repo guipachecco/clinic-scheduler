@@ -97,3 +97,34 @@ export const TEST_ADMIN_CLINIC_PAGE = {
   name: "Administradora da Página",
   password: "senha-de-teste-pagina-bem-longa",
 };
+
+// Owner used by the phone panel shell suite (bottom bar and "Mais" sheet).
+export const TEST_ADMIN_PANEL_MOBILE = {
+  role: "admin" as const,
+  clinicSlug: "grais",
+  email: "painel-celular@example.test",
+  name: "Administradora do Painel Celular",
+  password: "senha-de-teste-painel-celular-bem-longa",
+};
+
+// Owner of the clinic dedicated to the panel home suite (e2e/panel-home.spec.ts),
+// so today's numbers are not disturbed by the other suites' appointments.
+export const PANEL_HOME_CLINIC_SLUG = "clinica-painel-inicio";
+export const TEST_ADMIN_PANEL_HOME = {
+  role: "admin" as const,
+  clinicSlug: PANEL_HOME_CLINIC_SLUG,
+  email: "painel-inicio@example.test",
+  name: "Karol Teste do Início",
+  password: "senha-de-teste-painel-inicio-bem-longa",
+};
+
+// Owner used by the phone agenda suite. It shares the panel home clinic (it
+// has its own account so each suite sets up its own 2FA) and only touches
+// dates far in the future.
+export const TEST_ADMIN_AGENDA_PHONE = {
+  role: "admin" as const,
+  clinicSlug: PANEL_HOME_CLINIC_SLUG,
+  email: "agenda-celular@example.test",
+  name: "Dona da Agenda no Celular",
+  password: "senha-de-teste-agenda-celular-bem-longa",
+};

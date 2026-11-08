@@ -267,12 +267,13 @@ test.describe("agenda", () => {
     await expect(page.getByText("Não foi possível carregar")).toHaveCount(0);
   });
 
-  test("the list view is the default on a phone", async () => {
+  test("a phone shows the day list instead of the calendar", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/admin/agenda");
-    await expect(calendar().locator(".fc-list")).toBeVisible();
-    await expect(calendar().locator(".fc-timegrid")).toHaveCount(0);
-    await expect(calendar().getByText("Nenhum atendimento")).toBeVisible();
+    await expect(
+      page.getByRole("navigation", { name: "Dias da semana" }),
+    ).toBeVisible();
+    await expect(calendar()).toBeHidden();
     await page.setViewportSize({ width: 1280, height: 720 });
   });
 

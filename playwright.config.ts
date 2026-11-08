@@ -30,6 +30,10 @@ export const E2E_SERVER_ENV = {
   BETTER_AUTH_URL: BASE_URL,
   LOG_LEVEL: "warn",
   EMAIL_OUTBOX_DIR: E2E_EMAIL_OUTBOX_DIR,
+  // Empty on purpose: a local .env.production.local (loaded by next build and
+  // next start) must never make the tests send real e-mails.
+  MAILERSEND_API_KEY: "",
+  EMAIL_FROM: "",
   NEXT_TELEMETRY_DISABLED: "1",
 };
 

@@ -12,11 +12,22 @@ const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 export function ThemeToggle({
   initialTheme,
   className,
+  showLabel = false,
 }: {
   initialTheme: Theme;
   className?: string;
+  // Adds a visible "Tema escuro" text beside the icon.
+  showLabel?: boolean;
 }) {
-  const [theme, setTheme] = useState(initialTheme);
+  // Seed from the DOM when it exists so a remounted toggle (the phone "Mais"
+  // sheet) reflects the current theme; on the server use the prop.
+  const [theme, setTheme] = useState<Theme>(() =>
+    typeof document === "undefined"
+      ? initialTheme
+      : document.documentElement.classList.contains("dark")
+        ? "dark"
+        : "light",
+  );
   const isDark = theme === "dark";
 
   function toggle() {
@@ -68,6 +79,7 @@ export function ThemeToggle({
           <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
         </svg>
       )}
+      {showLabel ? <span>Tema escuro</span> : null}
     </button>
   );
 }
