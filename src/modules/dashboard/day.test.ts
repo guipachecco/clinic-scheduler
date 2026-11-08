@@ -177,3 +177,75 @@ describe("startsIn", () => {
     expect(startsIn(after(min), now)).toBe(expected);
   });
 });
+
+describe("freeIntervals edge cases", () => {
+  const one: DayHours[] = [
+    { weekday: 1, intervals: [{ start: "09:00", end: "12:00" }] },
+  ];
+
+  it("requested and no_show appointments occupy time", () => {
+    expect(
+      freeIntervals({
+        ...base,
+        hours: one,
+        blocks: [],
+        items: [
+          item("09:00", "10:00", "requested"),
+          item("11:00", "11:30", "no_show"),
+        ],
+      }),
+    ).toEqual([span("10:00", "11:00"), span("11:30", "12:00")]);
+  });
+
+  it("handles spans straddling interval edges and overlapping spans", () => {
+    expect(
+      freeIntervals({
+        ...base,
+        hours: one,
+        blocks: [{ startsAt: t("11:30"), endsAt: t("12:30") }],
+        items: [
+          item("08:30", "09:30"),
+          item("10:00", "11:00"),
+          item("10:30", "11:15"),
+        ],
+      }),
+    ).toEqual([span("09:30", "10:00")]);
+  });
+
+  it("yields nothing for an interval that closed before the floor", () => {
+    expect(
+      freeIntervals({ ...base, items: [], blocks: [], now: t("12:10") }),
+    ).toEqual([span("13:00", "18:00")]);
+  });
+
+  it("rounds the floor on the wall clock across a DST change", () => {
+    const ny = "America/New_York";
+    // 2026-03-08: clocks jump 02:00 -> 03:00; 2026-03-08 is a Sunday.
+    expect(
+      freeIntervals({
+        date: "2026-03-08",
+        zone: ny,
+        hours: [{ weekday: 0, intervals: [{ start: "01:00", end: "05:00" }] }],
+        blocks: [],
+        items: [],
+        stepMinutes: 30,
+        now: localToUtc("2026-03-08", "03:10", ny),
+      }),
+    ).toEqual([
+      {
+        start: localToUtc("2026-03-08", "03:30", ny),
+        end: localToUtc("2026-03-08", "05:00", ny),
+      },
+    ]);
+  });
+});
+
+describe("startsIn rounding", () => {
+  const now = new Date("2026-11-09T12:00:00Z");
+  const after = (ms: number) => new Date(now.getTime() + ms);
+  it("floors hours and minutes", () => {
+    expect(startsIn(after(59.5 * 60_000), now)).toBe("em 59 min");
+    expect(startsIn(after((119 * 60 + 10) * 1000), now)).toBe("em 1 h");
+    expect(startsIn(after(30_000), now)).toBe("em 1 min");
+  });
+});

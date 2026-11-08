@@ -68,7 +68,18 @@ export function freeIntervals(input: {
       local.minute +
       (local.second || local.millisecond ? 1 : 0);
     const rounded = Math.ceil(minutes / stepMinutes) * stepMinutes;
-    floor = localToUtc(date, "00:00", zone).getTime() + rounded * MINUTE;
+    // Built from the local day plus hour/minute (wall clock), so DST days are right.
+    floor =
+      rounded >= 24 * 60
+        ? Infinity
+        : local
+            .set({
+              hour: Math.floor(rounded / 60),
+              minute: rounded % 60,
+              second: 0,
+              millisecond: 0,
+            })
+            .toMillis();
   }
 
   const result: FreeInterval[] = [];
@@ -140,7 +151,7 @@ export function greeting(
 export function startsIn(start: Date, now: Date): string {
   const diff = start.getTime() - now.getTime();
   if (diff <= 0) return "agora";
-  const minutes = Math.ceil(diff / MINUTE);
-  if (minutes < 60) return `em ${minutes} min`;
+  const minutes = Math.floor(diff / MINUTE);
+  if (minutes < 60) return `em ${Math.max(1, minutes)} min`;
   return `em ${Math.floor(minutes / 60)} h`;
 }
