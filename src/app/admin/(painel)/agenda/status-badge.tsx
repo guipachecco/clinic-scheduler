@@ -14,9 +14,12 @@ const STATUS_CLASSES: Record<Status, string> = {
 
 export function StatusBadge({
   status,
+  label,
   className,
 }: {
   status: Status;
+  // Overrides the default text, for lists that word the statuses differently.
+  label?: string;
   className?: string;
 }) {
   return (
@@ -27,7 +30,7 @@ export function StatusBadge({
         className,
       )}
     >
-      {STATUS_LABELS[status]}
+      {label ?? STATUS_LABELS[status]}
     </span>
   );
 }

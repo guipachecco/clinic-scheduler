@@ -16,6 +16,8 @@ import {
   TEST_ADMIN_CLIENT_AREA,
   TEST_ADMIN_CLINIC_PAGE,
   TEST_ADMIN_FINANCE,
+  PANEL_HOME_CLINIC_SLUG,
+  TEST_ADMIN_PANEL_HOME,
   TEST_ADMIN_PANEL_MOBILE,
   TEST_ADMIN_PATIENT_LINKS,
   TEST_ROOT,
@@ -34,6 +36,11 @@ export default async function globalSetup() {
   await owner.connect();
   try {
     await seedClientAreaClinics(owner);
+    // Own clinic for the panel home suite (default time zone, no hours).
+    await owner.query(
+      `INSERT INTO clinics (slug, name, slot_step_minutes) VALUES ($1, $2, 30)`,
+      [PANEL_HOME_CLINIC_SLUG, "Clínica Painel Início (teste)"],
+    );
   } finally {
     await owner.end();
   }
@@ -53,6 +60,7 @@ export default async function globalSetup() {
     await createAdmin(TEST_ADMIN_CLINIC_PAGE);
     await createAdmin(TEST_ADMIN_PATIENT_LINKS);
     await createAdmin(TEST_ADMIN_PANEL_MOBILE);
+    await createAdmin(TEST_ADMIN_PANEL_HOME);
     await createAdmin(TEST_ROOT);
     await createAdmin(TEST_ROOT_BRANDING);
   } finally {
