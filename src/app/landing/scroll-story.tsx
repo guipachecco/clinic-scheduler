@@ -2,13 +2,15 @@
 
 import {
   motion,
+  useInView,
   useMotionValue,
+  useMotionValueEvent,
   useReducedMotion,
   useScroll,
   useSpring,
   useTransform,
 } from "motion/react";
-import { useRef, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -118,6 +120,18 @@ function StillStory() {
   );
 }
 
+// The story's phases on its progress: the pencil writing, the client's
+// message buzzing, the X, the stamp, and the phone.
+type Phase = "write" | "buzz" | "x" | "stamp" | "phone";
+
+function phaseOf(progress: number): Phase {
+  if (progress < 0.38) return "write";
+  if (progress < 0.66) return "buzz";
+  if (progress < 0.735) return "x";
+  if (progress < 0.81) return "stamp";
+  return "phone";
+}
+
 // The scroll-driven stage: pinned while its tall wrapper scrolls past.
 function LiveStory() {
   const target = useRef<HTMLDivElement>(null);
@@ -168,6 +182,13 @@ function LiveStory() {
   const enough = useTransform(story, [0.66, 0.7, 0.79, 0.82], [0, 1, 1, 0]);
   const after = useTransform(story, [0.81, 0.85], [0, 1]);
 
+  // Which layers are on screen, for screen readers and the buzz loop. State
+  // changes only when the story crosses a phase, not on every frame.
+  const [phase, setPhase] = useState(() => phaseOf(story.get()));
+  useMotionValueEvent(story, "change", (value) => setPhase(phaseOf(value)));
+  const inView = useInView(target);
+  const shows = (...phases: Phase[]) => phases.includes(phase);
+
   return (
     <div
       ref={target}
@@ -177,32 +198,54 @@ function LiveStory() {
     >
       <div className="sticky top-0 flex h-svh flex-col items-center justify-center gap-5 overflow-hidden px-4 pb-6">
         <div className="relative grid h-12 w-full max-w-[26rem] place-items-center">
-          <motion.div className="absolute" style={{ opacity: before }}>
+          <motion.div
+            className="absolute"
+            aria-hidden={!shows("write", "buzz")}
+            style={{ opacity: before }}
+          >
             <Caption className="-rotate-2">{CAPTIONS.before}</Caption>
           </motion.div>
-          <motion.div className="absolute" style={{ opacity: enough }}>
+          <motion.div
+            className="absolute"
+            aria-hidden={!shows("x", "stamp")}
+            style={{ opacity: enough }}
+          >
             <Caption className="rotate-1 bg-[#b7e7fc]">
               {CAPTIONS.enough}
             </Caption>
           </motion.div>
-          <motion.div className="absolute" style={{ opacity: after }}>
+          <motion.div
+            className="absolute"
+            aria-hidden={!shows("phone")}
+            style={{ opacity: after }}
+          >
             <Caption className="rotate-2 bg-[#ffd3f0]">
               {CAPTIONS.after}
             </Caption>
           </motion.div>
         </div>
         <div className="relative w-[min(86vw,26rem,56svh)]">
-          <motion.div style={{ x: paperX, rotate: paperRotate }}>
-            <PaperAgenda progress={paper} live />
+          <motion.div
+            aria-hidden={shows("phone")}
+            style={{ x: paperX, rotate: paperRotate }}
+          >
+            <PaperAgenda
+              progress={paper}
+              live
+              bubbleShown={shows("buzz", "x", "stamp")}
+              buzzing={inView && shows("buzz", "x", "stamp")}
+            />
           </motion.div>
           <motion.div
             className="absolute inset-0 grid place-items-center"
+            aria-hidden={!shows("phone")}
             style={{ y: phoneY, rotate: phoneRotate, opacity: phoneOpacity }}
           >
             <PhoneApp />
           </motion.div>
           <motion.div
             className="pointer-events-none absolute inset-0 grid place-items-center"
+            aria-hidden={!shows("stamp", "phone")}
             style={{ x: stampX, y: stampY, scale: stampShrink }}
           >
             <motion.div

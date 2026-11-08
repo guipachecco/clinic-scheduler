@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
@@ -207,10 +207,46 @@ test("metadata names Zemana and shares the generated image", async ({
 
 // The scroll story: the pencil fills a paper agenda, a giant X crosses it out,
 // the "PROBLEMA RESOLVIDO" stamp springs in, then the phone with the app.
-async function stampOpacity(page: import("@playwright/test").Page) {
-  return page
-    .getByTestId("story-stamp")
-    .evaluate((el) => Number(getComputedStyle(el).opacity));
+
+// Opacity as painted: the element's own times every ancestor's.
+async function paintedOpacity(locator: Locator) {
+  return locator.evaluate((el) => {
+    let opacity = 1;
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      opacity *= Number(getComputedStyle(node).opacity);
+    }
+    return opacity;
+  });
+}
+
+// How much of the X is on the page: the least opaque and least drawn of its
+// strokes (Motion writes the drawn fraction as the dash length, with the
+// path's length normalised to 1).
+async function bigX(page: Page) {
+  return page.getByTestId("big-x").evaluate((group) => {
+    const paths = [...group.querySelectorAll("path")];
+    return {
+      count: paths.length,
+      opacity: Math.min(
+        ...paths.map((path) => Number(getComputedStyle(path).opacity)),
+      ),
+      drawn: Math.min(
+        ...paths.map((path) => {
+          const dash = path.getAttribute("stroke-dasharray");
+          return dash ? Number.parseFloat(dash) : 1;
+        }),
+      ),
+    };
+  });
+}
+
+// Scrolls to a point of the story (0 = its start, 1 = its end).
+async function scrollStory(page: Page, fraction: number) {
+  await page.getByTestId("scroll-story").evaluate((el, at) => {
+    const top = window.scrollY + el.getBoundingClientRect().top;
+    const range = el.getBoundingClientRect().height - window.innerHeight;
+    window.scrollTo(0, top + range * at);
+  }, fraction);
 }
 
 test("story shows the X and the stamp after scrolling", async ({ page }) => {
@@ -218,24 +254,42 @@ test("story shows the X and the stamp after scrolling", async ({ page }) => {
   const story = page.getByTestId("scroll-story");
   // Hydrated with motion allowed: the scroll-driven version.
   await expect(story).toHaveAttribute("data-mode", "scroll");
+  const stamp = page.getByTestId("story-stamp");
+  const enough = page.getByText("Chega de rasura!", { exact: true });
+  const after = page.getByText("Com a Zemana", { exact: true });
 
-  // At the start of the story the stamp has not come in yet.
-  await story.evaluate((el) =>
-    window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top),
-  );
-  await expect.poll(() => stampOpacity(page)).toBeLessThan(0.1);
+  // At the start nothing is crossed out or stamped yet.
+  await scrollStory(page, 0);
+  await expect.poll(() => paintedOpacity(stamp)).toBeLessThan(0.05);
+  await expect.poll(async () => (await bigX(page)).drawn).toBeLessThan(0.01);
+  const start = await bigX(page);
+  expect(start.count).toBeGreaterThan(0);
+  expect(start.opacity).toBeLessThan(0.05);
 
-  // Scroll to the end of the story.
-  await story.evaluate((el) =>
-    window.scrollTo(
-      0,
-      window.scrollY + el.getBoundingClientRect().bottom - window.innerHeight,
-    ),
-  );
+  // Three quarters in: the X is drawn and the stamp has landed.
+  await scrollStory(page, 0.76);
+  await expect.poll(() => paintedOpacity(stamp)).toBeGreaterThan(0.9);
+  await expect.poll(() => paintedOpacity(enough)).toBeGreaterThan(0.9);
+  await expect.poll(async () => (await bigX(page)).drawn).toBeGreaterThan(0.99);
+  expect((await bigX(page)).opacity).toBeGreaterThan(0.99);
   await expect(page.getByText("Problema resolvido")).toBeVisible();
-  await expect.poll(() => stampOpacity(page)).toBeGreaterThan(0.9);
-  await expect(page.getByTestId("big-x")).toBeAttached();
-  await expect(page.getByText("Com a Zemana", { exact: true })).toBeVisible();
+  await expect(
+    stamp.locator("xpath=ancestor-or-self::*[@aria-hidden='true']"),
+  ).toHaveCount(0);
+
+  // At the end: the phone with the app, the stamp stuck on it.
+  await scrollStory(page, 1);
+  await expect.poll(() => paintedOpacity(after)).toBeGreaterThan(0.9);
+  await expect.poll(() => paintedOpacity(enough)).toBeLessThan(0.05);
+  await expect.poll(() => paintedOpacity(stamp)).toBeGreaterThan(0.9);
+  expect((await bigX(page)).drawn).toBeGreaterThan(0.99);
+  // Layers off screen are hidden from screen readers too.
+  await expect(
+    enough.locator("xpath=ancestor::*[@aria-hidden='true']"),
+  ).not.toHaveCount(0);
+  await expect(
+    after.locator("xpath=ancestor::*[@aria-hidden='true']"),
+  ).toHaveCount(0);
 
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(360);
@@ -256,9 +310,29 @@ test("reduced motion shows every scene statically", async ({ browser }) => {
     const scene = page.getByText(text, { exact: true });
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toBeVisible();
+    expect(await paintedOpacity(scene)).toBe(1);
   }
-  await expect(page.getByTestId("big-x")).toBeVisible();
-  expect(await stampOpacity(page)).toBe(1);
+  // The X is fully drawn.
+  const x = await bigX(page);
+  expect(x.count).toBeGreaterThan(0);
+  expect(x.opacity).toBe(1);
+  expect(x.drawn).toBe(1);
+  // "Ana 14h" is fully written: its clip is at least as wide as the text.
+  const ana = await page
+    .getByText("Ana 14h", { exact: true })
+    .evaluate((text: SVGTextElement) => {
+      const id = /url\(#(.+)\)/.exec(text.getAttribute("clip-path") ?? "")![1]!;
+      const rect = document
+        .getElementById(id)!
+        .querySelector<SVGRectElement>("rect")!;
+      return {
+        clip: rect.getBBox().width,
+        text: text.getBBox().width,
+      };
+    });
+  expect(ana.text).toBeGreaterThan(0);
+  expect(ana.clip).toBeGreaterThanOrEqual(ana.text);
+  expect(await paintedOpacity(page.getByTestId("story-stamp"))).toBe(1);
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   const width = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(width).toBeLessThanOrEqual(360);

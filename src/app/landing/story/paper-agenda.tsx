@@ -118,10 +118,12 @@ function PostIt({ progress }: { progress: MotionValue<number> }) {
 // The client's message buzzing on a little phone in the corner.
 function Buzz({
   progress,
-  animate,
+  shown,
+  buzzing,
 }: {
   progress: MotionValue<number>;
-  animate: boolean;
+  shown: boolean;
+  buzzing: boolean;
 }) {
   const opacity = useTransform(progress, [0.52, 0.56], [0, 1]);
   const scale = useTransform(progress, [0.52, 0.57], [0.5, 1], {
@@ -130,6 +132,7 @@ function Buzz({
   return (
     <motion.div
       className="absolute top-[4%] right-[3%] flex w-[50%] items-start justify-end gap-1.5"
+      aria-hidden={!shown}
       style={{ opacity, scale, transformOrigin: "100% 0%" }}
     >
       <p className="mt-1 rounded-2xl rounded-tr-sm border-[2.5px] border-[#2a0081] bg-[#b7e7fc] px-2.5 py-1.5 font-heading text-[0.8rem] leading-tight font-bold text-[#2a0081] shadow-[3px_3px_0_0_#2a0081]">
@@ -139,11 +142,15 @@ function Buzz({
         aria-hidden="true"
         className="relative h-12 w-7 shrink-0 rounded-[0.55rem] border-[2.5px] border-[#2a0081] bg-[#f5c700]"
         animate={
-          animate
+          buzzing
             ? { rotate: [0, -14, 12, -10, 8, 0], x: [0, -2, 2, -2, 2, 0] }
-            : undefined
+            : { rotate: 0, x: 0 }
         }
-        transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 0.9 }}
+        transition={
+          buzzing
+            ? { duration: 0.5, repeat: Infinity, repeatDelay: 0.9 }
+            : { duration: 0.2 }
+        }
       >
         <span className="absolute inset-x-1 top-1.5 bottom-2.5 rounded-sm bg-white" />
         <svg
@@ -166,16 +173,24 @@ function Buzz({
 export function PaperAgenda({
   progress,
   live,
+  bubbleShown = true,
+  buzzing = false,
 }: {
   progress: MotionValue<number>;
-  // Scroll-driven version: shows the pencil and the buzzing phone.
+  // Scroll-driven version: shows the pencil.
   live: boolean;
+  // Whether the message bubble is on screen (hidden from screen readers
+  // otherwise), and whether its phone is shaking.
+  bubbleShown?: boolean;
+  buzzing?: boolean;
 }) {
   return (
     <div className="relative aspect-[360/500] w-full">
       <svg
         viewBox={`0 0 ${VIEW.width} ${VIEW.height}`}
         className="absolute inset-0 size-full overflow-visible"
+        role="img"
+        aria-label="Agenda de papel de terça cheia de rabisco: Ana 14h, Bia 14h com duas interrogações e circulado, Carla 15h riscado, um remarcar com seta para Duda 16h, Fê 15h rabiscado e um post-it escrito confirmar todas. Um X enorme risca a página inteira."
       >
         <g aria-hidden="true">
           <rect
@@ -270,7 +285,7 @@ export function PaperAgenda({
         <BigX progress={progress} />
         {live && <Pencil progress={progress} />}
       </svg>
-      <Buzz progress={progress} animate={live} />
+      <Buzz progress={progress} shown={bubbleShown} buzzing={buzzing} />
     </div>
   );
 }
