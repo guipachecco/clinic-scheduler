@@ -1,13 +1,21 @@
 import { randomUUID } from "node:crypto";
 
-import { inArray, like, sql } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { inClinic } from "@/db/client";
 import { findPgError } from "@/db/errors";
 import { db, endPools } from "@/db/owner";
-import { clinics, patients, users } from "@/db/schema";
-import { listMyClinics } from "@/modules/clients/my-clinics";
+import {
+  appointments,
+  clinics,
+  patients,
+  reviews,
+  serviceCategories,
+  services,
+  users,
+} from "@/db/schema";
+import { listMyClinics, listPublicClinics } from "@/modules/clients/my-clinics";
 
 import { CLINIC } from "../helpers/clinic";
 
@@ -76,6 +84,9 @@ async function cleanup() {
       .where(like(clinics.slug, `${PREFIX}%`))
   ).map((row) => row.id);
   if (clinicIds.length > 0) {
+    for (const table of [reviews, appointments, services, serviceCategories]) {
+      await db.delete(table).where(inArray(table.clinicId, clinicIds));
+    }
     await db.delete(patients).where(inArray(patients.clinicId, clinicIds));
     await db.delete(clinics).where(inArray(clinics.id, clinicIds));
   }
@@ -127,16 +138,16 @@ afterAll(async () => {
 describe("listMyClinics", () => {
   it("lists only the user's active clinics, by name", async () => {
     const list = await listMyClinics(userU);
-    expect(list.map((c) => c.slug)).toEqual([
-      slugs.b,
-      slugs.a,
-      slugs.f,
-    ]);
-    expect(list[0]).toEqual({
+    expect(list.map((c) => c.slug)).toEqual([slugs.b, slugs.a, slugs.f]);
+    expect(list[0]).toMatchObject({
       slug: slugs.b,
       name: "Alfa Estética",
       areaLabel: "Estética",
       hasPhoto: false,
+      coverPhotoId: null,
+      rating: null,
+      loyalty: null,
+      nextAppointment: null,
     });
     expect(list[1]!.areaLabel).toBeNull();
   });
@@ -164,9 +175,117 @@ describe("listMyClinics", () => {
   it("returns nothing for an unknown or malformed id", async () => {
     expect(await listMyClinics(randomUUID())).toEqual([]);
     expect(await listMyClinics("x")).toEqual([]);
+    expect(await listMyClinics("00000000-0000-0000-0000-000000000000")).toEqual(
+      [],
+    );
+  });
+
+  it("shows her next appointment, loyalty, rating and cover in that clinic", async () => {
+    const [clinic] = await db
+      .select({ id: clinics.id })
+      .from(clinics)
+      .where(eq(clinics.slug, slugs.a));
+    const clinicId = clinic!.id;
+    await db
+      .update(clinics)
+      .set({
+        loyaltyEnabled: true,
+        loyaltyVisits: 3,
+        loyaltyReward: "Brinde",
+        whatsappPhone: "+5547999990000",
+      })
+      .where(eq(clinics.id, clinicId));
+    const [category] = await db
+      .insert(serviceCategories)
+      .values({ clinicId, name: "Categoria", slug: "categoria-minhas" })
+      .returning({ id: serviceCategories.id });
+    const [service] = await db
+      .insert(services)
+      .values({
+        clinicId,
+        categoryId: category!.id,
+        name: "Esmaltação",
+        slug: "esmaltacao-minhas",
+        durationMinutes: 60,
+      })
+      .returning({ id: services.id });
+    const patientOf = async (userId: string) =>
+      (
+        await db
+          .select({ id: patients.id })
+          .from(patients)
+          .where(
+            and(eq(patients.clinicId, clinicId), eq(patients.userId, userId)),
+          )
+      )[0]!.id;
+    const mine = await patientOf(userU);
+    // Another client of the same clinic, with an earlier appointment.
+    await addPatient(clinicId, userV, { phone: "+5511900009903" });
+    const theirs = await patientOf(userV);
+
+    const at = (hoursFromNow: number, patientId: string, extra = {}) => {
+      const startsAt = new Date(Date.now() + hoursFromNow * 3_600_000);
+      const endsAt = new Date(startsAt.getTime() + 3_600_000);
+      return {
+        clinicId,
+        patientId,
+        serviceId: service!.id,
+        serviceName: "Esmaltação",
+        serviceDurationMinutes: 60,
+        startsAt,
+        endsAt,
+        occupiedFrom: startsAt,
+        occupiedUntil: endsAt,
+        source: "admin" as const,
+        ...extra,
+      };
+    };
+    const cancelled = {
+      status: "cancelled" as const,
+      cancelledAt: new Date(),
+      cancelledBy: "clinic" as const,
+    };
+    await db
+      .insert(appointments)
+      .values([
+        at(-48, mine, { status: "completed" }),
+        at(-24, mine, { status: "completed" }),
+        at(-1, mine, { status: "confirmed" }),
+        at(2, mine, cancelled),
+        at(3, theirs, { status: "confirmed" }),
+        at(50, mine, { status: "requested" }),
+        at(26, mine, { status: "confirmed", customLabel: "Pé e mão" }),
+      ]);
+    await db.insert(reviews).values([
+      { clinicId, patientId: mine, rating: 5 },
+      { clinicId, patientId: theirs, rating: 4 },
+      { clinicId, patientId: theirs, rating: 1, isHidden: true },
+    ]);
+
+    const card = (await listMyClinics(userU)).find((c) => c.slug === slugs.a)!;
+    expect(card.nextAppointment?.service).toBe("Pé e mão");
     expect(
-      await listMyClinics("00000000-0000-0000-0000-000000000000"),
-    ).toEqual([]);
+      Math.round(
+        (card.nextAppointment!.startsAt.getTime() - Date.now()) / 3_600_000,
+      ),
+    ).toBe(26);
+    expect(card.loyalty).toEqual({
+      visits: 3,
+      reward: "Brinde",
+      stamps: 2,
+      prize: false,
+    });
+    expect(card.rating).toEqual({ average: 4.5, total: 2 });
+    expect(card.whatsappPhone).toBe("+5547999990000");
+
+    // The other client sees her own appointment, not this one's.
+    const other = (await listMyClinics(userV)).find((c) => c.slug === slugs.a)!;
+    expect(
+      Math.round(
+        (other.nextAppointment!.startsAt.getTime() - Date.now()) / 3_600_000,
+      ),
+    ).toBe(3);
+    expect(other.loyalty?.stamps).toBe(0);
   });
 
   it("is executable only by app_client", async () => {
@@ -179,5 +298,37 @@ describe("listMyClinics", () => {
       code = findPgError(error)?.code;
     }
     expect(code).toBe("42501");
+  });
+});
+
+describe("listPublicClinics", () => {
+  it("lists active clinics with online booking on, without private data", async () => {
+    const [c] = await db
+      .select({ id: clinics.id })
+      .from(clinics)
+      .where(eq(clinics.slug, slugs.c));
+    // New clinics start with online booking off; a and b turn it on, c stays
+    // off.
+    await db
+      .update(clinics)
+      .set({ onlineBookingEnabled: true })
+      .where(inArray(clinics.slug, [slugs.a, slugs.b, slugs.e]));
+    await db
+      .update(clinics)
+      .set({ onlineBookingEnabled: false })
+      .where(eq(clinics.id, c!.id));
+    const list = await listPublicClinics();
+    const found = list.map((clinic) => clinic.slug);
+    expect(found).toContain(slugs.a);
+    expect(found).toContain(slugs.b);
+    expect(found).not.toContain(slugs.c);
+    expect(found).not.toContain(slugs.e);
+    expect(list.find((clinic) => clinic.slug === slugs.b)).toEqual({
+      slug: slugs.b,
+      name: "Alfa Estética",
+      areaLabel: "Estética",
+      hasPhoto: false,
+      coverPhotoId: null,
+    });
   });
 });

@@ -897,6 +897,7 @@ describe("client access", () => {
         "client_my_clinics",
         "client_owner_photo",
         "client_payment_methods",
+        "client_public_clinics",
         "client_public_reviews",
         "client_review_summary",
         "register_client_patient",

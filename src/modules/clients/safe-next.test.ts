@@ -28,6 +28,18 @@ describe("safeNext", () => {
     }
   });
 
+  it("accepts exactly the Zemana page Suas clínicas", () => {
+    expect(safeNext("clinica", "/minhas-clinicas")).toBe("/minhas-clinicas");
+    for (const next of [
+      "/minhas-clinicas/",
+      "/minhas-clinicas?x=1",
+      "/minhas-clinicasx",
+      "//minhas-clinicas",
+    ]) {
+      expect(safeNext("clinica", next)).toBeNull();
+    }
+  });
+
   it("rejects external, protocol-relative and encoded tricks", () => {
     for (const next of [
       "https://evil.test/clinica",

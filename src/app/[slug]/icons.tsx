@@ -27,7 +27,8 @@ export type IconName =
   | "gift"
   | "bag"
   | "check"
-  | "close";
+  | "close"
+  | "plus";
 
 // Stroke icons in the style of the panel's (src/app/admin/(painel)/panel-nav.tsx).
 const PATHS: Record<IconName, React.ReactNode> = {
@@ -165,6 +166,7 @@ const PATHS: Record<IconName, React.ReactNode> = {
   ),
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
+  plus: <path d="M12 5v14M5 12h14" />,
 };
 
 export function Icon({

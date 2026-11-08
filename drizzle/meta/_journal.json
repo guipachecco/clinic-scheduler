@@ -148,6 +148,13 @@
       "when": 1794140962074,
       "tag": "0020_clinic_photos",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1794142856949,
+      "tag": "0021_client_clinic_lists",
+      "breakpoints": true
     }
   ]
 }
