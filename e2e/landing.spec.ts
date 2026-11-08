@@ -178,6 +178,12 @@ test("feature cards show without JavaScript", async ({ browser }) => {
   for (const card of await cards.all()) {
     await expect(card).toHaveCSS("opacity", "1");
   }
+  // The story renders its still scenes in the server HTML.
+  for (const text of ["Ana 14h", "Problema resolvido", "Com a Zemana"]) {
+    const scene = page.getByText(text, { exact: true });
+    await scene.scrollIntoViewIfNeeded();
+    await expect(scene).toBeVisible();
+  }
   await context.close();
 });
 
@@ -197,4 +203,64 @@ test("metadata names Zemana and shares the generated image", async ({
   const response = await request.get(new URL(ogImage!).pathname);
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toBe("image/png");
+});
+
+// The scroll story: the pencil fills a paper agenda, a giant X crosses it out,
+// the "PROBLEMA RESOLVIDO" stamp springs in, then the phone with the app.
+async function stampOpacity(page: import("@playwright/test").Page) {
+  return page
+    .getByTestId("story-stamp")
+    .evaluate((el) => Number(getComputedStyle(el).opacity));
+}
+
+test("story shows the X and the stamp after scrolling", async ({ page }) => {
+  await page.goto("/");
+  const story = page.getByTestId("scroll-story");
+  // Hydrated with motion allowed: the scroll-driven version.
+  await expect(story).toHaveAttribute("data-mode", "scroll");
+
+  // At the start of the story the stamp has not come in yet.
+  await story.evaluate((el) =>
+    window.scrollTo(0, window.scrollY + el.getBoundingClientRect().top),
+  );
+  await expect.poll(() => stampOpacity(page)).toBeLessThan(0.1);
+
+  // Scroll to the end of the story.
+  await story.evaluate((el) =>
+    window.scrollTo(
+      0,
+      window.scrollY + el.getBoundingClientRect().bottom - window.innerHeight,
+    ),
+  );
+  await expect(page.getByText("Problema resolvido")).toBeVisible();
+  await expect.poll(() => stampOpacity(page)).toBeGreaterThan(0.9);
+  await expect(page.getByTestId("big-x")).toBeAttached();
+  await expect(page.getByText("Com a Zemana", { exact: true })).toBeVisible();
+
+  const width = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(width).toBeLessThanOrEqual(360);
+});
+
+test("reduced motion shows every scene statically", async ({ browser }) => {
+  const context = await browser.newContext({
+    reducedMotion: "reduce",
+    viewport: { width: 360, height: 800 },
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+  await expect(page.getByTestId("scroll-story")).toHaveAttribute(
+    "data-mode",
+    "static",
+  );
+  for (const text of ["Ana 14h", "Problema resolvido", "Com a Zemana"]) {
+    const scene = page.getByText(text, { exact: true });
+    await scene.scrollIntoViewIfNeeded();
+    await expect(scene).toBeVisible();
+  }
+  await expect(page.getByTestId("big-x")).toBeVisible();
+  expect(await stampOpacity(page)).toBe(1);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const width = await page.evaluate(() => document.documentElement.scrollWidth);
+  expect(width).toBeLessThanOrEqual(360);
+  await context.close();
 });

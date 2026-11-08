@@ -8,7 +8,7 @@ import { FinalCta } from "./landing/final-cta";
 import { Hero } from "./landing/hero";
 import { SiteFooter } from "./landing/site-footer";
 import { SiteHeader } from "./landing/site-header";
-import { StoryPlaceholder } from "./landing/story-placeholder";
+import { ScrollStory } from "./landing/scroll-story";
 
 const TITLE = "Zemana — agenda online para profissionais de beleza e saúde";
 const DESCRIPTION =
@@ -34,7 +34,7 @@ export default function HomePage() {
       <SiteHeader />
       <main className="flex-1">
         <Hero />
-        <StoryPlaceholder />
+        <ScrollStory />
         <Features />
         <FinalCta />
       </main>
