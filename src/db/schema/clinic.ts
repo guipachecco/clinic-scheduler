@@ -189,6 +189,9 @@ export const clinics = pgTable(
     loyaltyEnabled: boolean("loyalty_enabled").notNull().default(false),
     loyaltyVisits: integer("loyalty_visits").notNull().default(10),
     loyaltyReward: text("loyalty_reward"),
+    // Health questionnaire template the clinic uses (migration 0024); empty
+    // while the clinic has none. Only root/migrations change it.
+    anamnesisTemplate: text("anamnesis_template"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

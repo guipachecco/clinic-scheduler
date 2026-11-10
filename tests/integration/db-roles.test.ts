@@ -174,6 +174,18 @@ describe("database roles", () => {
     );
   });
 
+  it("panel cannot change the anamnesis flag", async () => {
+    const code = await pgErrorCode(
+      inClinic(CLINIC, (tx) =>
+        tx
+          .update(clinics)
+          .set({ anamnesisTemplate: null })
+          .where(eq(clinics.id, CLINIC)),
+      ),
+    );
+    expect(code).toBe("42501");
+  });
+
   it("panel cannot point its photo at another clinic's image", async () => {
     const code = await pgErrorCode(
       inClinic(CLINIC, (tx) =>

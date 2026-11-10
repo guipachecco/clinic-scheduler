@@ -5,6 +5,7 @@ import { asClient, clientDb } from "@/db/client";
 import { db, endPools } from "@/db/owner";
 import { findPgError } from "@/db/errors";
 import {
+  anamneses,
   appointments,
   auditLogs,
   clinics,
@@ -315,6 +316,13 @@ describe("client access", () => {
       );
       expect(code, table).toBe("42501");
     }
+  });
+
+  it("client cannot read anamneses", async () => {
+    const code = await pgErrorCode(
+      asClient(ctx("ana", patientAna), (tx) => tx.select().from(anamneses)),
+    );
+    expect(code).toBe("42501");
   });
 
   it("client cannot update or delete appointments", async () => {

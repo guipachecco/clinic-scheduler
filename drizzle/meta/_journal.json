@@ -169,6 +169,13 @@
       "when": 1794325243195,
       "tag": "0023_mercado_pago",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794354724941,
+      "tag": "0024_anamnesis",
+      "breakpoints": true
     }
   ]
 }

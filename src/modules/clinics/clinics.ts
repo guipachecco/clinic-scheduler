@@ -34,6 +34,7 @@ export type ClinicSummary = {
   slug: string;
   name: string;
   isActive: boolean;
+  anamnesisTemplate: string | null;
 };
 
 export type ClinicResult =
@@ -50,6 +51,7 @@ const summaryColumns = {
   slug: clinics.slug,
   name: clinics.name,
   isActive: clinics.isActive,
+  anamnesisTemplate: clinics.anamnesisTemplate,
 };
 
 export async function getClinic(id: string): Promise<ClinicSummary | null> {
