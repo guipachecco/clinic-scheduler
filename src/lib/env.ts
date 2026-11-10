@@ -55,7 +55,23 @@ export const serverEnvSchema = z
       },
     ),
     EMAIL_OUTBOX_DIR: optionalText().transform((value) => value ?? ".emails"),
+    // Mercado Pago (docs/mercado-pago.md). The application of the Zemana at
+    // Mercado Pago: clinics connect their own accounts to it by OAuth.
+    // Without MP_CLIENT_ID the panel hides "Conectar Mercado Pago".
+    MP_CLIENT_ID: optionalText(),
+    MP_CLIENT_SECRET: optionalText(),
+    // Signs the notifications (Webhooks > Configurar notificações, in the
+    // application). Without it, every notification is refused.
+    MP_WEBHOOK_SECRET: optionalText(),
   })
+  .refine(
+    (env) =>
+      (env.MP_CLIENT_ID === undefined) === (env.MP_CLIENT_SECRET === undefined),
+    {
+      error: "defina MP_CLIENT_ID e MP_CLIENT_SECRET juntas",
+      path: ["MP_CLIENT_SECRET"],
+    },
+  )
   .refine(
     (env) =>
       env.NODE_ENV !== "production" ||

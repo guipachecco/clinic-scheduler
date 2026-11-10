@@ -33,10 +33,14 @@ import { createReceipt, reverseReceipt } from "@/modules/finance/receipts";
 import {
   cancelSale,
   receivePayment,
-  reversePayment,
   reviseSale,
   scheduleSessions,
 } from "@/modules/finance/sales";
+import { disconnect, NotConnectedError } from "@/modules/mercado-pago/accounts";
+import {
+  createCharge,
+  reverseWithRefund,
+} from "@/modules/mercado-pago/charges";
 import { DateTime } from "luxon";
 
 import { CLINIC_TIME_ZONE, todayLocal } from "@/modules/schedule/time";
@@ -154,7 +158,58 @@ export async function reversePaymentAction(
   if (!idSchema.safeParse(paymentId).success) {
     return { ok: false, formError: GENERIC_ERROR };
   }
-  return run(() => reversePayment(clinicId, paymentId, parsed.data, user.id));
+  // A payment that came from a Mercado Pago link is refunded there first.
+  return run(() =>
+    reverseWithRefund(clinicId, paymentId, parsed.data, user.id),
+  );
+}
+
+// ------------------------------------------------------------ mercado pago
+
+export type ChargeActionResult = ActionResult & {
+  link?: { checkoutUrl: string; amountCents: number; expiresAt: string };
+};
+
+export async function createChargeAction(
+  installmentId: string,
+): Promise<ChargeActionResult> {
+  const { clinicId, clinic, user } = await requireAdmin();
+  if (!idSchema.safeParse(installmentId).success) {
+    return { ok: false, formError: GENERIC_ERROR };
+  }
+  try {
+    const result = await createCharge(
+      clinicId,
+      { installmentId, clinicName: clinic.name },
+      user.id,
+    );
+    if (!result.ok) return { ok: false, formError: result.formError };
+    return {
+      ok: true,
+      id: result.link.id,
+      link: {
+        checkoutUrl: result.link.checkoutUrl,
+        amountCents: result.link.amountCents,
+        expiresAt: result.link.expiresAt.toISOString(),
+      },
+    };
+  } catch (error) {
+    if (error instanceof NotConnectedError) {
+      return { ok: false, formError: error.message };
+    }
+    return {
+      ok: false,
+      formError: "O Mercado Pago não respondeu. Tente de novo em instantes.",
+    };
+  }
+}
+
+export async function disconnectMercadoPagoAction(): Promise<ActionResult> {
+  const { clinicId, user } = await requireAdmin();
+  return run(async () => {
+    await disconnect(clinicId, user.id);
+    return { ok: true };
+  });
 }
 
 // --------------------------------------------------------------- receipts
