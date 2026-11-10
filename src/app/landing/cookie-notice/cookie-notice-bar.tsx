@@ -25,7 +25,17 @@ const linkClass =
 // the giant cookie along its torn top edge. "Entendi" saves the choice in a
 // cookie, then Zema leaps away, the cookie rolls past and the strip drops.
 export function CookieNoticeBar() {
-  const [hidden, setHidden] = useState(false);
+  // The server leaves the strip out once the cookie exists, but going back
+  // can restore a page rendered before "Entendi" from the router cache: in
+  // the browser, check the cookie again (no hydration mismatch: a server
+  // render only happens without the cookie).
+  const [hidden, setHidden] = useState(
+    () =>
+      typeof document !== "undefined" &&
+      document.cookie
+        .split("; ")
+        .includes(`${COOKIE_NOTICE_COOKIE}=${COOKIE_NOTICE_ACCEPTED}`),
+  );
   const reduce = useReducedMotion();
   const [scope, animate] = useAnimate<HTMLElement>();
   // Height of the strip, kept as blank space at the end of the page so its

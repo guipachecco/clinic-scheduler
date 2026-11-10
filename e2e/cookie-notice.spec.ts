@@ -32,6 +32,25 @@ test("the cookie notice shows until Entendi and stays gone after reload", async 
   await expect(notice(page)).toHaveCount(0);
 });
 
+test("going back after Entendi does not bring the notice back", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(notice(page)).toBeVisible();
+  await page
+    .getByRole("contentinfo")
+    .getByRole("link", { name: "Privacidade" })
+    .click();
+  await expect(page).toHaveURL(/\/privacidade$/);
+  await notice(page).getByRole("button", { name: "Entendi" }).click();
+  await expect(notice(page)).toHaveCount(0);
+
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator("h1")).toBeVisible();
+  await expect(notice(page)).toHaveCount(0);
+});
+
 test("the notice shows on the Zemana pages without horizontal scroll", async ({
   page,
 }) => {
