@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { CookieNotice } from "../landing/cookie-notice/cookie-notice";
+
 // Titles of the Zemana pages read "<page> | Zemana", not the clinic suffix
 // set by the root layout.
 export const metadata: Metadata = {
@@ -11,5 +13,10 @@ export default function ZemanaLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return (
+    <>
+      {children}
+      <CookieNotice />
+    </>
+  );
 }

@@ -4,6 +4,7 @@ import "@fontsource-variable/bricolage-grotesque/wdth.css";
 import "./landing/landing.css";
 
 import { JsonLd } from "./json-ld";
+import { CookieNotice } from "./landing/cookie-notice/cookie-notice";
 import { Features } from "./landing/features";
 import { FinalCta } from "./landing/final-cta";
 import { Hero } from "./landing/hero";
@@ -60,8 +61,9 @@ const ZEMANA_JSON_LD = {
   ],
 };
 
-// The Zemana landing page. It renders static content only (no database, no
-// cookies): the session-aware header link is a client island.
+// The Zemana landing page. It renders static content only (no database): the
+// session-aware header link is a client island, and the cookie notice only
+// reads its own cookie.
 export default function HomePage() {
   return (
     <div className="flex flex-1 flex-col overflow-x-clip">
@@ -74,6 +76,7 @@ export default function HomePage() {
       </main>
       <SiteFooter />
       <JsonLd data={ZEMANA_JSON_LD} />
+      <CookieNotice />
     </div>
   );
 }

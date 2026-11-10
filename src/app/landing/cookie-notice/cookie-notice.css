@@ -1,0 +1,128 @@
+/* The chase above the cookie notice (src/app/landing/cookie-notice): Zema
+   runs from the giant cookie along the torn top edge, crossing the screen
+   again and again. Only with motion allowed; otherwise both stand still. */
+
+.cn-zema .cn-leg-l,
+.cn-zema .cn-leg-r {
+  transform-origin: 60px 104px;
+}
+.cn-zema .cn-arm-l {
+  transform-origin: 24px 62px;
+}
+.cn-zema .cn-arm-r {
+  transform-origin: 96px 62px;
+}
+.cn-cookie .cn-spin {
+  transform-origin: 50px 50px;
+}
+
+/* Still: the pair stands near the left edge. */
+.cn-chase {
+  left: 0.75rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cn-chase {
+    animation: cn-cross 3.6s linear infinite;
+  }
+  .cn-zema {
+    animation: cn-gap 1.6s ease-in-out infinite alternate;
+  }
+  .cn-zema .cn-leg-l {
+    animation: cn-stride 0.36s linear infinite;
+  }
+  .cn-zema .cn-leg-r {
+    animation: cn-stride 0.36s linear infinite reverse;
+  }
+  .cn-zema .cn-arm-l {
+    animation: cn-swing 0.36s linear infinite;
+  }
+  .cn-zema .cn-arm-r {
+    animation: cn-swing 0.36s linear infinite reverse;
+  }
+  .cn-zema .cn-bob {
+    animation: cn-bob 0.18s ease-in-out infinite alternate;
+  }
+  .cn-zema .cn-sweat {
+    animation: cn-sweat 0.6s ease-out infinite;
+  }
+  .cn-cookie .cn-spin {
+    animation: cn-roll 0.9s linear infinite;
+  }
+  .cn-cookie .cn-hop {
+    animation: cn-hop 0.45s ease-in-out infinite alternate;
+  }
+  /* Once "Entendi" is clicked the pair stops crossing and leaves. */
+  .cn-leaving .cn-chase {
+    animation-play-state: paused;
+  }
+}
+
+@media (min-width: 40rem) and (prefers-reduced-motion: no-preference) {
+  .cn-chase {
+    animation-duration: 6.5s;
+  }
+}
+
+@keyframes cn-cross {
+  from {
+    left: -16rem;
+  }
+  to {
+    left: calc(100% + 1rem);
+  }
+}
+@keyframes cn-gap {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-14px);
+  }
+}
+@keyframes cn-stride {
+  0%,
+  100% {
+    transform: rotate(38deg);
+  }
+  50% {
+    transform: rotate(-38deg);
+  }
+}
+@keyframes cn-swing {
+  0%,
+  100% {
+    transform: rotate(-40deg);
+  }
+  50% {
+    transform: rotate(40deg);
+  }
+}
+@keyframes cn-bob {
+  to {
+    transform: translateY(-5px);
+  }
+}
+@keyframes cn-sweat {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-14px, -10px);
+  }
+}
+@keyframes cn-roll {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes cn-hop {
+  to {
+    transform: translateY(-4px);
+  }
+}
