@@ -33,6 +33,7 @@
 ### Task 1: Aviso de cookies (servidor + faixa + arte + montagem)
 
 **Files:**
+
 - Create: `src/app/landing/cookie-notice/cookie.ts` — constantes do cookie.
 - Create: `src/app/landing/cookie-notice/cookie-notice.tsx` — componente de servidor.
 - Create: `src/app/landing/cookie-notice/cookie-notice-bar.tsx` — `"use client"`, faixa + saída.
@@ -44,38 +45,57 @@
 - Test: `e2e/cookie-notice.spec.ts`
 
 **Interfaces:**
+
 - Produces: `COOKIE_NOTICE_COOKIE = "aviso_cookies"`, `COOKIE_NOTICE_ACCEPTED = "ok"` (de `cookie.ts`); `async function CookieNotice(): Promise<React.ReactNode>`; `function CookieNoticeBar(): React.ReactNode`.
 - Consumes: `displayClass`, `TornEdge` de `src/app/landing/ui.tsx`; `@fontsource-variable/bricolage-grotesque/wdth.css` (importado pela faixa, para o `font-stretch` funcionar fora da landing).
 
 - [ ] **Step 1: Write the failing e2e `e2e/cookie-notice.spec.ts`** (viewport 360×800)
 
 ```ts
-const notice = (page: Page) => page.getByRole("region", { name: "Aviso de cookies" });
+const notice = (page: Page) =>
+  page.getByRole("region", { name: "Aviso de cookies" });
 
-test("the cookie notice shows until Entendi and stays gone after reload", async ({ page, context }) => {
+test("the cookie notice shows until Entendi and stays gone after reload", async ({
+  page,
+  context,
+}) => {
   await page.goto("/");
   await expect(notice(page)).toBeVisible();
-  await expect(notice(page).getByRole("link", { name: "Privacidade" })).toHaveAttribute("href", "/privacidade");
-  await expect(notice(page).getByRole("link", { name: "Termos" })).toHaveAttribute("href", "/termos");
+  await expect(
+    notice(page).getByRole("link", { name: "Privacidade" }),
+  ).toHaveAttribute("href", "/privacidade");
+  await expect(
+    notice(page).getByRole("link", { name: "Termos" }),
+  ).toHaveAttribute("href", "/termos");
   await notice(page).getByRole("button", { name: "Entendi" }).click();
   await expect(notice(page)).toHaveCount(0);
-  expect((await context.cookies()).find((c) => c.name === "aviso_cookies")?.value).toBe("ok");
+  expect(
+    (await context.cookies()).find((c) => c.name === "aviso_cookies")?.value,
+  ).toBe("ok");
   await page.reload();
   await expect(notice(page)).toHaveCount(0);
   await page.goto("/privacidade");
   await expect(notice(page)).toHaveCount(0);
 });
 
-test("the notice shows on the Zemana pages without horizontal scroll", async ({ page }) => {
+test("the notice shows on the Zemana pages without horizontal scroll", async ({
+  page,
+}) => {
   for (const path of ["/", "/privacidade", "/entrar"]) {
     await page.goto(path);
     await expect(notice(page)).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth <=
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
   }
 });
 
 test("the notice does not show in the panel", async ({ page }) => {
-  await page.goto("/admin/entrar");   // usar a rota de login do painel que existir
+  await page.goto("/admin/entrar"); // usar a rota de login do painel que existir
   await expect(notice(page)).toHaveCount(0);
 });
 
@@ -120,6 +140,7 @@ git commit -m "feat: aviso de cookies com o Zema fugindo do biscoito"
 ### Task 2: Testes existentes e checagens
 
 **Files:**
+
 - Modify (se precisar): `e2e/landing.spec.ts`, `e2e/site.spec.ts`, `e2e/seo.spec.ts`, `e2e/zemana-entrar.spec.ts`, `e2e/branding.spec.ts`.
 
 - [ ] **Step 1: Run** `npx playwright test e2e/landing.spec.ts e2e/site.spec.ts e2e/seo.spec.ts e2e/zemana-entrar.spec.ts e2e/branding.spec.ts e2e/cookie-notice.spec.ts`. Expected: tudo passa; onde a faixa interceptar um clique, o spec ganha `await context.addCookies([{ name: "aviso_cookies", value: "ok", url: <baseURL> }])` num `beforeEach` (não mudar o que o teste confere).

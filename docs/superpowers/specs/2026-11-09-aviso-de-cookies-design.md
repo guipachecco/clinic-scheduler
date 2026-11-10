@@ -32,7 +32,7 @@ informativo: um botão só, "Entendi", sem "recusar".
 
 - Corrida (CSS keyframes, só com `prefers-reduced-motion: no-preference`):
   pernas e braços balançando, corpo quicando, suor, poeira; o biscoito gira. A
-  dupla atravessa a tela correndo *em cima* da borda rasgada, da esquerda para
+  dupla atravessa a tela correndo _em cima_ da borda rasgada, da esquerda para
   a direita, e recomeça pela esquerda (≈6,5 s no computador, ≈3,6 s no
   celular). O Zema às vezes perde terreno e recupera (distância oscilando).
 - Saída (motion/react, ao clicar): o Zema pula para a direita e sai, o biscoito

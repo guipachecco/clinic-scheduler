@@ -57,17 +57,23 @@ test("the end of the page can scroll out from under the notice", async ({
     const last = page
       .getByRole("link", { name: "É profissional? Entre no painel" })
       .last();
-    await last.scrollIntoViewIfNeeded();
-    await page.mouse.wheel(0, 5000);
-    const covered = await last.evaluate((link) => {
-      const box = link.getBoundingClientRect();
-      const top = document.elementFromPoint(
-        box.left + box.width / 2,
-        box.top + box.height / 2,
-      );
-      return !(top && link.contains(top));
-    });
-    expect(covered, path).toBe(false);
+    // Scrolled all the way down, the link is the element under its own
+    // centre, not the notice.
+    await expect
+      .poll(
+        () =>
+          last.evaluate((link) => {
+            window.scrollTo(0, document.documentElement.scrollHeight);
+            const box = link.getBoundingClientRect();
+            const top = document.elementFromPoint(
+              box.left + box.width / 2,
+              box.top + box.height / 2,
+            );
+            return Boolean(top && link.contains(top));
+          }),
+        { message: path },
+      )
+      .toBe(true);
   }
 });
 
