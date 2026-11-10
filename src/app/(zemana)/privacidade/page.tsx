@@ -119,8 +119,9 @@ export default function PrivacyPage() {
       <LegalSection title="Cookies">
         <p>
           Usamos apenas cookies necessários: o que mantém você conectada à sua
-          conta e o que guarda a sua escolha de tema claro ou escuro. A contagem
-          de visitas não usa cookies.
+          conta, o que guarda a sua escolha de tema claro ou escuro e o que
+          lembra que você já viu o aviso de cookies. A contagem de visitas não
+          usa cookies.
         </p>
       </LegalSection>
 
