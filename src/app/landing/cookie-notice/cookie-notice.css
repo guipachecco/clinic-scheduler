@@ -77,7 +77,7 @@
     transform: translateX(0);
   }
   to {
-    transform: translateX(-14px);
+    transform: translateX(-9px);
   }
 }
 @keyframes cn-stride {

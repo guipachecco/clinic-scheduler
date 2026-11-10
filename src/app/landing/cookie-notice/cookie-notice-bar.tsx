@@ -62,7 +62,7 @@ export function CookieNoticeBar() {
     await Promise.all([
       animate(
         ".cn-zema-exit",
-        { x: [0, 40, 280], y: [0, -80, -40], rotate: [0, -12, 10] },
+        { x: [0, 28, 220], y: [0, -52, -26], rotate: [0, -12, 10] },
         { duration: 0.6, ease: [0.3, 0, 0.6, 1] },
       ),
       animate(
@@ -92,15 +92,15 @@ export function CookieNoticeBar() {
         {/* The chase: decoration only, never in the way of clicks. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-full z-10 h-48 overflow-hidden"
+          className="pointer-events-none absolute inset-x-0 bottom-full z-10 h-32 overflow-hidden"
         >
-          <div className="cn-chase absolute bottom-1.5 h-28 w-[200px] sm:bottom-2.5 sm:w-[230px]">
-            <div className="cn-cookie-exit absolute bottom-0 left-0 w-24 sm:w-28">
+          <div className="cn-chase absolute bottom-1.5 h-16 w-[120px] sm:bottom-2.5 sm:w-[136px]">
+            <div className="cn-cookie-exit absolute bottom-0 left-0 w-14 sm:w-16">
               <div className="cn-cookie">
                 <BigCookie />
               </div>
             </div>
-            <div className="cn-zema-exit absolute bottom-0.5 left-[114px] w-[68px] sm:left-[134px] sm:w-[78px]">
+            <div className="cn-zema-exit absolute bottom-0.5 left-[68px] w-10 sm:left-[78px] sm:w-[46px]">
               <div className="cn-zema">
                 <Zema />
               </div>
