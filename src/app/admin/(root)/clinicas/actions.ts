@@ -57,11 +57,17 @@ export async function openClinicAction(formData: FormData): Promise<void> {
   const id = formData.get("clinicId");
   if (typeof id !== "string" || !idSchema.safeParse(id).success) return;
   if (!(await getClinic(id))) return;
-  (await cookies()).set(ACTIVE_CLINIC_COOKIE, id, {
+  const jar = await cookies();
+  // The cookie used to live on "/admin" only. Clear that copy, or the browser
+  // would keep sending the old clinic first on /admin pages.
+  jar.delete({ name: ACTIVE_CLINIC_COOKIE, path: "/admin" });
+  // Site-wide, because the panel's Route Handlers (the Mercado Pago connection
+  // under /api/mercado-pago) also need the chosen clinic.
+  jar.set(ACTIVE_CLINIC_COOKIE, id, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    path: "/admin",
+    path: "/",
     maxAge: 60 * 60 * 12,
   });
   redirect("/admin");
