@@ -1,16 +1,16 @@
 "use client";
 
 import {
+  animate,
   motion,
   useInView,
   useMotionValue,
   useMotionValueEvent,
   useReducedMotion,
-  useScroll,
   useSpring,
   useTransform,
 } from "motion/react";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -20,13 +20,13 @@ import { Stamp } from "./story/stamp";
 import { displayClass, Sticker, TornEdge } from "./ui";
 
 // Steps 2 to 4 of the story. A pencil fills a paper agenda with names,
-// rasuras and arrows as the page scrolls, a giant X crosses it all out, the
+// rasuras and arrows once the scene comes into view, a giant X crosses it all out, the
 // "PROBLEMA RESOLVIDO" stamp springs in, and the paper gives way to a phone
 // with the app.
 //
 // The server HTML (and the page without JavaScript, or with reduced motion)
 // shows the finished scenes stacked and still. Only after mount, when motion
-// is allowed, the scroll-driven stage takes their place.
+// is allowed, the animated stage takes their place.
 
 const noopSubscribe = () => () => {};
 
@@ -132,19 +132,27 @@ function phaseOf(progress: number): Phase {
   return "phone";
 }
 
-// The scroll-driven stage: pinned while its tall wrapper scrolls past.
+// How long the whole story takes to play, in seconds.
+const STORY_SECONDS = 11;
+
+// The animated stage: plays the story on a timeline once it comes into view,
+// and can be replayed at the end. It does not follow the scroll, so it plays
+// the same on phones as on desktops.
 function LiveStory() {
   const target = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target,
-    offset: ["start start", "end end"],
-  });
-  // A light spring so the pencil glides instead of ticking with each wheel step.
-  const story = useSpring(scrollYProgress, {
-    stiffness: 180,
-    damping: 32,
-    restDelta: 0.0005,
-  });
+  const story = useMotionValue(0);
+  const seen = useInView(target, { once: true, amount: 0.4 });
+  const [run, setRun] = useState(0);
+
+  useEffect(() => {
+    if (!seen) return;
+    story.set(0);
+    const controls = animate(story, 1, {
+      duration: STORY_SECONDS,
+      ease: "linear",
+    });
+    return () => controls.stop();
+  }, [seen, run, story]);
 
   // Scene timings on the story's progress.
   const paper = useTransform(story, [0.02, 0.72], [0, 1]);
@@ -193,11 +201,10 @@ function LiveStory() {
     <div
       ref={target}
       data-testid="scroll-story"
-      data-mode="scroll"
-      className="relative h-[440svh]"
+      data-mode="play"
+      className="relative"
     >
-      {/* Sticks below the fixed site header (--site-header-h, landing.css). */}
-      <div className="sticky top-(--site-header-h) flex h-[calc(100svh-var(--site-header-h))] flex-col items-center justify-center gap-5 overflow-hidden px-4 pb-6">
+      <div className="flex flex-col items-center justify-center gap-5 overflow-hidden px-4 pt-14 pb-28 lg:pb-36">
         <div className="relative grid h-12 w-full max-w-[26rem] place-items-center">
           <motion.div
             className="absolute"
@@ -257,6 +264,18 @@ function LiveStory() {
             </motion.div>
           </motion.div>
         </div>
+        <button
+          type="button"
+          onClick={() => setRun((n) => n + 1)}
+          className={cn(
+            "mt-2 rounded-full border-2 border-white/80 px-5 py-2 text-sm font-semibold text-white transition-opacity hover:bg-white/10",
+            shows("phone") ? "opacity-100" : "pointer-events-none opacity-0",
+          )}
+          aria-hidden={!shows("phone")}
+          tabIndex={shows("phone") ? 0 : -1}
+        >
+          Ver de novo
+        </button>
       </div>
     </div>
   );

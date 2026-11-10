@@ -240,46 +240,39 @@ async function bigX(page: Page) {
   });
 }
 
-// Scrolls to a point of the story (0 = its start, 1 = its end).
-async function scrollStory(page: Page, fraction: number) {
-  await page.getByTestId("scroll-story").evaluate((el, at) => {
-    const top = window.scrollY + el.getBoundingClientRect().top;
-    const range = el.getBoundingClientRect().height - window.innerHeight;
-    window.scrollTo(0, top + range * at);
-  }, fraction);
-}
-
-test("story shows the X and the stamp after scrolling", async ({ page }) => {
+test("story plays the X and the stamp once in view", async ({ page }) => {
   await page.goto("/");
   const story = page.getByTestId("scroll-story");
-  // Hydrated with motion allowed: the scroll-driven version.
-  await expect(story).toHaveAttribute("data-mode", "scroll");
+  // Hydrated with motion allowed: the animated version.
+  await expect(story).toHaveAttribute("data-mode", "play");
   const stamp = page.getByTestId("story-stamp");
   const enough = page.getByText("Chega de rasura!", { exact: true });
   const after = page.getByText("Com a Zemana", { exact: true });
 
-  // At the start nothing is crossed out or stamped yet.
-  await scrollStory(page, 0);
-  await expect.poll(() => paintedOpacity(stamp)).toBeLessThan(0.05);
-  await expect.poll(async () => (await bigX(page)).drawn).toBeLessThan(0.01);
+  // Before it comes into view nothing is crossed out or stamped yet.
+  expect(await paintedOpacity(stamp)).toBeLessThan(0.05);
   const start = await bigX(page);
   expect(start.count).toBeGreaterThan(0);
+  expect(start.drawn).toBeLessThan(0.01);
   expect(start.opacity).toBeLessThan(0.05);
 
-  // Three quarters in: the X is drawn and the stamp has landed.
-  await scrollStory(page, 0.76);
-  await expect.poll(() => paintedOpacity(stamp)).toBeGreaterThan(0.9);
-  await expect.poll(() => paintedOpacity(enough)).toBeGreaterThan(0.9);
-  await expect.poll(async () => (await bigX(page)).drawn).toBeGreaterThan(0.99);
-  expect((await bigX(page)).opacity).toBeGreaterThan(0.99);
+  // In view, it plays on its own: the X is drawn and the stamp lands.
+  await story.scrollIntoViewIfNeeded();
+  await expect
+    .poll(async () => (await bigX(page)).drawn, { timeout: 15_000 })
+    .toBeGreaterThan(0.99);
+  await expect
+    .poll(() => paintedOpacity(stamp), { timeout: 5_000 })
+    .toBeGreaterThan(0.9);
   await expect(page.getByText("Problema resolvido")).toBeVisible();
+
+  // At the end: the phone with the app, the stamp stuck on it.
+  await expect
+    .poll(() => paintedOpacity(after), { timeout: 10_000 })
+    .toBeGreaterThan(0.9);
   await expect(
     stamp.locator("xpath=ancestor-or-self::*[@aria-hidden='true']"),
   ).toHaveCount(0);
-
-  // At the end: the phone with the app, the stamp stuck on it.
-  await scrollStory(page, 1);
-  await expect.poll(() => paintedOpacity(after)).toBeGreaterThan(0.9);
   await expect.poll(() => paintedOpacity(enough)).toBeLessThan(0.05);
   await expect.poll(() => paintedOpacity(stamp)).toBeGreaterThan(0.9);
   expect((await bigX(page)).drawn).toBeGreaterThan(0.99);
