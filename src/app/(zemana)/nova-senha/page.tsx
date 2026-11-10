@@ -5,9 +5,18 @@ import { NewPasswordForm } from "@/app/[slug]/nova-senha/new-password-form";
 import { PageTitle } from "@/app/[slug]/ui";
 import { MIN_PASSWORD_LENGTH } from "@/modules/auth/password-policy";
 
+import { AuthArt } from "../auth-art";
 import { AuthShell, authLinkClass } from "../auth-shell";
 
 export const metadata: Metadata = { title: "Nova senha" };
+
+const art = (
+  <AuthArt
+    sticker="Quase lá"
+    lines={["Senha", "nova,", "tudo certo."]}
+    note="Depois é só entrar e voltar pra sua agenda."
+  />
+);
 
 export default async function ZemanaNewPasswordPage({
   searchParams,
@@ -18,7 +27,7 @@ export default async function ZemanaNewPasswordPage({
 
   if (typeof token !== "string" || token.length === 0) {
     return (
-      <AuthShell>
+      <AuthShell art={art}>
         <PageTitle description="O link está incompleto ou já foi usado.">
           Link inválido
         </PageTitle>
@@ -30,7 +39,7 @@ export default async function ZemanaNewPasswordPage({
   }
 
   return (
-    <AuthShell>
+    <AuthShell art={art}>
       <PageTitle
         description={`Escolha uma senha com pelo menos ${MIN_PASSWORD_LENGTH} caracteres.`}
       >

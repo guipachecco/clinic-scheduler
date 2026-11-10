@@ -6,6 +6,7 @@ import { ClientLoginForm } from "@/app/[slug]/entrar/login-form";
 import { PageTitle } from "@/app/[slug]/ui";
 import { getSession } from "@/modules/auth/session";
 
+import { AuthArt } from "../auth-art";
 import { AuthShell, authLinkClass } from "../auth-shell";
 
 export const metadata: Metadata = { title: "Entrar" };
@@ -17,7 +18,15 @@ export default async function ZemanaLoginPage() {
   }
 
   return (
-    <AuthShell>
+    <AuthShell
+      art={
+        <AuthArt
+          sticker="Que bom te ver"
+          lines={["Seus", "horários,", "num lugar só."]}
+          note="Veja e marque seus horários nas clínicas onde você é cliente."
+        />
+      }
+    >
       <PageTitle description="Entre com o e-mail e a senha da sua conta.">
         Entrar
       </PageTitle>
