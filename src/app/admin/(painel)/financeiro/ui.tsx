@@ -26,6 +26,7 @@ const TABS = [
   { href: "/admin/financeiro/receber", label: "A receber" },
   { href: "/admin/financeiro/caixa", label: "Caixa" },
   { href: "/admin/financeiro/despesas", label: "Despesas" },
+  { href: "/admin/financeiro/mercado-pago", label: "Mercado Pago" },
 ] as const;
 
 export function FinanceTabs({

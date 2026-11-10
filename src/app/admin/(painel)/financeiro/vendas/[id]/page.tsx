@@ -6,11 +6,18 @@ import { STATUS_LABELS, type Status } from "@/modules/appointments/fields";
 import { requireAdmin } from "@/modules/auth/session";
 import { PAYMENT_PLAN_LABELS } from "@/modules/finance/fields";
 import { getSale, listPaymentMethods } from "@/modules/finance/sales";
+import {
+  getConnection,
+  mercadoPagoConfig,
+} from "@/modules/mercado-pago/accounts";
+import { listSaleCharges } from "@/modules/mercado-pago/charges";
+import { getPatient } from "@/modules/patients/patients";
 import { formatLocal, todayLocal } from "@/modules/schedule/time";
 import { listCatalog } from "@/modules/services/services";
 
 import { FinanceTabs, formatDay, money, PageTitle, StateBadge } from "../../ui";
 
+import { ChargeLink } from "./charge-link";
 import {
   CancelSaleForm,
   PaymentForm,
@@ -27,15 +34,34 @@ export default async function SalePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { clinicId } = await requireAdmin();
+  const { clinicId, clinic } = await requireAdmin();
   const { id } = await params;
   const today = todayLocal();
-  const [sale, methods, catalog] = await Promise.all([
+  const [sale, methods, catalog, connection] = await Promise.all([
     getSale(clinicId, id, today),
     listPaymentMethods(clinicId),
     listCatalog(clinicId),
+    mercadoPagoConfig() ? getConnection(clinicId) : null,
   ]);
   if (!sale) notFound();
+  const [charges, patient] = connection
+    ? await Promise.all([
+        listSaleCharges(clinicId, sale.id),
+        getPatient(clinicId, sale.patientId),
+      ])
+    : [[], null];
+  const phone = patient?.phone?.replace(/\D/g, "") || null;
+  const openLink = (installmentId: string, outstandingCents: number) => {
+    const charge = charges.find((c) => c.installmentId === installmentId);
+    return charge?.usable && charge.amountCents === outstandingCents
+      ? {
+          checkoutUrl: charge.checkoutUrl,
+          amountCents: charge.amountCents,
+          expiresAt: charge.expiresAt.toISOString(),
+        }
+      : null;
+  };
+  const conflicts = charges.filter((c) => c.status === "conflict");
   const catalogServices = catalog.flatMap((c) =>
     c.services.map((s) => ({ ...s, categoryActive: c.isActive })),
   );
@@ -162,6 +188,22 @@ export default async function SalePage({
         <h2 id="parcelas" className="font-heading text-lg font-semibold">
           Parcelas
         </h2>
+        {conflicts.length > 0 ? (
+          <p
+            role="alert"
+            className="rounded-xl border border-destructive/40 bg-card p-3 text-sm font-medium text-destructive"
+          >
+            A paciente pagou pelo Mercado Pago uma parcela que já estava paga ou
+            foi cancelada aqui (
+            {conflicts
+              .map(
+                (c) =>
+                  `parcela ${sale.installments.find((p) => p.id === c.installmentId)?.number ?? "?"}, ${money(c.amountCents)}`,
+              )
+              .join("; ")}
+            ). Devolva o valor pelo app do Mercado Pago.
+          </p>
+        ) : null}
         {sale.installments.length === 0 ? (
           <p className="text-muted-foreground">
             Nenhuma parcela (venda sem valor).
@@ -197,7 +239,19 @@ export default async function SalePage({
                 (part.state === "open" ||
                   part.state === "partial" ||
                   part.state === "overdue") ? (
-                  <div className="flex w-full justify-end">
+                  <div className="flex w-full flex-wrap items-center justify-end gap-2">
+                    {connection ? (
+                      <ChargeLink
+                        installmentId={part.id}
+                        installmentNumber={part.number}
+                        clinicName={clinic.name}
+                        phone={phone}
+                        existing={openLink(
+                          part.id,
+                          part.amountCents - part.paidCents,
+                        )}
+                      />
+                    ) : null}
                     <PaymentForm
                       installmentId={part.id}
                       outstandingCents={part.amountCents - part.paidCents}

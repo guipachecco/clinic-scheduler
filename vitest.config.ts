@@ -43,6 +43,11 @@ export default defineConfig({
       LOG_LEVEL: "warn",
       // Without MAILERSEND_API_KEY the e-mails the tests send are written here.
       EMAIL_OUTBOX_DIR: path.join(tmpdir(), "clinic-scheduler-test-emails"),
+      // Fictitious Mercado Pago application. The tests never call Mercado
+      // Pago: they pass a fake fetch.
+      MP_CLIENT_ID: "1234567890",
+      MP_CLIENT_SECRET: "segredo-ficticio-do-cliente",
+      MP_WEBHOOK_SECRET: "segredo-ficticio-do-webhook",
     },
     projects: [
       {
