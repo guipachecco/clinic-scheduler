@@ -1,9 +1,10 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { inClinic } from "@/db/client";
 import { db, endPools } from "@/db/owner";
-import { anamneses, auditLogs, patients, users } from "@/db/schema";
+import { anamneses, auditLogs, clinics, patients, users } from "@/db/schema";
+import { answersSchema } from "@/modules/anamnesis/fields";
 import {
   createAnamnesis,
   deleteAnamnesis,
@@ -244,7 +245,7 @@ describe("anamnesis module", () => {
       (await setAnamnesisStatus(CLINIC, patientId, id, "in_progress", actorId))
         .ok,
     ).toBe(true);
-    await recordPdfGenerated(CLINIC, id, actorId);
+    await recordPdfGenerated(CLINIC, patientId, id, actorId);
     expect(await deleteAnamnesis(CLINIC, patientId, id, actorId)).toEqual({
       ok: true,
     });
@@ -285,6 +286,105 @@ describe("anamnesis module", () => {
     } finally {
       await db.delete(anamneses).where(eq(anamneses.patientId, anon!.id));
       await db.delete(patients).where(eq(patients.id, anon!.id));
+    }
+  });
+
+  it("a clinic with the feature on cannot read another clinic's anamnesis", async () => {
+    const id = await create();
+    await db
+      .update(clinics)
+      .set({ anamnesisTemplate: "integrativa-ads-v1" })
+      .where(eq(clinics.id, other));
+    try {
+      expect(await getAnamnesis(other, patientId, id)).toBeNull();
+      expect(await listAnamneses(other, patientId)).toBeNull();
+      expect(await deleteAnamnesis(other, patientId, id, actorId)).toEqual({
+        ok: false,
+      });
+    } finally {
+      await db
+        .update(clinics)
+        .set({ anamnesisTemplate: null })
+        .where(eq(clinics.id, other));
+    }
+    expect(await getAnamnesis(CLINIC, patientId, id)).not.toBeNull();
+  });
+
+  it("recordPdfGenerated writes nothing out of scope", async () => {
+    const id = await create();
+    await recordPdfGenerated(other, patientId, id, actorId);
+    await recordPdfGenerated(CLINIC, otherPatientId, id, actorId);
+    expect(await actions(id)).toEqual(["anamnesis.created"]);
+  });
+
+  it("the copy keeps only options the template still offers and passes its schema", async () => {
+    const first = await create("2026-11-01");
+    await save(
+      first,
+      { queixas_principais: "Dor", pregressas_doencas: ["diabetes"] },
+      "2026-11-01",
+    );
+    const second = await create();
+    const record = await current(second);
+    const parsed = answersSchema(record.template).safeParse(record.answers);
+    expect(parsed.success).toBe(true);
+    expect(record.answers.pregressas_doencas).toEqual(["diabetes"]);
+  });
+
+  it("create waits behind a concurrent anonymization", async () => {
+    const [victim] = await db
+      .insert(patients)
+      .values({
+        clinicId: CLINIC,
+        name: "Paciente Corrida",
+        nameNormalized: "paciente corrida",
+        phone: "+5511900000303",
+      })
+      .returning({ id: patients.id });
+    const vid = victim!.id;
+    await db.insert(anamneses).values({
+      clinicId: CLINIC,
+      patientId: vid,
+      template: "integrativa-ads-v1",
+      takenOn: "2026-11-01",
+      answers: { queixas_principais: "Dor" },
+    });
+    try {
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      let locked!: () => void;
+      const hasLock = new Promise<void>((resolve) => (locked = resolve));
+      const anonymizing = db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select 1 from patients where id = ${vid} for update`,
+        );
+        locked();
+        await gate;
+        await tx.delete(anamneses).where(eq(anamneses.patientId, vid));
+        await tx
+          .update(patients)
+          .set({
+            name: "Paciente anonimizado",
+            nameNormalized: null,
+            phone: null,
+            anonymizedAt: new Date(),
+          })
+          .where(eq(patients.id, vid));
+      });
+      await hasLock;
+      const creating = createAnamnesis(CLINIC, vid, actorId, TODAY);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      release();
+      await anonymizing;
+      expect(await creating).toEqual({ ok: false });
+      const left = await db
+        .select({ id: anamneses.id })
+        .from(anamneses)
+        .where(eq(anamneses.patientId, vid));
+      expect(left).toHaveLength(0);
+    } finally {
+      await db.delete(anamneses).where(eq(anamneses.patientId, vid));
+      await db.delete(patients).where(eq(patients.id, vid));
     }
   });
 

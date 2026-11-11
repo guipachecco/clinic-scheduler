@@ -48,6 +48,9 @@ async function patientInScope(
   tx: Tx,
   clinicId: string,
   patientId: string,
+  // Writes lock the patient row (share) so they wait behind a concurrent
+  // anonymization and then see it committed.
+  lock = false,
 ): Promise<boolean> {
   if (!UUID_PATTERN.test(patientId)) return false;
   const [clinic] = await tx
@@ -56,11 +59,12 @@ async function patientInScope(
     .where(eq(clinics.id, clinicId))
     .limit(1);
   if (!clinic?.template) return false;
-  const [patient] = await tx
+  const query = tx
     .select({ anonymizedAt: patients.anonymizedAt })
     .from(patients)
     .where(and(eq(patients.id, patientId), eq(patients.clinicId, clinicId)))
     .limit(1);
+  const [patient] = await (lock ? query.for("share") : query);
   return !!patient && patient.anonymizedAt === null;
 }
 
@@ -160,7 +164,7 @@ export async function createAnamnesis(
   const target = getTemplate(CURRENT_TEMPLATE_ID);
   if (!target) return { ok: false };
   return inClinic(clinicId, async (tx) => {
-    if (!(await patientInScope(tx, clinicId, patientId))) {
+    if (!(await patientInScope(tx, clinicId, patientId, true))) {
       return { ok: false } as const;
     }
     const [latest] = await tx
@@ -177,7 +181,7 @@ export async function createAnamnesis(
     const fromTemplate = latest ? getTemplate(latest.template) : null;
     const answers =
       latest && fromTemplate
-        ? copyAnswers(latest.answers, fromTemplate, target)
+        ? keepValid(copyAnswers(latest.answers, fromTemplate, target), target)
         : {};
     const [row] = await tx
       .insert(anamneses)
@@ -212,6 +216,18 @@ type SaveResult =
       fieldErrors?: Record<string, string>;
     };
 
+// Drops any copied answer the current template would reject, so the stored
+// copy always passes its schema.
+function keepValid(answers: Answers, template: AnamnesisTemplate): Answers {
+  const schema = answersSchema(template);
+  const out: Answers = {};
+  for (const [id, value] of Object.entries(answers)) {
+    const parsed = schema.safeParse({ [id]: value });
+    if (parsed.success) Object.assign(out, parsed.data);
+  }
+  return out;
+}
+
 function isRealDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
@@ -231,7 +247,7 @@ export async function saveAnamnesis(
 ): Promise<SaveResult> {
   if (!UUID_PATTERN.test(id)) return { ok: false, reason: "not_found" };
   return inClinic(clinicId, async (tx): Promise<SaveResult> => {
-    if (!(await patientInScope(tx, clinicId, patientId))) {
+    if (!(await patientInScope(tx, clinicId, patientId, true))) {
       return { ok: false, reason: "not_found" };
     }
     const [row] = await tx
@@ -328,7 +344,7 @@ export async function setAnamnesisStatus(
 ): Promise<{ ok: true; updatedAt: string } | { ok: false }> {
   if (!UUID_PATTERN.test(id)) return { ok: false };
   return inClinic(clinicId, async (tx) => {
-    if (!(await patientInScope(tx, clinicId, patientId))) {
+    if (!(await patientInScope(tx, clinicId, patientId, true))) {
       return { ok: false } as const;
     }
     const [row] = await tx
@@ -365,7 +381,8 @@ export async function deleteAnamnesis(
 ): Promise<{ ok: boolean }> {
   if (!UUID_PATTERN.test(id)) return { ok: false };
   return inClinic(clinicId, async (tx) => {
-    if (!(await patientInScope(tx, clinicId, patientId))) return { ok: false };
+    if (!(await patientInScope(tx, clinicId, patientId, true)))
+      return { ok: false };
     const deleted = await tx
       .delete(anamneses)
       .where(rowOf(clinicId, patientId, id))
@@ -377,17 +394,20 @@ export async function deleteAnamnesis(
 }
 
 // The PDF of an anamnesis was generated (a copy of health data left the app).
+// Writes nothing when the anamnesis is out of scope.
 export async function recordPdfGenerated(
   clinicId: string,
+  patientId: string,
   id: string,
   actorUserId: string,
 ): Promise<void> {
   if (!UUID_PATTERN.test(id)) return;
   await inClinic(clinicId, async (tx) => {
+    if (!(await patientInScope(tx, clinicId, patientId, true))) return;
     const [row] = await tx
-      .select({ patientId: anamneses.patientId })
+      .select({ id: anamneses.id })
       .from(anamneses)
-      .where(and(eq(anamneses.id, id), eq(anamneses.clinicId, clinicId)))
+      .where(rowOf(clinicId, patientId, id))
       .limit(1);
     if (!row) return;
     await audit(
@@ -396,7 +416,7 @@ export async function recordPdfGenerated(
       actorUserId,
       "anamnesis.pdf_generated",
       id,
-      row.patientId,
+      patientId,
     );
   });
 }
