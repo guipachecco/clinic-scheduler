@@ -51,7 +51,7 @@ Cada PR depende do anterior.
 | Chave | Rótulo | O que some quando desligado |
 |---|---|---|
 | `products` | Produtos | Menu Produtos, aba Produtos da página pública, produto no orçamento, "Produtos usados" no atendimento, bloco de produtos na venda |
-| `finance` | Financeiro | Menu Financeiro (caixa, entradas, despesas, a receber, orçamentos, vendas, Mercado Pago), o bloco de pagamento no detalhe do atendimento e os números de dinheiro da Início |
+| `finance` | Financeiro | Menu Financeiro (caixa, entradas, despesas, a receber, orçamentos, vendas, Mercado Pago), o bloco de pagamento no detalhe do atendimento e o resumo financeiro na ficha da pessoa |
 | `online_booking` | Agendamento online | Marcação pela página (`/[slug]/marcar`) e a chave correspondente em "Minha página" |
 | `loyalty` | Fidelidade | Cartão na página e na área da cliente, resgates no painel e a configuração em "Minha página" |
 | `anamnesis` | Anamnese | Aba de anamnese da ficha |
@@ -162,7 +162,7 @@ Sempre ligadas, fora da lista: Agenda, Clientes/Pacientes, Serviços, Expediente
 
 ## Decisões minhas, para conferir
 
-- A lista exata do que some com cada módulo (tabela do PR 1). Os números de dinheiro da Início somem junto com o Financeiro.
+- A lista exata do que some com cada módulo (tabela do PR 1). O webhook do Mercado Pago continua funcionando com o Financeiro desligado, para não perder pagamentos em andamento.
 - O endereço (slug) não muda na tela de edição do root.
 - Os produtos existentes vão para "Outros", e "Escondido" vira "Mostrar na página = não".
 - No plano "por sessão", o produto vira uma parcela à parte, com vencimento na data da venda.
