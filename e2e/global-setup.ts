@@ -17,8 +17,10 @@ import {
   TEST_ADMIN_CLIENT_AREA,
   TEST_ADMIN_CLINIC_PAGE,
   TEST_ADMIN_FINANCE,
+  PAGE_BUILDER_CLINIC_SLUG,
   PANEL_HOME_CLINIC_SLUG,
   TEST_ADMIN_AGENDA_PHONE,
+  TEST_ADMIN_PAGE_BUILDER,
   TEST_ADMIN_PANEL_HOME,
   TEST_ADMIN_PANEL_MOBILE,
   TEST_ADMIN_PATIENT_LINKS,
@@ -44,6 +46,13 @@ export default async function globalSetup() {
       `INSERT INTO clinics (slug, name, slot_step_minutes) VALUES ($1, $2, 30)`,
       [PANEL_HOME_CLINIC_SLUG, "Clínica Painel Início (teste)"],
     );
+    // Own clinic for the page builder suite: online booking on, so the public
+    // page shows its booking button.
+    await owner.query(
+      `INSERT INTO clinics (slug, name, slot_step_minutes, online_booking_enabled)
+       VALUES ($1, $2, 30, true)`,
+      [PAGE_BUILDER_CLINIC_SLUG, "Barbearia Montar Página (teste)"],
+    );
   } finally {
     await owner.end();
   }
@@ -64,6 +73,7 @@ export default async function globalSetup() {
     await createAdmin(TEST_ADMIN_PATIENT_LINKS);
     await createAdmin(TEST_ADMIN_PANEL_MOBILE);
     await createAdmin(TEST_ADMIN_PANEL_HOME);
+    await createAdmin(TEST_ADMIN_PAGE_BUILDER);
     await createAdmin(TEST_ADMIN_AGENDA_PHONE);
     await createAdmin(TEST_ROOT);
     await createAdmin(TEST_ROOT_BRANDING);
