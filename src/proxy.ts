@@ -22,8 +22,14 @@ export function proxy(request: NextRequest) {
   // Fast path only: it checks that a session cookie exists, not that it is
   // valid. Every panel page and action verifies the session on the server
   // (src/modules/auth/session.ts).
+  // Server Action calls pass through: each action checks the session itself
+  // and answers in a way the page understands (the anamnesis form keeps the
+  // typed text instead of following a redirect it cannot read).
+  const isServerAction =
+    request.method === "POST" && request.headers.has("next-action");
   if (
     isProtectedAdminPath(request.nextUrl.pathname) &&
+    !isServerAction &&
     !getSessionCookie(request)
   ) {
     const response = NextResponse.redirect(

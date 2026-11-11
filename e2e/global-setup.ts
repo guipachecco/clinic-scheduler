@@ -13,6 +13,7 @@ import { seedClientAreaClinics } from "./client-area-fixtures";
 import {
   TEST_ADMIN,
   TEST_ADMIN_AGENDA,
+  TEST_ADMIN_ANAMNESIS,
   TEST_ADMIN_CLIENT_AREA,
   TEST_ADMIN_CLINIC_PAGE,
   TEST_ADMIN_FINANCE,
@@ -22,6 +23,7 @@ import {
   TEST_ADMIN_PANEL_MOBILE,
   TEST_ADMIN_PATIENT_LINKS,
   TEST_ROOT,
+  TEST_ROOT_ANAMNESIS,
   TEST_ROOT_BRANDING,
   TEST_ADMIN_PATIENTS,
   TEST_ADMIN_SCHEDULE,
@@ -65,6 +67,8 @@ export default async function globalSetup() {
     await createAdmin(TEST_ADMIN_AGENDA_PHONE);
     await createAdmin(TEST_ROOT);
     await createAdmin(TEST_ROOT_BRANDING);
+    await createAdmin(TEST_ADMIN_ANAMNESIS);
+    await createAdmin(TEST_ROOT_ANAMNESIS);
   } finally {
     await endPools();
   }
