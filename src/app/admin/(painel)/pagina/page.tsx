@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/modules/auth/session";
 import { getClinicPageSettings } from "@/modules/clinic-page/panel";
+import { getBuilderState } from "@/modules/page-builder/builder";
 import { formatStoredPhone } from "@/modules/patients/fields";
 
 import { LoyaltyForm } from "./loyalty-form";
@@ -14,8 +15,10 @@ export const metadata: Metadata = { title: "Minha página" };
 
 export default async function ClinicPageSettingsPage() {
   const { clinicId } = await requireAdmin();
+  // The builder state throws for a missing clinic, so it waits for the check.
   const settings = await getClinicPageSettings(clinicId);
   if (!settings) notFound();
+  const builder = await getBuilderState(clinicId);
 
   return (
     <div className="grid max-w-3xl gap-8">
@@ -33,14 +36,31 @@ export default async function ClinicPageSettingsPage() {
         </div>
       </header>
 
+      <section
+        aria-labelledby="montar"
+        className="grid gap-3 rounded-2xl border bg-card p-5 shadow-sm"
+      >
+        <h2 id="montar" className="font-heading text-lg font-bold">
+          Monte a cara da sua página
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {builder.hasDraft
+            ? "Você tem mudanças guardadas que ainda não estão no ar."
+            : "Logo, fotos, cor, botões, letra e apresentação, um passo de cada vez. Nada muda para os clientes até você publicar."}
+        </p>
+        <Button asChild className="min-h-11 w-fit">
+          <Link href={"/admin/pagina/montar" as Route}>
+            {builder.hasDraft ? "Continuar rascunho" : "Começar"}
+          </Link>
+        </Button>
+      </section>
+
       <section aria-labelledby="dados" className="grid gap-4">
         <h2 id="dados" className="font-heading text-lg font-bold">
           Dados da página
         </h2>
         <PageForm
           defaults={{
-            headline: settings.headline ?? "",
-            about: settings.about ?? "",
             whatsappPhone: formatStoredPhone(settings.whatsappPhone),
             contactEmail: settings.contactEmail ?? "",
             address: settings.address ?? "",

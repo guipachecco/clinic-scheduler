@@ -14,6 +14,7 @@ import {
   whatsappUrl,
 } from "../ui";
 
+import { bookingButtonClass } from "./booking-button";
 import { CopyPhone } from "./copy-phone";
 import { WEEKDAY_NAMES } from "./open-status";
 import { PhotoGallery } from "./photo-gallery";
@@ -68,7 +69,7 @@ export function Amenities({
           <li key={key} className="inline-flex items-center gap-2 text-sm">
             <Icon
               name={AMENITY_ICONS[key]}
-              className="size-5 shrink-0 text-primary"
+              className="size-5 shrink-0 text-primary-text"
             />
             {AMENITY_LABELS[key]}
           </li>
@@ -237,7 +238,7 @@ function RoundLink({
       href={href}
       aria-label={label}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className="inline-flex size-11 items-center justify-center rounded-full bg-secondary text-primary hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="inline-flex size-11 items-center justify-center rounded-full bg-secondary text-primary-text hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
     >
       <Icon name={icon} />
     </a>
@@ -338,7 +339,7 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
                   {body}
                   <Icon
                     name="chevronRight"
-                    className="size-5 shrink-0 text-primary"
+                    className="size-5 shrink-0 text-primary-text"
                   />
                 </Link>
               ) : (
@@ -357,9 +358,7 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
 // The one strong action of the page, fixed above the bottom navigation:
 // "Marcar horário", or the clinic's WhatsApp when online booking is off.
 export function BookingBar({ page }: { page: ClinicPage }) {
-  const className =
-    // Purple in the light theme, the Zemana yellow in the dark one.
-    "flex min-h-13 w-full items-center justify-center gap-2 rounded-full bg-primary font-heading text-base font-extrabold text-primary-foreground shadow-[0_0_0_4px_var(--background)] outline-none hover:bg-primary-pressed focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-highlight dark:text-highlight-foreground dark:hover:bg-highlight/90";
+  const className = bookingButtonClass(page.theme);
   let action: React.ReactNode = null;
   if (page.onlineBookingEnabled) {
     action = (

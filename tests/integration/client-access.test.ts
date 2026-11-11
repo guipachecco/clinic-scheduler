@@ -473,7 +473,7 @@ describe("client access", () => {
     expect(clinic).toEqual([{ id: CLINIC }]);
     const privateColumn = await pgErrorCode(
       asClient(ctx("ana", patientAna), (tx) =>
-        tx.select({ theme: clinics.theme }).from(clinics),
+        tx.select({ draft: clinics.pageDraft }).from(clinics),
       ),
     );
     expect(privateColumn).toBe("42501");
@@ -898,6 +898,9 @@ describe("client access", () => {
       [
         "client_business_hours",
         "client_busy_intervals",
+        "client_clinic_cover",
+        "client_clinic_cover_size",
+        "client_clinic_logo",
         "client_clinic_photo",
         "client_clinic_photos",
         "client_context",

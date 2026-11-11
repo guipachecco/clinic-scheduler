@@ -2,6 +2,7 @@ export type TokenName =
   | "primary"
   | "primary-pressed"
   | "primary-foreground"
+  | "primary-text"
   | "highlight"
   | "highlight-foreground"
   | "brand"
@@ -58,6 +59,7 @@ function fromTones(
       primary: t.main,
       "primary-pressed": t.mainPressed,
       "primary-foreground": WHITE,
+      "primary-text": t.main,
       highlight: t.highlight,
       "highlight-foreground": t.highlightForeground,
       brand: t.main,
@@ -71,6 +73,7 @@ function fromTones(
       primary: t.tint,
       "primary-pressed": t.tintPressed,
       "primary-foreground": DARK_PAGE,
+      "primary-text": t.tint,
       highlight: t.highlight,
       "highlight-foreground": t.highlightForeground,
       brand: t.darkBrand,
@@ -91,6 +94,7 @@ const GRAIS: Palette = {
     primary: "#00357a",
     "primary-pressed": "#00245a",
     "primary-foreground": "#ffffff",
+    "primary-text": "#00357a",
     highlight: "#ffde59",
     "highlight-foreground": "#00357a",
     brand: "#00357a",
@@ -104,6 +108,7 @@ const GRAIS: Palette = {
     primary: "#99f0ff",
     "primary-pressed": "#6fe3f7",
     "primary-foreground": "#0b0b10",
+    "primary-text": "#99f0ff",
     highlight: "#ffde59",
     "highlight-foreground": "#00357a",
     brand: "#000000",
@@ -124,6 +129,7 @@ const ZEMANA: Palette = {
     primary: "#2a0081",
     "primary-pressed": "#1d005c",
     "primary-foreground": "#ffffff",
+    "primary-text": "#2a0081",
     highlight: "#f5c700",
     "highlight-foreground": "#2a0081",
     brand: "#2a0081",
@@ -137,6 +143,7 @@ const ZEMANA: Palette = {
     primary: "#b7e7fc",
     "primary-pressed": "#8fd3f2",
     "primary-foreground": "#0b0b10",
+    "primary-text": "#b7e7fc",
     highlight: "#f5c700",
     "highlight-foreground": "#2a0081",
     brand: "#14033a",

@@ -69,7 +69,7 @@ export default async function MyAppointmentsPage({
             href={whatsappUrl(clinic.whatsappPhone)}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-semibold text-primary underline underline-offset-4"
+            className="font-semibold text-primary-text underline underline-offset-4"
           >
             Falar no WhatsApp
           </a>
@@ -130,7 +130,10 @@ function AppointmentList({
             }
           >
             <span className="flex items-center gap-2 font-semibold break-words">
-              <Icon name="calendar" className="size-4 shrink-0 text-primary" />
+              <Icon
+                name="calendar"
+                className="size-4 shrink-0 text-primary-text"
+              />
               {item.serviceName}
             </span>
             <span className="text-sm">

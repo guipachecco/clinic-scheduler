@@ -54,7 +54,7 @@ export function SlotGroups({
             key={group.period}
             type="button"
             onClick={() => jump(group.period)}
-            className="rounded-full border bg-card px-4 py-1.5 text-sm font-semibold outline-none hover:border-primary focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="rounded-full border bg-card px-4 py-1.5 text-sm font-semibold outline-none hover:border-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             {group.label}
           </button>
@@ -82,7 +82,7 @@ export function SlotGroups({
                   type="button"
                   disabled={disabled}
                   onClick={(event) => onSlot(value, event.currentTarget)}
-                  className="h-11 rounded-xl border bg-card text-sm font-semibold outline-none hover:border-primary focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
+                  className="h-11 rounded-xl border bg-card text-sm font-semibold outline-none hover:border-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
                 >
                   {timeOf(value)}
                 </button>

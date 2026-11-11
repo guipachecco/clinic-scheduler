@@ -19,6 +19,7 @@
   --color-primary: var(--primary);
   --color-primary-pressed: var(--primary-pressed);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-text: var(--primary-text);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -49,15 +50,22 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --font-sans: "Figtree Variable", system-ui, sans-serif;
-  --font-heading: "Bricolage Grotesque Variable", system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Not inline: `font-heading` reads var(--font-heading), so the clinic page
+   can swap the heading font inside its container (src/app/[slug]/page-theme.tsx). */
+@theme {
+  --font-heading: "Bricolage Grotesque Variable", system-ui, sans-serif;
+}
+
 :root {
   --radius: 0.625rem;
+  /* Shape of the clinic page's main buttons; the page builder can change it. */
+  --radius-button: 9999px;
   --background: #f7f5f8;
   --foreground: #1c1a22;
   --card: #ffffff;
@@ -67,6 +75,7 @@
   --primary: #2a0081;
   --primary-pressed: #1d005c;
   --primary-foreground: #ffffff;
+  --primary-text: #2a0081;
   --secondary: #eeebf0;
   --secondary-foreground: #2a0081;
   --muted: #eeebf0;
@@ -109,6 +118,7 @@
   --primary: #b7e7fc;
   --primary-pressed: #8fd3f2;
   --primary-foreground: #0b0b10;
+  --primary-text: #b7e7fc;
   --secondary: #23212b;
   --secondary-foreground: #b7e7fc;
   --muted: #23212b;

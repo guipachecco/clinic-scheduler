@@ -6,6 +6,10 @@ import { inClinic } from "@/db/client";
 import { auditLogs, clinicPhotos, media } from "@/db/schema";
 import { reencodeImage } from "@/modules/media/reencode";
 
+import { MAX_CLINIC_PHOTOS } from "./limits";
+
+export { MAX_CLINIC_PHOTOS };
+
 // Photos of the clinic's space and work for its public page, managed as
 // app_panel inside the clinic (the panel screen and the terminal command use
 // the same functions). The first photo by position is the page's cover.
@@ -14,7 +18,6 @@ import { reencodeImage } from "@/modules/media/reencode";
 // 150-250 KB as WebP.
 const MAX_SIDE = 1600;
 const QUALITY = 80;
-export const MAX_CLINIC_PHOTOS = 30;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -38,7 +38,7 @@ export function ReviewForm({ slug }: { slug: string }) {
     return (
       <div role="status" className="grid gap-3 rounded-2xl border bg-card p-4">
         <p className="flex items-center gap-2 font-semibold">
-          <Icon name="check" className="size-5 shrink-0 text-primary" />
+          <Icon name="check" className="size-5 shrink-0 text-primary-text" />
           Obrigada pela avaliação!
         </p>
         <Button asChild size="lg">

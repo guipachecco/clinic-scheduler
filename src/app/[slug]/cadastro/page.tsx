@@ -51,7 +51,7 @@ export default async function SignupPage({
           href={
             `/${clinic.slug}/entrar?next=${encodeURIComponent(next)}` as Route
           }
-          className="font-semibold text-primary underline underline-offset-4"
+          className="font-semibold text-primary-text underline underline-offset-4"
         >
           Entrar
         </Link>

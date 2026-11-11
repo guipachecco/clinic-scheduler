@@ -7,7 +7,6 @@ import { FieldError, FormError } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { applyMask } from "@/lib/input-mask";
 import {
   AMENITIES,
@@ -21,8 +20,6 @@ import { savePageAction } from "./actions";
 const SAVE_ERROR = "Não foi possível salvar. Tente novamente.";
 
 export type PageFormDefaults = {
-  headline: string;
-  about: string;
   whatsappPhone: string;
   contactEmail: string;
   address: string;
@@ -86,7 +83,6 @@ export function PageForm({ defaults }: { defaults: PageFormDefaults }) {
     options: {
       help?: string;
       type?: string;
-      multiline?: boolean;
       mask?: (value: string) => string;
     } = {},
   ) {
@@ -104,23 +100,16 @@ export function PageForm({ defaults }: { defaults: PageFormDefaults }) {
     return (
       <div className="grid gap-2">
         <Label htmlFor={id}>{label}</Label>
-        {options.multiline ? (
-          <Textarea
-            {...common}
-            onChange={(event) => set(id, event.target.value)}
-          />
-        ) : (
-          <Input
-            {...common}
-            type={options.type ?? "text"}
-            inputMode={options.type === "tel" ? "tel" : undefined}
-            onChange={(event) => {
-              const { mask } = options;
-              if (mask) applyMask(event, mask, (value) => set(id, value));
-              else set(id, event.target.value);
-            }}
-          />
-        )}
+        <Input
+          {...common}
+          type={options.type ?? "text"}
+          inputMode={options.type === "tel" ? "tel" : undefined}
+          onChange={(event) => {
+            const { mask } = options;
+            if (mask) applyMask(event, mask, (value) => set(id, value));
+            else set(id, event.target.value);
+          }}
+        />
         {options.help ? (
           <p id={`${id}-ajuda`} className="text-sm text-muted-foreground">
             {options.help}
@@ -133,8 +122,6 @@ export function PageForm({ defaults }: { defaults: PageFormDefaults }) {
 
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-5">
-      {field("headline", "Frase de apresentação")}
-      {field("about", "Sobre a clínica", { multiline: true })}
       {field("whatsappPhone", "WhatsApp", {
         type: "tel",
         mask: formatBrPhoneInput,

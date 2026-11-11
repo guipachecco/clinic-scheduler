@@ -145,3 +145,15 @@ export const TEST_ROOT_ANAMNESIS = {
   name: "Root da Anamnese",
   password: "senha-de-teste-root-anamnese-bem-longa",
 };
+
+// Owner of the clinic dedicated to the page builder suite
+// (e2e/page-builder.spec.ts): a barbershop that publishes its page through
+// the panel wizard.
+export const PAGE_BUILDER_CLINIC_SLUG = "barbearia-montar-pagina";
+export const TEST_ADMIN_PAGE_BUILDER = {
+  role: "admin" as const,
+  clinicSlug: PAGE_BUILDER_CLINIC_SLUG,
+  email: "montar-pagina@example.test",
+  name: "Dono da Barbearia",
+  password: "senha-de-teste-montar-pagina-bem-longa",
+};

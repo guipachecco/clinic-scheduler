@@ -60,6 +60,7 @@ describe("palettes", () => {
       primary: "#00357a",
       "primary-pressed": "#00245a",
       "primary-foreground": "#ffffff",
+      "primary-text": "#00357a",
       highlight: "#ffde59",
       "highlight-foreground": "#00357a",
       brand: "#00357a",
@@ -73,6 +74,7 @@ describe("palettes", () => {
       primary: "#99f0ff",
       "primary-pressed": "#6fe3f7",
       "primary-foreground": "#0b0b10",
+      "primary-text": "#99f0ff",
       highlight: "#ffde59",
       "highlight-foreground": "#00357a",
       brand: "#000000",
@@ -122,7 +124,7 @@ describe("palettes", () => {
       dark: blockOf(/^\.dark\s*\{([^}]*)\}/m),
     };
     const names = Object.keys(PALETTES.zemana.light) as TokenName[];
-    expect(names).toHaveLength(11);
+    expect(names).toHaveLength(12);
     for (const theme of ["light", "dark"] as const) {
       for (const name of names) {
         const m = blocks[theme].match(

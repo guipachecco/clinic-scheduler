@@ -84,8 +84,6 @@ const optionalText = (max: number, label: string) =>
 
 export const clinicPageSchema = z
   .object({
-    headline: optionalText(120, "Frase de apresentação"),
-    about: optionalText(2000, "Texto sobre a clínica"),
     whatsappPhone: z
       .string()
       .trim()

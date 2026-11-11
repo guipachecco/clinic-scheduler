@@ -25,7 +25,7 @@ export function CopyPhone({ phone, label }: { phone: string; label: string }) {
         type="button"
         onClick={copy}
         aria-label="Copiar telefone"
-        className="inline-flex size-11 items-center justify-center rounded-full text-primary hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+        className="inline-flex size-11 items-center justify-center rounded-full text-primary-text hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
       >
         <Icon name="copy" />
       </button>

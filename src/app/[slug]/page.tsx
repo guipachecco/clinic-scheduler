@@ -1,20 +1,18 @@
 import { DateTime } from "luxon";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { cache } from "react";
 
 import { JsonLd } from "@/app/json-ld";
 import { SITE_URL } from "@/app/site-url";
 import {
   canReview,
-  getClinicPage,
   getLoyaltyProgress,
   type ClinicPage,
 } from "@/modules/clinic-page/public";
 import { getClientContext } from "@/modules/clients/context";
 import { getClientUser, requireClinic } from "@/modules/clients/session";
 
-import { Hero } from "./home/hero";
+import { coverImage, Hero } from "./home/hero";
 import {
   AboutTab,
   Amenities,
@@ -31,10 +29,8 @@ import {
   ServicesTab,
 } from "./home/sections";
 import { Tabs, type TabItem } from "./home/tabs";
+import { loadClinicPage as loadPage } from "./load-page";
 import { clinicName, instagramUrl } from "./ui";
-
-// The metadata and the page read the same clinic once per request.
-const loadPage = cache(getClinicPage);
 
 // What a search result and a shared link show: the owner's headline, else the
 // start of her "about" text, else a sentence built from the clinic's name.
@@ -56,6 +52,7 @@ export async function generateMetadata({
   const page = await loadPage(slug);
   if (!page) return {};
   const description = describe(page);
+  const cover = coverImage(page);
   return {
     description,
     alternates: { canonical: `/${page.slug}` },
@@ -65,15 +62,15 @@ export async function generateMetadata({
       siteName: "Zemana",
       title: clinicName(page),
       description,
-      // The cover makes the shared link show the space; without photos the
-      // Zemana image of the root layout stays.
-      ...(page.photos[0]
+      // The cover (or the first photo) makes the shared link show the
+      // space; without either the Zemana image of the root layout stays.
+      ...(cover
         ? {
             images: [
               {
-                url: `/${page.slug}/fotos/${page.photos[0].id}`,
-                width: page.photos[0].width,
-                height: page.photos[0].height,
+                url: cover.src,
+                width: cover.width,
+                height: cover.height,
                 alt: `Espaço de ${clinicName(page)}`,
               },
             ],
@@ -97,9 +94,14 @@ function clinicJsonLd(page: ClinicPage) {
     description: describe(page),
     ...(page.address ? { address: page.address } : {}),
     ...(page.whatsappPhone ? { telephone: page.whatsappPhone } : {}),
-    ...(page.photos.length > 0 || page.hasOwnerPhoto
+    ...(page.cover || page.photos.length > 0 || page.hasOwnerPhoto
       ? {
           image: [
+            ...(page.cover
+              ? [
+                  `${url}/capa${page.coverVersion ? `?v=${page.coverVersion}` : ""}`,
+                ]
+              : []),
             ...page.photos
               .slice(0, 3)
               .map((photo) => `${url}/fotos/${photo.id}`),

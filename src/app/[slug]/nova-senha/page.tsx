@@ -25,7 +25,7 @@ export default async function NewPasswordPage({
         </PageTitle>
         <Link
           href={`/${clinic.slug}/esqueci-senha`}
-          className="font-semibold text-primary underline underline-offset-4"
+          className="font-semibold text-primary-text underline underline-offset-4"
         >
           Pedir um novo link
         </Link>
