@@ -9,7 +9,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary-pressed",
+        // The main action of a screen: Zemana yellow with purple text.
+        default:
+          "bg-highlight text-highlight-foreground font-bold hover:bg-highlight/85",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 focus-visible:ring-destructive/20",
         outline:

@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { FormError } from "@/components/form-message";
+import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import {
   ageOn,
   formatStoredPhone,
@@ -23,7 +25,25 @@ import { formatDate } from "./format";
 
 type Props = { initialItems: PatientListItem[]; initialNext?: PatientCursor };
 
-const ROW_COLUMNS = "md:grid-cols-[2fr_1.2fr_1fr_0.6fr]";
+const AVATAR_TONES = [
+  "bg-brand-accent text-brand-accent-foreground",
+  "bg-primary text-primary-foreground",
+  "bg-highlight text-highlight-foreground",
+];
+
+// Same color for the same patient on every visit.
+function avatarTone(id: string) {
+  let sum = 0;
+  for (const char of id) sum += char.charCodeAt(0);
+  return AVATAR_TONES[sum % AVATAR_TONES.length];
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+  return (first + last).toUpperCase();
+}
 
 // The term travels in a Server Action POST body, never in the URL.
 export function PatientSearch({ initialItems, initialNext }: Props) {
@@ -101,19 +121,26 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
         onSubmit={onSearch}
         className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
       >
-        <div className="grid gap-2">
-          <Label htmlFor="patient-search">Buscar paciente</Label>
+        <div className="relative">
+          <Label htmlFor="patient-search" className="sr-only">
+            Buscar paciente
+          </Label>
+          <Icon
+            name="search"
+            className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             id="patient-search"
             type="search"
+            className="pl-11"
             value={term}
             onChange={(event) => setTerm(event.target.value)}
             maxLength={100}
             autoComplete="off"
-            placeholder="Nome, apelido, telefone ou CPF"
+            placeholder="Nome, telefone ou CPF"
           />
         </div>
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" variant="outline" disabled={pending}>
           {pending ? "Buscando..." : "Buscar"}
         </Button>
       </form>
@@ -142,47 +169,51 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
             : "Nenhum paciente encontrado"}
         </p>
       ) : (
-        <ul className="grid gap-3 md:gap-0 md:overflow-hidden md:rounded-2xl md:border md:bg-card">
-          <li
-            aria-hidden="true"
-            className={`hidden gap-4 border-b bg-muted px-4 py-3 text-sm font-medium text-muted-foreground md:grid ${ROW_COLUMNS}`}
-          >
-            <span>Nome</span>
-            <span>WhatsApp</span>
-            <span>Nascimento</span>
-            <span>Idade</span>
-          </li>
+        <ul className="grid gap-2">
           {items.map((patient) => (
-            <li key={patient.id} className="md:border-b md:last:border-b-0">
+            <li key={patient.id}>
               <Link
                 href={`/admin/pacientes/${patient.id}` as Route}
-                className={`grid gap-1 rounded-2xl border bg-card p-4 outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 md:items-center md:gap-4 md:rounded-none md:border-0 ${ROW_COLUMNS}`}
+                className="flex min-h-16 items-center gap-3 rounded-2xl border bg-card px-4 py-3 outline-none hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <span className="font-medium">
-                  {patient.name}
-                  {patient.anonymizedAt ? (
-                    <span className="ml-2 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      Anonimizado
-                    </span>
-                  ) : null}
-                  {patient.nickname ? (
-                    <span className="font-normal text-muted-foreground">
-                      {" "}
-                      ({patient.nickname})
-                    </span>
-                  ) : null}
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "inline-flex size-10 shrink-0 items-center justify-center rounded-full font-heading text-sm font-extrabold",
+                    patient.anonymizedAt
+                      ? "bg-muted text-muted-foreground"
+                      : avatarTone(patient.id),
+                  )}
+                >
+                  {initials(patient.name)}
                 </span>
-                <span className="text-sm md:text-base">
-                  {formatStoredPhone(patient.phone)}
+                <span className="grid min-w-0 flex-1 gap-0.5">
+                  <span className="font-heading font-semibold break-words">
+                    {patient.name}
+                    {patient.nickname ? (
+                      <span className="font-sans font-normal text-muted-foreground">
+                        {" "}
+                        ({patient.nickname})
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {[
+                      formatStoredPhone(patient.phone),
+                      patient.birthDate
+                        ? `${formatDate(patient.birthDate)} · ${ageOn(patient.birthDate, today)} anos`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 </span>
-                <span className="text-sm text-muted-foreground md:text-base md:text-foreground">
-                  {formatDate(patient.birthDate)}
-                </span>
-                <span className="text-sm text-muted-foreground md:text-base md:text-foreground">
-                  {patient.birthDate
-                    ? `${ageOn(patient.birthDate, today)} anos`
-                    : ""}
-                </span>
+                {patient.anonymizedAt ? (
+                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-0.5 text-xs font-bold text-muted-foreground">
+                    Anonimizado
+                  </span>
+                ) : null}
+                <Icon name="chevronRight" className="text-muted-foreground" />
               </Link>
             </li>
           ))}
