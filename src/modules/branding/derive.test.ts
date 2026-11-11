@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contrastRatio } from "./contrast";
+import { contrastRatio, mixColors } from "./contrast";
 import { HEX_COLOR, paletteFromColor, readableOn } from "./derive";
 import { PALETTES } from "./palettes";
 
@@ -55,6 +55,29 @@ describe("paletteFromColor", () => {
 
   it("normalizes uppercase input", () => {
     expect(paletteFromColor("#7A3CFF").light.primary).toBe("#7a3cff");
+  });
+});
+
+describe("paletteFromColor derived tokens", () => {
+  for (const color of COLORS) {
+    it(`pins the mixes for ${color}`, () => {
+      const p = paletteFromColor(color);
+      const pressed = mixColors(color, "#000000", 0.12);
+      expect(p.light["primary-pressed"]).toBe(pressed);
+      expect(p.light["brand-muted"]).toBe(pressed);
+      expect(p.light["brand-accent"]).toBe(mixColors(color, "#ffffff", 0.85));
+      expect(p.dark.brand).toBe(mixColors(color, "#0b0b10", 0.8));
+      expect(p.dark["primary-text"]).toBe(p.dark.primary);
+      expect(
+        contrastRatio(p.dark["brand-foreground"], p.dark.brand),
+      ).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+
+  it("throws on a value that is not #rrggbb", () => {
+    expect(() => paletteFromColor("red")).toThrow();
+    expect(() => paletteFromColor("#12345")).toThrow();
+    expect(() => paletteFromColor("")).toThrow();
   });
 });
 

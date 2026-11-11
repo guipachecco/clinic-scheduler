@@ -42,6 +42,7 @@ function shiftUntil(
 /** Builds a readable palette in both themes from any `#rrggbb` color. */
 export function paletteFromColor(hex: string): Palette {
   const color = hex.toLowerCase();
+  if (!HEX_COLOR.test(color)) throw new Error(`Invalid color: ${hex}`);
   const zemana = PALETTES[ZEMANA_PALETTE_ID];
   const pressed = mixColors(color, BLACK, 0.12);
   const accent = mixColors(color, WHITE, 0.85);
@@ -76,6 +77,9 @@ export function paletteFromColor(hex: string): Palette {
       "highlight-foreground": zemana.dark["highlight-foreground"],
       brand: mixColors(color, DARK_PAGE, 0.8),
       "brand-foreground": DARK_TEXT,
+      // brand-muted: 70% toward the page, a step lighter than brand (80%).
+      // brand-accent and its foreground reuse the light values, which are
+      // already readable and do not depend on the theme.
       "brand-muted": mixColors(color, DARK_PAGE, 0.7),
       "brand-accent": accent,
       "brand-accent-foreground": accentForeground,
