@@ -278,6 +278,31 @@ test.describe("anamnese", () => {
     );
   });
 
+  test("browser back shows the latest text and keeps saving", async () => {
+    await page.goto(anamnesisPath);
+    await page.getByLabel("Principais queixas").fill("Antes do voltar");
+    await expect(saved()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("link", { name: "Voltar à ficha" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/admin/pacientes/${PATIENTS.fill.id}$`),
+    );
+    // Back to the form from the browser, without reloading the page.
+    await page.goBack();
+    await expect(page).toHaveURL(new RegExp(`${anamnesisPath}$`));
+    await expect(page.getByLabel("Principais queixas")).toHaveValue(
+      "Antes do voltar",
+    );
+
+    await page.getByLabel("Principais queixas").fill("Depois do voltar");
+    await saveButton().click();
+    await expect(saved()).toBeVisible({ timeout: 10_000 });
+    await expect(conflict()).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByLabel("Principais queixas")).toHaveValue(
+      "Depois do voltar",
+    );
+  });
+
   test("second anamnesis comes prefilled, diagnosis blank", async () => {
     await openNewAnamnesis(PATIENTS.copy.id);
     await page.getByLabel("Principais queixas").fill("Insônia fictícia");

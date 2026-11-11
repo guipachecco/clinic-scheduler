@@ -7,6 +7,7 @@ import { requireAdmin } from "@/modules/auth/session";
 import { formatDate } from "../format";
 
 import { NewAnamnesisButton } from "./anamneses/new-anamnesis-button";
+import { RefreshWhenChanged } from "./anamneses/refresh-when-changed";
 
 const STATUS_LABELS = {
   in_progress: "Em andamento",
@@ -29,6 +30,7 @@ export async function Anamneses({ patientId }: { patientId: string }) {
 
   return (
     <section aria-labelledby="anamneses" className="grid gap-4">
+      <RefreshWhenChanged patientId={patientId} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="anamneses" className="font-heading text-lg font-semibold">
           Anamneses

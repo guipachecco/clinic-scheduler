@@ -123,6 +123,48 @@ const styles = StyleSheet.create({
   },
 });
 
+// The built-in Helvetica only has the WinAnsi (Windows-1252) characters:
+// anything else (emoji and other symbols a phone keyboard inserts) would print
+// as garbage. Composes accents first, turns the usual look-alikes into their
+// WinAnsi form and drops the rest. Every Portuguese letter is in WinAnsi.
+const WINANSI_EXTRAS = "€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ";
+const LOOK_ALIKES: Record<string, string> = {
+  "\u2010": "-",
+  "\u2011": "-",
+  "\u2012": "\u2013",
+  "\u2015": "\u2014",
+  "\u2032": "'",
+  "\u2033": '"',
+  "\u2212": "-",
+  "\u2028": "\n",
+  "\u2029": "\n",
+};
+
+function isWinAnsi(char: string): boolean {
+  const code = char.codePointAt(0)!;
+  return (
+    code === 0x09 ||
+    code === 0x0a ||
+    (code >= 0x20 && code <= 0x7e) ||
+    (code >= 0xa0 && code <= 0xff) ||
+    WINANSI_EXTRAS.includes(char)
+  );
+}
+
+export function toWinAnsi(text: string): string {
+  let result = "";
+  for (const char of text.normalize("NFC").replace(/\r\n?/g, "\n")) {
+    if (isWinAnsi(char)) result += char;
+    else if (LOOK_ALIKES[char]) result += LOOK_ALIKES[char];
+    // Other spaces (thin, narrow no-break...) become a plain space.
+    else if (/^\s$/u.test(char)) result += " ";
+  }
+  return result;
+}
+
+const safe = (text: string | null): string | null =>
+  text === null ? null : toWinAnsi(text) || null;
+
 // "2026-11-10" -> "10/11/2026".
 function formatDate(iso: string): string {
   const [year, month, day] = iso.split("-");
@@ -141,13 +183,35 @@ function contactLine(header: PdfHeader): string | null {
 }
 
 function AnamnesisDocument({
-  header,
-  patient,
+  header: rawHeader,
+  patient: rawPatient,
   takenOn,
   template,
   answers,
 }: Input) {
-  const sections = answeredSections(template, answers);
+  const header: PdfHeader = {
+    ...rawHeader,
+    clinicName: toWinAnsi(rawHeader.clinicName),
+    professionalName: safe(rawHeader.professionalName),
+    professionalRegistration: safe(rawHeader.professionalRegistration),
+    address: safe(rawHeader.address),
+    contactEmail: safe(rawHeader.contactEmail),
+  };
+  const patient: PdfPatient = {
+    ...rawPatient,
+    name: toWinAnsi(rawPatient.name),
+    email: safe(rawPatient.email),
+  };
+  // An answer made only of characters the font lacks prints as nothing, so
+  // it is left out like an empty one.
+  const sections = answeredSections(template, answers)
+    .map(({ section, items }) => ({
+      section,
+      items: items
+        .map((item) => ({ ...item, text: toWinAnsi(item.text) }))
+        .filter((item) => item.text.trim() !== ""),
+    }))
+    .filter(({ items }) => items.length > 0);
   const professional = [
     header.professionalName,
     header.professionalRegistration,
@@ -160,13 +224,16 @@ function AnamnesisDocument({
         patient.age !== null ? ` (${patient.age} anos)` : ""
       }`
     : null;
-  const phones = [patient.phone, patient.landlinePhone]
-    .filter((phone): phone is string => Boolean(phone))
-    .map(formatStoredPhone)
-    .join(" / ");
   const identification: [string, string | null][] = [
     ["Nascimento", birth],
-    ["Telefone", phones || null],
+    [
+      "Celular / WhatsApp",
+      patient.phone ? formatStoredPhone(patient.phone) : null,
+    ],
+    [
+      "Telefone fixo",
+      patient.landlinePhone ? formatStoredPhone(patient.landlinePhone) : null,
+    ],
     ["E-mail", patient.email],
   ];
 

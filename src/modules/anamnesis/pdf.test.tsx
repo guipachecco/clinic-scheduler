@@ -55,7 +55,36 @@ describe("anamnesis pdf", () => {
 
   it("identification comes from the record", async () => {
     const { text } = await render({ queixas_principais: "x" });
-    expect(text).toContain("(11) 98765-4321");
+    expect(text).toContain("Celular / WhatsApp: (11) 98765-4321");
+    expect(text).not.toContain("Telefone fixo");
+  });
+
+  it("the landline has its own line", async () => {
+    const { text } = await render(
+      { queixas_principais: "x" },
+      { phone: null, landlinePhone: "+551133334444" },
+    );
+    expect(text).toContain("Telefone fixo: (11) 3333-4444");
+    expect(text).not.toContain("Celular / WhatsApp");
+  });
+
+  it("characters outside the font are dropped, accents kept", async () => {
+    const { text } = await render(
+      {
+        queixas_principais:
+          "Dor de cabeça\u{1F915}\u2009forte\u2764\uFE0F — “sempre” • às vezes…\u{1F468}\u200D\u{1F469}\u200D\u{1F467}",
+        // A decomposed accent (a + combining acute) is composed.
+        queixas_duracao: "Ha\u0301 dois anos",
+        // Only emoji: left out like an empty answer.
+        queixas_agrava_melhora: "\u{1F600}\u{1F600}",
+      },
+      { name: "Maria\u{1F338} Conceição" },
+    );
+    expect(text).toContain("Dor de cabeça forte — “sempre” • às vezes…");
+    expect(text).toContain("Há dois anos");
+    expect(text).toContain("Maria Conceição");
+    expect(text).not.toContain("O que agrava ou melhora?");
+    expect(text).not.toMatch(/\p{Extended_Pictographic}|\u200D|\uFE0F/u);
   });
 
   it("accents survive", async () => {

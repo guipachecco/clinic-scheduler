@@ -31,11 +31,14 @@ import {
   setStatusAction,
   type SaveResult,
 } from "../actions";
+import { rememberSaved, startingPoint } from "../latest";
 
 // The anamnesis form. Drafts live only on the server: nothing is written to
 // localStorage, sessionStorage or IndexedDB (the phone may be shared). Every
 // save carries the version the screen holds (expectedUpdatedAt), and saves run
-// one at a time, each with the version the previous one returned.
+// one at a time, each with the version the previous one returned. What each
+// save stored is also kept in memory (../latest.ts) for the browser's back and
+// forward buttons.
 
 type Status = "in_progress" | "completed";
 
@@ -80,9 +83,19 @@ export function AnamnesisForm({
   initialUpdatedAt,
   today,
 }: Props) {
-  const [answers, setAnswers] = useState<Answers>(initialAnswers);
-  const [takenOn, setTakenOn] = useState(initialTakenOn);
-  const [status, setStatus] = useState<Status>(initialStatus);
+  // Back and forward bring the props of the first visit: start from what
+  // this tab stored since, when it is newer.
+  const [start] = useState(() =>
+    startingPoint(id, {
+      updatedAt: initialUpdatedAt,
+      answers: initialAnswers,
+      takenOn: initialTakenOn,
+      status: initialStatus,
+    }),
+  );
+  const [answers, setAnswers] = useState<Answers>(start.answers);
+  const [takenOn, setTakenOn] = useState(start.takenOn);
+  const [status, setStatus] = useState<Status>(start.status);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
@@ -93,9 +106,11 @@ export function AnamnesisForm({
   const router = useRouter();
 
   // What the next save sends, read outside React renders.
-  const latest = useRef({ answers: initialAnswers, takenOn: initialTakenOn });
-  // The version of the anamnesis this screen holds.
-  const version = useRef(initialUpdatedAt);
+  const latest = useRef({ answers: start.answers, takenOn: start.takenOn });
+  // What the server holds, as far as this screen knows: its version, the
+  // last answers stored and the status.
+  const version = useRef(start.updatedAt);
+  const stored = useRef(start);
   // Each change bumps `revision`; `savedRevision` is the last one stored.
   const revision = useRef(0);
   const savedRevision = useRef(0);
@@ -141,6 +156,13 @@ export function AnamnesisForm({
       setSaving(false);
       if (result.ok) {
         version.current = result.updatedAt;
+        stored.current = {
+          ...stored.current,
+          updatedAt: result.updatedAt,
+          answers: input.answers,
+          takenOn: input.takenOn,
+        };
+        rememberSaved(patientId, id, stored.current);
         savedRevision.current = rev;
         leaveFailed.current = false;
         setSavedAt(new Date());
@@ -273,6 +295,12 @@ export function AnamnesisForm({
       if (result.ok) {
         // The status change is a new version too.
         version.current = result.updatedAt;
+        stored.current = {
+          ...stored.current,
+          updatedAt: result.updatedAt,
+          status: next,
+        };
+        rememberSaved(patientId, id, stored.current);
         setStatus(next);
       } else {
         setMessage(

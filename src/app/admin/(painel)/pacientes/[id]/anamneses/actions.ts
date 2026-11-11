@@ -11,7 +11,7 @@ import {
   setAnamnesisStatus,
 } from "@/modules/anamnesis/anamnesis";
 import type { Answers } from "@/modules/anamnesis/fields";
-import { getSession, requireAdmin } from "@/modules/auth/session";
+import { getPanelContext, requireAdmin } from "@/modules/auth/session";
 import { todayInClinic } from "@/modules/patients/fields";
 
 // Server Actions for the anamnesis of a patient. The answers are health data:
@@ -71,15 +71,16 @@ export async function createAnamnesisAction(
   }
 }
 
-// Never redirects: the form keeps what was typed when the session is gone,
-// and the person signs in again in another tab.
+// Save, status and delete never redirect: the form keeps what was typed when
+// the session is gone or no longer valid for the panel (wrong role, 2FA not
+// set up, no open clinic), and the person signs in again in another tab.
 export async function saveAnamnesisAction(
   patientId: string,
   id: string,
   input: { answers: Answers; takenOn: string; expectedUpdatedAt: string },
 ): Promise<SaveResult> {
-  if (!(await getSession())) return { ok: false, reason: "session" };
-  const session = await requireAdmin();
+  const session = await getPanelContext();
+  if (!session) return { ok: false, reason: "session" };
   const parsed = saveSchema.safeParse(input);
   if (!validIds(patientId, id) || !parsed.success) {
     return { ok: false, reason: "invalid" };
@@ -111,8 +112,8 @@ export async function setStatusAction(
   status: "in_progress" | "completed",
   expectedUpdatedAt: string,
 ): Promise<StatusResult> {
-  if (!(await getSession())) return { ok: false, reason: "session" };
-  const session = await requireAdmin();
+  const session = await getPanelContext();
+  if (!session) return { ok: false, reason: "session" };
   const parsed = statusSchema.safeParse(status);
   const version = z.string().max(40).safeParse(expectedUpdatedAt);
   if (!validIds(patientId, id) || !parsed.success || !version.success) {
@@ -139,8 +140,8 @@ export async function deleteAnamnesisAction(
   patientId: string,
   id: string,
 ): Promise<DeleteResult> {
-  if (!(await getSession())) return { ok: false, reason: "session" };
-  const session = await requireAdmin();
+  const session = await getPanelContext();
+  if (!session) return { ok: false, reason: "session" };
   if (!validIds(patientId, id)) return { ok: false, reason: "error" };
   let deleted = false;
   try {
