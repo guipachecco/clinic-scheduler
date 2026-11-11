@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   // Makes the shared image (src/app/opengraph-image.tsx) an absolute URL.
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Agendamentos",
-    template: "%s | Agendamentos",
+    default: "Zemana",
+    template: "%s | Zemana",
   },
   description: "Agendamento online de serviços da clínica.",
 };
