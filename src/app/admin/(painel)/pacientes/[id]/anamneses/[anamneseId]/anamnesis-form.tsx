@@ -15,8 +15,8 @@ import { FieldError, FormError } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import {
   answersSchema,
   LONG_MAX,
@@ -94,6 +94,18 @@ export function AnamnesisForm({
     }),
   );
   const [answers, setAnswers] = useState<Answers>(start.answers);
+  // Which sections open folded: decided once, so a section does not close
+  // under her while she fills its last question.
+  const [initiallyComplete] = useState(() =>
+    Object.fromEntries(
+      template.sections.map((section) => [
+        section.id,
+        section.questions.every((question) =>
+          isAnswered(start.answers[question.id]),
+        ),
+      ]),
+    ),
+  );
   const [takenOn, setTakenOn] = useState(start.takenOn);
   const [status, setStatus] = useState<Status>(start.status);
   const [dirty, setDirty] = useState(false);
@@ -370,8 +382,8 @@ export function AnamnesisForm({
         void save();
       }}
     >
-      <div className="grid gap-4 rounded-2xl border p-4 md:p-6">
-        <div className="flex flex-wrap items-end gap-4">
+      <div className="grid gap-4 rounded-2xl border bg-card p-4 md:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="grid gap-2">
             <Label htmlFor="takenOn">Data da anamnese</Label>
             <Input
@@ -386,9 +398,9 @@ export function AnamnesisForm({
             />
             <FieldError id="takenOn-error" message={takenOnError} />
           </div>
-          <p className="pb-3">
-            Situação:{" "}
-            <span className="font-semibold">{STATUS_LABELS[status]}</span>
+          <p className="flex items-center gap-2 pb-2">
+            <span className="sr-only">Situação:</span>
+            <StatusTag status={status} />
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -418,48 +430,81 @@ export function AnamnesisForm({
         <FormError message={message} />
       </div>
 
-      <nav aria-label="Seções da anamnese" className="min-w-0">
-        <ol className="grid gap-1 text-sm sm:grid-cols-2">
-          {template.sections.map((section, index) => (
-            <li key={section.id} className="min-w-0">
-              <a
-                href={`#secao-${section.id}`}
-                className="inline-flex min-h-11 items-center break-words underline-offset-4 hover:underline"
-              >
-                {index + 1}. {section.title}
-              </a>
-            </li>
-          ))}
-        </ol>
-      </nav>
+      <div className="grid gap-3">
+        {template.sections.map((section, index) => {
+          const total = section.questions.length;
+          const answered = section.questions.filter((question) =>
+            isAnswered(answers[question.id]),
+          ).length;
+          const complete = answered === total;
+          return (
+            <details
+              key={section.id}
+              id={`secao-${section.id}`}
+              // Sections already filled in start folded; the rest is open.
+              open={!initiallyComplete[section.id]}
+              className="group min-w-0 scroll-mt-4 rounded-2xl border bg-card"
+            >
+              <summary className="flex min-h-14 cursor-pointer list-none items-center gap-3 rounded-2xl px-4 py-3 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 md:px-5 [&::-webkit-details-marker]:hidden">
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "inline-flex size-8 shrink-0 items-center justify-center rounded-full font-heading text-sm font-extrabold",
+                    complete
+                      ? "bg-primary text-primary-foreground"
+                      : answered > 0
+                        ? "bg-highlight text-highlight-foreground"
+                        : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {index + 1}
+                </span>
+                <span className="min-w-0 flex-1 font-heading text-lg leading-snug font-semibold break-words">
+                  {section.title}
+                </span>
+                {complete ? (
+                  <span className="shrink-0 rounded-full bg-primary px-2.5 py-0.5 text-xs font-bold text-primary-foreground">
+                    Preenchida
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-sm text-muted-foreground">
+                    {answered} de {total}
+                  </span>
+                )}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="size-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </summary>
+              <div className="grid gap-5 border-t px-4 pt-4 pb-5 md:px-5">
+                {section.help ? (
+                  <p className="text-sm text-muted-foreground">
+                    {section.help}
+                  </p>
+                ) : null}
+                {section.questions.map((question) => (
+                  <QuestionField
+                    key={question.id}
+                    question={question}
+                    value={answers[question.id]}
+                    onChange={(value) => setAnswer(question.id, value)}
+                  />
+                ))}
+              </div>
+            </details>
+          );
+        })}
+      </div>
 
-      {template.sections.map((section, index) => (
-        <details
-          key={section.id}
-          id={`secao-${section.id}`}
-          open
-          className="min-w-0 scroll-mt-4 rounded-2xl border p-4 md:p-6"
-        >
-          <summary className="flex min-h-11 cursor-pointer items-center rounded-md font-heading text-lg font-semibold break-words outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-            {index + 1}. {section.title}
-          </summary>
-          <div className="mt-4 grid gap-5">
-            {section.help ? (
-              <p className="text-sm text-muted-foreground">{section.help}</p>
-            ) : null}
-            {section.questions.map((question) => (
-              <QuestionField
-                key={question.id}
-                question={question}
-                value={answers[question.id]}
-                onChange={(value) => setAnswer(question.id, value)}
-              />
-            ))}
-          </div>
-        </details>
-      ))}
-
-      <div className="grid gap-4 rounded-2xl border p-4 md:p-6">
+      <div className="grid gap-4 rounded-2xl border bg-card p-4 md:p-5">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit">Salvar</Button>
           <Button
@@ -474,6 +519,60 @@ export function AnamnesisForm({
         </div>
       </div>
     </form>
+  );
+}
+
+function isAnswered(value: string | string[] | undefined): boolean {
+  return Array.isArray(value) ? value.length > 0 : Boolean(value?.trim());
+}
+
+function StatusTag({ status }: { status: Status }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-3 py-1 text-xs font-bold",
+        status === "completed"
+          ? "bg-primary text-primary-foreground"
+          : "bg-brand-accent text-brand-accent-foreground",
+      )}
+    >
+      {STATUS_LABELS[status]}
+    </span>
+  );
+}
+
+// An option drawn as a pill. The real checkbox or radio covers the pill,
+// transparent, so it keeps its label, keyboard and screen reader behavior.
+function OptionPill({
+  id,
+  type,
+  name,
+  label,
+  checked,
+  onChange,
+}: {
+  id: string;
+  type: "checkbox" | "radio";
+  name?: string;
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label
+      htmlFor={id}
+      className="relative inline-flex min-h-11 cursor-pointer items-center rounded-full border bg-muted/40 px-4 text-sm leading-snug break-words has-checked:border-highlight has-checked:bg-highlight has-checked:font-semibold has-checked:text-highlight-foreground has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50"
+    >
+      <input
+        id={id}
+        type={type}
+        name={name}
+        className="absolute inset-0 size-full cursor-pointer appearance-none rounded-full opacity-0"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      {label}
+    </label>
   );
 }
 
@@ -494,43 +593,52 @@ function QuestionField({
     </p>
   ) : null;
 
-  if (question.type === "multi") {
-    const selected = Array.isArray(value) ? value : [];
+  if (question.type === "multi" || question.type === "single") {
+    const selected =
+      question.type === "multi"
+        ? Array.isArray(value)
+          ? value
+          : []
+        : typeof value === "string" && value
+          ? [value]
+          : [];
     return (
       <fieldset className="grid min-w-0 gap-2" aria-describedby={helpId}>
         <legend className="mb-2 text-sm leading-snug font-medium break-words">
           {question.label}
         </legend>
         {help}
-        {question.options.map((option) => {
-          const optionId = `${fieldId}-${option.value}`;
-          return (
-            <div
+        <div className="flex flex-wrap gap-2">
+          {question.options.map((option) => (
+            <OptionPill
               key={option.value}
-              className="flex min-h-11 items-center gap-3"
+              id={`${fieldId}-${option.value}`}
+              type={question.type === "multi" ? "checkbox" : "radio"}
+              name={question.type === "single" ? fieldId : undefined}
+              label={option.label}
+              checked={selected.includes(option.value)}
+              onChange={(checked) =>
+                question.type === "multi"
+                  ? onChange(
+                      checked
+                        ? [...selected, option.value]
+                        : selected.filter((v) => v !== option.value),
+                    )
+                  : onChange(option.value)
+              }
+            />
+          ))}
+          {question.type === "single" && selected.length > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-11 text-muted-foreground"
+              onClick={() => onChange("")}
             >
-              <input
-                id={optionId}
-                type="checkbox"
-                className="size-5 shrink-0 accent-primary"
-                checked={selected.includes(option.value)}
-                onChange={(event) =>
-                  onChange(
-                    event.target.checked
-                      ? [...selected, option.value]
-                      : selected.filter((v) => v !== option.value),
-                  )
-                }
-              />
-              <Label
-                htmlFor={optionId}
-                className="min-w-0 leading-snug break-words"
-              >
-                {option.label}
-              </Label>
-            </div>
-          );
-        })}
+              Limpar
+            </Button>
+          ) : null}
+        </div>
       </fieldset>
     );
   }
@@ -542,21 +650,7 @@ function QuestionField({
         {question.label}
       </Label>
       {help}
-      {question.type === "single" ? (
-        <NativeSelect
-          id={fieldId}
-          value={text}
-          aria-describedby={helpId}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          <option value="">Não informado</option>
-          {question.options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </NativeSelect>
-      ) : question.type === "long" ? (
+      {question.type === "long" ? (
         <Textarea
           id={fieldId}
           value={text}

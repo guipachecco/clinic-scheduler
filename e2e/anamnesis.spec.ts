@@ -330,7 +330,7 @@ test.describe("anamnese", () => {
       "Em andamento",
     );
     await expect(list.getByRole("listitem").first()).toContainText(
-      /\d{2}\/\d{2}\/\d{4} · Em andamento · atualizada em \d{2}\/\d{2}\/\d{4}/,
+      /^\d{2}\/\d{2}\/\d{4}Em andamentoatualizada em \d{2}\/\d{2}\/\d{4}$/,
     );
   });
 

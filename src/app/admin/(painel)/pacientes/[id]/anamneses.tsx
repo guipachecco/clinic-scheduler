@@ -1,6 +1,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 
+import { cn } from "@/lib/utils";
 import { listAnamneses } from "@/modules/anamnesis/anamnesis";
 import { requireAdmin } from "@/modules/auth/session";
 
@@ -47,10 +48,36 @@ export async function Anamneses({ patientId }: { patientId: string }) {
                 href={
                   `/admin/pacientes/${patientId}/anamneses/${item.id}` as Route
                 }
-                className="block rounded-xl border bg-card p-3 hover:bg-muted/50"
+                className="flex min-h-14 flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border bg-card px-4 py-3 hover:bg-muted/50 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
               >
-                {formatDate(item.takenOn)} · {STATUS_LABELS[item.status]} ·
-                atualizada em {updatedOn.format(item.updatedAt)}
+                <span className="font-heading text-base font-bold">
+                  {formatDate(item.takenOn)}
+                </span>
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-xs font-bold",
+                    item.status === "completed"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-brand-accent text-brand-accent-foreground",
+                  )}
+                >
+                  {STATUS_LABELS[item.status]}
+                </span>
+                <span className="text-sm text-muted-foreground">
+                  atualizada em {updatedOn.format(item.updatedAt)}
+                </span>
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="ml-auto size-5 shrink-0 text-muted-foreground"
+                >
+                  <path d="m9 6 6 6-6 6" />
+                </svg>
               </Link>
             </li>
           ))}

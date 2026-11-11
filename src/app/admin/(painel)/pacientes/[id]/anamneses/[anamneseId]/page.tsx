@@ -33,10 +33,10 @@ export default async function AnamnesisPage({
         >
           Voltar à ficha
         </Link>
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          Anamnese
-        </h1>
         <p className="break-words text-muted-foreground">{patient.name}</p>
+        <h1 className="font-heading text-3xl font-bold tracking-tight">
+          {anamnesis.template.title}
+        </h1>
       </header>
       <AnamnesisForm
         patientId={patientId}
