@@ -603,7 +603,7 @@ describe("clinic page rules", () => {
       { amenities: ["sauna"] },
       { instagramHandle: "bad handle" },
       { loyaltyVisits: 1 },
-      { loyaltyEnabled: true, loyaltyReward: null },
+      { loyaltyChoice: true, loyaltyReward: null },
       { mapsUrl: "javascript:alert(1)" },
     ];
     for (const change of cases) {
@@ -616,7 +616,7 @@ describe("clinic page rules", () => {
 
   it("panel may update the new clinic page columns", async () => {
     const [before] = await db
-      .select({ online: clinics.onlineBookingEnabled })
+      .select({ online: clinics.onlineBookingChoice })
       .from(clinics)
       .where(eq(clinics.id, CLINIC));
     try {
@@ -626,8 +626,8 @@ describe("clinic page rules", () => {
           .set({
             instagramHandle: "clinica.teste_1",
             amenities: ["wifi", "cafe_agua"],
-            onlineBookingEnabled: !before!.online,
-            loyaltyEnabled: true,
+            onlineBookingChoice: !before!.online,
+            loyaltyChoice: true,
             loyaltyVisits: 8,
             loyaltyReward: "Uma sessão grátis",
           })
@@ -650,8 +650,8 @@ describe("clinic page rules", () => {
         .set({
           instagramHandle: null,
           amenities: [],
-          onlineBookingEnabled: before!.online,
-          loyaltyEnabled: false,
+          onlineBookingChoice: before!.online,
+          loyaltyChoice: false,
           loyaltyVisits: 10,
           loyaltyReward: null,
         })

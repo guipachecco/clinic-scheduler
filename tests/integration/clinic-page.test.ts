@@ -129,7 +129,7 @@ beforeAll(async () => {
     .set({
       amenities: ["wifi", "aceita_pets"],
       instagramHandle: "zemana.teste",
-      loyaltyEnabled: true,
+      loyaltyChoice: true,
       loyaltyVisits: 2,
       loyaltyReward: "Brinde fictício",
     })
@@ -205,7 +205,7 @@ afterAll(async () => {
     .set({
       amenities: original.amenities,
       instagramHandle: original.instagramHandle,
-      loyaltyEnabled: original.loyaltyEnabled,
+      loyaltyChoice: original.loyaltyChoice,
       loyaltyVisits: original.loyaltyVisits,
       loyaltyReward: original.loyaltyReward,
       headline: original.headline,
@@ -214,7 +214,7 @@ afterAll(async () => {
       contactEmail: original.contactEmail,
       address: original.address,
       mapsUrl: original.mapsUrl,
-      onlineBookingEnabled: original.onlineBookingEnabled,
+      onlineBookingChoice: original.onlineBookingChoice,
     })
     .where(eq(clinics.id, CLINIC));
   await cleanup();

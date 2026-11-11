@@ -44,7 +44,7 @@ export async function seedClientAreaClinics(client: Client) {
       rows: [row],
     } = await client.query<{ id: string }>(
       `INSERT INTO clinics (slug, name, display_name, whatsapp_phone,
-         contact_email, address, online_booking_enabled, min_advance_minutes,
+         contact_email, address, online_booking_choice, min_advance_minutes,
          max_advance_days, slot_step_minutes,
          max_active_appointments_per_phone)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 30, 30, 5)

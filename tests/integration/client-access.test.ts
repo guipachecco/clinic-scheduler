@@ -70,7 +70,7 @@ async function pgErrorCode(promise: Promise<unknown>) {
 async function setOnlineBooking(clinicId: string, enabled: boolean) {
   await db
     .update(clinics)
-    .set({ onlineBookingEnabled: enabled })
+    .set({ onlineBookingChoice: enabled })
     .where(eq(clinics.id, clinicId));
 }
 

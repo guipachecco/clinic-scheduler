@@ -189,7 +189,7 @@ describe("listMyClinics", () => {
     await db
       .update(clinics)
       .set({
-        loyaltyEnabled: true,
+        loyaltyChoice: true,
         loyaltyVisits: 3,
         loyaltyReward: "Brinde",
         whatsappPhone: "+5547999990000",
@@ -311,11 +311,11 @@ describe("listPublicClinics", () => {
     // off.
     await db
       .update(clinics)
-      .set({ onlineBookingEnabled: true })
+      .set({ onlineBookingChoice: true })
       .where(inArray(clinics.slug, [slugs.a, slugs.b, slugs.e]));
     await db
       .update(clinics)
-      .set({ onlineBookingEnabled: false })
+      .set({ onlineBookingChoice: false })
       .where(eq(clinics.id, c!.id));
     const list = await listPublicClinics();
     const found = list.map((clinic) => clinic.slug);

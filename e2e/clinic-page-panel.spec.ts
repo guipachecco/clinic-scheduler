@@ -53,7 +53,7 @@ test.describe("minha página", () => {
     await signInWithFreshTwoFactor(page, TEST_ADMIN_CLINIC_PAGE);
     originalOnline = await withDb(async (client) => {
       const { rows } = await client.query<{ on: boolean }>(
-        "SELECT online_booking_enabled AS on FROM clinics WHERE id = $1",
+        "SELECT online_booking_choice AS on FROM clinics WHERE id = $1",
         [CLINIC_ID],
       );
       return rows[0]!.on;
@@ -79,7 +79,7 @@ test.describe("minha página", () => {
       ]);
       await client.query(
         `UPDATE clinics SET instagram_handle = NULL, amenities = '{}',
-           online_booking_enabled = $2, loyalty_enabled = false,
+           online_booking_choice = $2, loyalty_choice = false,
            loyalty_visits = 10, loyalty_reward = NULL
          WHERE id = $1`,
         [CLINIC_ID, originalOnline],
@@ -113,7 +113,7 @@ test.describe("minha página", () => {
     });
     await withDb((client) =>
       client.query(
-        "UPDATE clinics SET online_booking_enabled = true WHERE id = $1",
+        "UPDATE clinics SET online_booking_choice = true WHERE id = $1",
         [CLINIC_ID],
       ),
     );

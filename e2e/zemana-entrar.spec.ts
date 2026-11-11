@@ -88,7 +88,7 @@ test.beforeAll(async () => {
       const {
         rows: [clinic],
       } = await db.query<{ id: string }>(
-        `INSERT INTO clinics (slug, name, area_label, online_booking_enabled)
+        `INSERT INTO clinics (slug, name, area_label, online_booking_choice)
          VALUES ($1, $2, $3, $4) RETURNING id`,
         // Only A takes signups from the clinic list.
         [SLUGS[key], name, area, key === "a"],

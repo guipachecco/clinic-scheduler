@@ -49,7 +49,7 @@ export default async function globalSetup() {
     // Own clinic for the page builder suite: online booking on, so the public
     // page shows its booking button.
     await owner.query(
-      `INSERT INTO clinics (slug, name, slot_step_minutes, online_booking_enabled)
+      `INSERT INTO clinics (slug, name, slot_step_minutes, online_booking_choice)
        VALUES ($1, $2, 30, true)`,
       [PAGE_BUILDER_CLINIC_SLUG, "Barbearia Montar Página (teste)"],
     );

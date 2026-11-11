@@ -147,7 +147,7 @@ async function setService(values: Partial<typeof services.$inferInsert>) {
 
 const defaultClinic = {
   isActive: true,
-  onlineBookingEnabled: true,
+  onlineBookingChoice: true,
   minAdvanceMinutes: 120,
   maxAdvanceDays: 60,
   slotStepMinutes: 30,
@@ -335,7 +335,7 @@ describe("online booking", () => {
     ]);
     expect(list.map((s) => s.id)).not.toContain(flexibleId);
 
-    await setClinic({ onlineBookingEnabled: false });
+    await setClinic({ onlineBookingChoice: false });
     expect(await listBookableServices(ctx("ana"))).toEqual([]);
   });
 
@@ -509,7 +509,7 @@ describe("online booking", () => {
   it("online off for clinic or service", async () => {
     const slot = { serviceId, startsAt: local(MONDAY, "09:00") };
 
-    await setClinic({ onlineBookingEnabled: false });
+    await setClinic({ onlineBookingChoice: false });
     expect(await bookOnline(ctx("ana"), slot)).toEqual({
       ok: false,
       reason: "unavailable",
@@ -519,7 +519,7 @@ describe("online booking", () => {
       [],
     );
 
-    await setClinic({ onlineBookingEnabled: true, isActive: false });
+    await setClinic({ onlineBookingChoice: true, isActive: false });
     expect(await bookOnline(ctx("ana"), slot)).toEqual({
       ok: false,
       reason: "unavailable",

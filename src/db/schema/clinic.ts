@@ -193,9 +193,26 @@ export const clinics = pgTable(
     maxActiveAppointmentsPerPhone: integer("max_active_appointments_per_phone")
       .notNull()
       .default(2),
-    onlineBookingEnabled: boolean("online_booking_enabled")
+    // Modules (migration 0027): the optional features the clinic has
+    // (src/modules/clinics/modules.ts). Only root changes them, through
+    // app_platform. Online booking, loyalty and the anamnesis template are
+    // the owner's choice (`*_choice`, the writable columns) combined with the
+    // module; the old names are generated from both and are read-only, so
+    // every reader, including the SECURITY DEFINER functions, obeys the module.
+    modules: text("modules")
+      .array()
+      .notNull()
+      .default(
+        sql`'{products,finance,online_booking,loyalty,anamnesis,reviews}'`,
+      ),
+    onlineBookingChoice: boolean("online_booking_choice")
       .notNull()
       .default(false),
+    onlineBookingEnabled: boolean("online_booking_enabled")
+      .notNull()
+      .generatedAlwaysAs(
+        sql`online_booking_choice AND 'online_booking' = ANY(modules)`,
+      ),
     // Clinic page (migration 0017): Instagram handle without the "@", the
     // amenities shown (keys of clinics_amenities_check) and the loyalty card.
     instagramHandle: text("instagram_handle"),
@@ -203,12 +220,19 @@ export const clinics = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'`),
-    loyaltyEnabled: boolean("loyalty_enabled").notNull().default(false),
+    loyaltyChoice: boolean("loyalty_choice").notNull().default(false),
+    loyaltyEnabled: boolean("loyalty_enabled")
+      .notNull()
+      .generatedAlwaysAs(sql`loyalty_choice AND 'loyalty' = ANY(modules)`),
     loyaltyVisits: integer("loyalty_visits").notNull().default(10),
     loyaltyReward: text("loyalty_reward"),
     // Health questionnaire template the clinic uses (migration 0024); empty
-    // while the clinic has none. Only root/migrations change it.
-    anamnesisTemplate: text("anamnesis_template"),
+    // while the clinic has none. Only root/migrations change it. The effective
+    // template (migration 0027) is null while the anamnesis module is off.
+    anamnesisTemplateChoice: text("anamnesis_template_choice"),
+    anamnesisTemplate: text("anamnesis_template").generatedAlwaysAs(
+      sql`CASE WHEN 'anamnesis' = ANY(modules) THEN anamnesis_template_choice END`,
+    ),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -279,7 +303,11 @@ export const clinics = pgTable(
     ),
     check(
       "clinics_loyalty_check",
-      sql`not ${t.loyaltyEnabled} or ${t.loyaltyReward} is not null`,
+      sql`not ${t.loyaltyChoice} or ${t.loyaltyReward} is not null`,
+    ),
+    check(
+      "clinics_modules_check",
+      sql`${t.modules} <@ ARRAY['products', 'finance', 'online_booking', 'loyalty', 'anamnesis', 'reviews']::text[]`,
     ),
     check(
       "clinics_maps_url_check",
