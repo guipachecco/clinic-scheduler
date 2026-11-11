@@ -93,6 +93,13 @@ export const patientReferralSource = pgEnum("patient_referral_source", [
   "other",
 ]);
 
+export const businessType = pgEnum("business_type", [
+  "clinic",
+  "barbershop",
+  "nail_salon",
+  "other",
+]);
+
 export const mediaKind = pgEnum("media_kind", ["logo", "photo"]);
 
 // Site images live in the database in the MVP so that they are covered by the
@@ -129,8 +136,13 @@ export const media = pgTable(
   ],
 );
 
+// What the page builder (migration 0025) saves in `theme`. `fontId` is a
+// string here to avoid a cycle with the font list; the zod schema narrows it.
 export type ClinicTheme = {
   primaryColor?: string;
+  buttonShape?: "pill" | "rounded" | "square";
+  buttonFill?: "solid" | "outline";
+  fontId?: string;
   paletteId?: string;
 };
 
@@ -165,6 +177,11 @@ export const clinics = pgTable(
     displayName: text("display_name"),
     areaLabel: text("area_label"),
     ownerPhotoMediaId: uuid("owner_photo_media_id"),
+    // Page builder (migration 0025): the kind of business, the cover image and
+    // the unpublished draft of the page (never readable by clients).
+    businessType: businessType("business_type").notNull().default("clinic"),
+    coverMediaId: uuid("cover_media_id"),
+    pageDraft: jsonb("page_draft").$type<unknown>(),
     theme: jsonb("theme").$type<ClinicTheme>().notNull().default({}),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     minAdvanceMinutes: integer("min_advance_minutes").notNull().default(120),
@@ -203,6 +220,15 @@ export const clinics = pgTable(
       columns: [t.id, t.logoMediaId],
       foreignColumns: [media.clinicId, media.id],
     }),
+    foreignKey({
+      name: "clinics_cover_media_fk",
+      columns: [t.id, t.coverMediaId],
+      foreignColumns: [media.clinicId, media.id],
+    }),
+    check(
+      "clinics_page_draft_size_check",
+      sql`${t.pageDraft} is null or pg_column_size(${t.pageDraft}) <= 16384`,
+    ),
     foreignKey({
       name: "clinics_owner_photo_media_fk",
       columns: [t.id, t.ownerPhotoMediaId],
