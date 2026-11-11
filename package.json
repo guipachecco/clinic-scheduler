@@ -36,6 +36,7 @@
     "@fullcalendar/react": "6.1.22",
     "@fullcalendar/timegrid": "6.1.22",
     "@hookform/resolvers": "^6.0.2",
+    "@react-pdf/renderer": "4.9.0",
     "@vercel/analytics": "^2.0.1",
     "better-auth": "^1.7.14",
     "class-variance-authority": "^0.7.1",
@@ -73,6 +74,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
+    "unpdf": "2.1.0",
     "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@10.28.0"
