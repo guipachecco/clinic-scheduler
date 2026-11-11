@@ -199,6 +199,58 @@ describe("copyAnswers", () => {
   });
 });
 
+describe("copyAnswers options", () => {
+  const to: AnamnesisTemplate = {
+    id: "fake",
+    title: "Fake",
+    sections: [
+      {
+        id: "s",
+        title: "S",
+        copy: true,
+        questions: [
+          {
+            id: "pregressas_doencas",
+            label: "x",
+            type: "multi",
+            options: [{ value: "diabetes", label: "D" }],
+          },
+          {
+            id: "identificacao_atuacao",
+            label: "y",
+            type: "single",
+            options: [{ value: "clt", label: "C" }],
+          },
+        ],
+      },
+    ],
+  };
+
+  it("drops option values that no longer exist", () => {
+    const out = copyAnswers(
+      {
+        pregressas_doencas: ["diabetes", "cancer"],
+        identificacao_atuacao: "clinica",
+      },
+      t,
+      to,
+    );
+    expect(out).toEqual({ pregressas_doencas: ["diabetes"] });
+  });
+
+  it("keeps answers whose options all still exist", () => {
+    const out = copyAnswers(
+      { pregressas_doencas: ["diabetes"], identificacao_atuacao: "clt" },
+      t,
+      to,
+    );
+    expect(out).toEqual({
+      pregressas_doencas: ["diabetes"],
+      identificacao_atuacao: "clt",
+    });
+  });
+});
+
 describe("answeredSections", () => {
   it("hides empty sections and maps labels", () => {
     const out = answeredSections(t, {

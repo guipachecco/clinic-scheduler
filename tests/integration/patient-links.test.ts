@@ -5,6 +5,7 @@ import { inClinic } from "@/db/client";
 import { db, endPools } from "@/db/owner";
 import { findPgError } from "@/db/errors";
 import {
+  anamneses,
   appointments,
   auditLogs,
   loyaltyRedemptions,
@@ -135,6 +136,7 @@ async function patientRow(id: string) {
 }
 
 async function clearClinic(id: string) {
+  await db.delete(anamneses).where(eq(anamneses.clinicId, id));
   await db.delete(auditLogs).where(eq(auditLogs.clinicId, id));
   await db.delete(reviews).where(eq(reviews.clinicId, id));
   await db
@@ -320,6 +322,29 @@ describe("pending links", () => {
       [s.oldAppointment, s.onlineAppointment].sort(),
     );
     expect(await listPendingLinks(clinicId)).toEqual([]);
+  });
+
+  it("confirm moves her anamneses", async () => {
+    const s = await scenario();
+    const [row] = await db
+      .insert(anamneses)
+      .values({
+        clinicId,
+        patientId: s.provisionalId,
+        template: "integrativa-ads-v1",
+        takenOn: "2026-11-10",
+      })
+      .returning({ id: anamneses.id });
+
+    expect(await confirmLink(clinicId, s.provisionalId, ownerId)).toEqual({
+      ok: true,
+    });
+
+    const [moved] = await db
+      .select({ patientId: anamneses.patientId })
+      .from(anamneses)
+      .where(eq(anamneses.id, row!.id));
+    expect(moved?.patientId).toBe(s.existingId);
   });
 
   it("confirm moves her reviews and loyalty rewards", async () => {

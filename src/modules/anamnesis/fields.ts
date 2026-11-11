@@ -54,7 +54,8 @@ export function answersSchema(template: AnamnesisTemplate): z.ZodType<Answers> {
 }
 
 // Keeps only the answers whose id exists in `to` with the same type, and
-// only from sections of `to` that are marked to be copied.
+// only from sections of `to` that are marked to be copied. Choice values that
+// `to` no longer offers are dropped.
 export function copyAnswers(
   from: Answers,
   fromTemplate: AnamnesisTemplate,
@@ -73,7 +74,18 @@ export function copyAnswers(
   for (const [id, value] of Object.entries(from)) {
     const t = target.get(id);
     const s = source.get(id);
-    if (t && s && t.type === s.type) out[id] = value;
+    if (!t || !s || t.type !== s.type) continue;
+    if (t.type === "single" || t.type === "multi") {
+      // Options may disappear between versions: keep only the ones left.
+      const offered = new Set(t.options.map((o) => o.value));
+      const kept = (Array.isArray(value) ? value : [value]).filter((v) =>
+        offered.has(v),
+      );
+      if (kept.length === 0) continue;
+      out[id] = Array.isArray(value) ? kept : kept[0]!;
+    } else {
+      out[id] = value;
+    }
   }
   return out;
 }
