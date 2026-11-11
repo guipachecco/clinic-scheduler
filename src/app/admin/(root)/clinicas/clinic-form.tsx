@@ -3,12 +3,18 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { FieldError, FormError } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import {
+  BUSINESS_TYPE_LABELS,
+  BUSINESS_TYPES,
+} from "@/modules/business-type/vocabulary";
+import { CLINIC_MODULES, type ClinicModule } from "@/modules/clinics/modules";
 import {
   clinicFormSchema,
   type ClinicFormInput,
@@ -17,9 +23,15 @@ import {
 import { slugify } from "@/modules/services/fields";
 
 import { createClinicAction } from "./actions";
+import { ModulesFieldset } from "./modules-fieldset";
 
 const SAVE_ERROR = "Não foi possível salvar. Tente novamente.";
-const EMPTY: ClinicFormInput = { name: "", slug: "" };
+const EMPTY: ClinicFormInput = {
+  name: "",
+  slug: "",
+  businessType: "clinic",
+  modules: [...CLINIC_MODULES],
+};
 
 // Creates a clinic. The address (slug) is suggested from the name until the
 // user edits it.
@@ -40,6 +52,9 @@ export function ClinicForm() {
     reset,
     formState: { errors, isSubmitting },
   } = form;
+
+  const modules = useWatch({ control: form.control, name: "modules" }) as
+    ClinicModule[] | undefined;
 
   async function onSubmit() {
     setFormError(null);
@@ -110,6 +125,33 @@ export function ClinicForm() {
           Vira o link e o QR code da clínica. Evite mudar depois de divulgar.
         </p>
         <FieldError id="clinica-endereco-erro" message={errors.slug?.message} />
+      </div>
+      <div className="grid content-start gap-2">
+        <Label htmlFor="clinica-tipo">Tipo de negócio</Label>
+        <NativeSelect
+          id="clinica-tipo"
+          aria-invalid={Boolean(errors.businessType)}
+          aria-describedby={
+            errors.businessType ? "clinica-tipo-erro" : undefined
+          }
+          {...register("businessType")}
+        >
+          {BUSINESS_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {BUSINESS_TYPE_LABELS[type]}
+            </option>
+          ))}
+        </NativeSelect>
+        <FieldError
+          id="clinica-tipo-erro"
+          message={errors.businessType?.message}
+        />
+      </div>
+      <div className="md:col-span-2">
+        <ModulesFieldset
+          value={modules ?? []}
+          onChange={(next) => setValue("modules", next)}
+        />
       </div>
       <div className="grid gap-3 md:col-span-2">
         <FormError message={formError} />
