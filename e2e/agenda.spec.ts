@@ -244,10 +244,7 @@ test.describe("agenda", () => {
     // A range outside the one already loaded asks the server again (a Server
     // Action POST). Its body is not read here: the browser may drop it before
     // the test gets to it. The page itself shows whether the load worked.
-    const expectLoad = async (
-      action: () => Promise<void>,
-      month: DateTime,
-    ) => {
+    const expectLoad = async (action: () => Promise<void>, month: DateTime) => {
       const loaded = page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
