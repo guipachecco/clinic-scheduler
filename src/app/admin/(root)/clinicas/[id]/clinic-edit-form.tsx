@@ -21,7 +21,6 @@ import {
   type ClinicEditInput,
   type ClinicEditValues,
 } from "@/modules/clinics/fields";
-import type { ClinicModule } from "@/modules/clinics/modules";
 
 import { updateClinicAction } from "../actions";
 import { ModulesFieldset } from "../modules-fieldset";
@@ -50,8 +49,7 @@ export function ClinicEditForm({
     setError,
     formState: { errors, isSubmitting },
   } = form;
-  const modules = useWatch({ control: form.control, name: "modules" }) as
-    ClinicModule[] | undefined;
+  const modules = useWatch({ control: form.control, name: "modules" });
 
   async function onSubmit() {
     setFormError(null);

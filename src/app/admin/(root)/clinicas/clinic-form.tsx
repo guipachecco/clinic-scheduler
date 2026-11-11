@@ -14,7 +14,7 @@ import {
   BUSINESS_TYPE_LABELS,
   BUSINESS_TYPES,
 } from "@/modules/business-type/vocabulary";
-import { CLINIC_MODULES, type ClinicModule } from "@/modules/clinics/modules";
+import { CLINIC_MODULES } from "@/modules/clinics/modules";
 import {
   clinicFormSchema,
   type ClinicFormInput,
@@ -53,8 +53,7 @@ export function ClinicForm() {
     formState: { errors, isSubmitting },
   } = form;
 
-  const modules = useWatch({ control: form.control, name: "modules" }) as
-    ClinicModule[] | undefined;
+  const modules = useWatch({ control: form.control, name: "modules" });
 
   async function onSubmit() {
     setFormError(null);

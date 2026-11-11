@@ -32,6 +32,6 @@ export function hasModule(
 }
 
 // Drops duplicates and sorts by the catalog order; an empty list is valid.
-export const modulesSchema: z.ZodType<ClinicModule[]> = z
+export const modulesSchema: z.ZodType<ClinicModule[], ClinicModule[]> = z
   .array(z.enum(CLINIC_MODULES))
   .transform((list) => CLINIC_MODULES.filter((key) => list.includes(key)));
