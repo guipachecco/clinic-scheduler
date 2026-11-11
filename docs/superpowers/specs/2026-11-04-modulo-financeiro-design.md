@@ -49,11 +49,11 @@ O módulo falha, mesmo funcionando, se:
 
 ## Caminhos considerados
 
-| Caminho | A favor | Contra |
-| --- | --- | --- |
-| **1. Módulo próprio dentro do sistema (escolhido)** | Orçamento, agenda e baixa no mesmo lugar; a sessão do pacote fica ligada à parcela; segue a arquitetura do planejamento | É o que dá mais trabalho |
-| 2. Integrar sistema pronto (Asaas, Conta Azul) | Menos código | Mensalidade por clínica, marca de terceiros para a dona, orçamento e agenda separados |
-| 3. Só um caixa simples (entradas e saídas) | Muito rápido | Perde "quanto falta pagar" e a ligação com o pacote, que são o centro do pedido |
+| Caminho                                             | A favor                                                                                                                 | Contra                                                                                |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **1. Módulo próprio dentro do sistema (escolhido)** | Orçamento, agenda e baixa no mesmo lugar; a sessão do pacote fica ligada à parcela; segue a arquitetura do planejamento | É o que dá mais trabalho                                                              |
+| 2. Integrar sistema pronto (Asaas, Conta Azul)      | Menos código                                                                                                            | Mensalidade por clínica, marca de terceiros para a dona, orçamento e agenda separados |
+| 3. Só um caixa simples (entradas e saídas)          | Muito rápido                                                                                                            | Perde "quanto falta pagar" e a ligação com o pacote, que são o centro do pedido       |
 
 Guilherme escolheu o caminho 1 em 04/11/2026. Os caminhos 2 e 3 quebram o fluxo orçamento → agenda → baixa ou não cobrem os três modos de pagamento.
 
@@ -102,11 +102,11 @@ flowchart LR
 
 Ao aprovar, a dona escolhe o plano de pagamento (depois, ele ainda pode ser alterado; ver a seção 6). Isso cria a venda e as parcelas numa única transação.
 
-| Modo | Parcelas criadas |
-| --- | --- |
-| À vista | 1 parcela com o total; o vencimento padrão é hoje |
-| Parcelado | N parcelas; a dona define a quantidade, a data da primeira e o intervalo (mensal por padrão), e pode editar cada valor e cada data antes de salvar |
-| Por sessão | 1 parcela por sessão de cada item, com valor igual ao preço da sessão já com desconto, sem vencimento até a sessão ser agendada |
+| Modo       | Parcelas criadas                                                                                                                                   |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| À vista    | 1 parcela com o total; o vencimento padrão é hoje                                                                                                  |
+| Parcelado  | N parcelas; a dona define a quantidade, a data da primeira e o intervalo (mensal por padrão), e pode editar cada valor e cada data antes de salvar |
+| Por sessão | 1 parcela por sessão de cada item, com valor igual ao preço da sessão já com desconto, sem vencimento até a sessão ser agendada                    |
 
 - Antes de salvar, a tela mostra o resumo: total, número de parcelas e soma conferida. **A soma das parcelas é sempre igual ao total da venda,** e o servidor recusa o que não bater.
 - Um sinal, como "metade agora e o resto depois", é feito com o parcelado: duas parcelas com valores diferentes.
@@ -168,15 +168,15 @@ Decisão de Guilherme: a venda pode ser alterada depois de aprovada, sem precisa
 
 ## Telas do painel (admin)
 
-| Tela | Conteúdo |
-| --- | --- |
+| Tela               | Conteúdo                                                                                                                                                                     |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Financeiro, início | Entrou hoje e no mês (por forma de pagamento), saiu no mês, saldo do mês, parcelas atrasadas e total a receber, separado em "com vencimento" e "sessões ainda não agendadas" |
-| Orçamentos | Lista com filtro por status; criar, enviar (link wa.me), aprovar, recusar e duplicar |
-| Vendas | Lista com o saldo de cada uma; detalhe com itens, sessões (contratadas, agendadas, feitas), parcelas, pagamentos e "Agendar sessões" |
-| A receber | Parcelas em aberto por vencimento, atrasadas em destaque, com baixa direto da lista |
-| Caixa | Lançamentos do período: pagamentos recebidos e despesas, com totais por forma de pagamento |
-| Despesas | Lista e cadastro |
-| Ficha da cliente | Ganha uma aba Financeiro: orçamentos, vendas, saldo devedor e sessões restantes |
+| Orçamentos         | Lista com filtro por status; criar, enviar (link wa.me), aprovar, recusar e duplicar                                                                                         |
+| Vendas             | Lista com o saldo de cada uma; detalhe com itens, sessões (contratadas, agendadas, feitas), parcelas, pagamentos e "Agendar sessões"                                         |
+| A receber          | Parcelas em aberto por vencimento, atrasadas em destaque, com baixa direto da lista                                                                                          |
+| Caixa              | Lançamentos do período: pagamentos recebidos e despesas, com totais por forma de pagamento                                                                                   |
+| Despesas           | Lista e cadastro                                                                                                                                                             |
+| Ficha da cliente   | Ganha uma aba Financeiro: orçamentos, vendas, saldo devedor e sessões restantes                                                                                              |
 
 O root vê as mesmas telas em qualquer clínica e um resumo com o total de cada clínica.
 
@@ -184,20 +184,20 @@ O root vê as mesmas telas em qualquer clínica e um resumo com o total de cada 
 
 Todas as tabelas têm `id` UUID, `clinic_id` e `created_at`. Os valores são inteiros em centavos.
 
-| Tabela | Para quê | Campos principais |
-| --- | --- | --- |
-| quotes | Orçamentos | paciente, número sequencial por clínica (para falar com a cliente), status, válido até, desconto do total, observação, criado por, datas de envio, aprovação e recusa |
-| quote_items | Itens do orçamento | orçamento, serviço, cópia do nome, sessões, preço unitário, desconto |
-| sales | Venda gerada na aprovação | orçamento, paciente, modo de pagamento, total, status (ativa, quitada, cancelada), motivo do cancelamento |
-| sale_items | Itens da venda, com o saldo de sessões | venda, serviço, cópia do nome, sessões contratadas, preço por sessão |
-| installments | Parcelas a receber | venda, número, valor, vencimento (vazio no modo por sessão até agendar), agendamento ligado (opcional), status (aberta, paga, cancelada) |
-| payments | Baixas | parcela, data, valor, forma de pagamento, registrado por, observação, estornado em, estornado por, motivo do estorno |
-| payment_methods | Formas aceitas pela clínica | nome, ativa, ordem |
-| expenses | Despesas | data, valor, categoria, forma de pagamento, descrição, venda ligada (para devolução), cancelada em, motivo |
-| expense_categories | Categorias de despesa | nome, ativa |
-| sale_revisions | Histórico de alterações da venda | venda, autor, data, motivo, antes e depois (itens, total, parcelas) |
-| appointment_series | Regra usada para agendar o pacote | item da venda, tipo (semanal, mensal, manual), parâmetros da repetição |
-| appointments (já existe) | Ganha a ligação com o pacote | item da venda (opcional), série (opcional) |
+| Tabela                   | Para quê                               | Campos principais                                                                                                                                                     |
+| ------------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| quotes                   | Orçamentos                             | paciente, número sequencial por clínica (para falar com a cliente), status, válido até, desconto do total, observação, criado por, datas de envio, aprovação e recusa |
+| quote_items              | Itens do orçamento                     | orçamento, serviço, cópia do nome, sessões, preço unitário, desconto                                                                                                  |
+| sales                    | Venda gerada na aprovação              | orçamento, paciente, modo de pagamento, total, status (ativa, quitada, cancelada), motivo do cancelamento                                                             |
+| sale_items               | Itens da venda, com o saldo de sessões | venda, serviço, cópia do nome, sessões contratadas, preço por sessão                                                                                                  |
+| installments             | Parcelas a receber                     | venda, número, valor, vencimento (vazio no modo por sessão até agendar), agendamento ligado (opcional), status (aberta, paga, cancelada)                              |
+| payments                 | Baixas                                 | parcela, data, valor, forma de pagamento, registrado por, observação, estornado em, estornado por, motivo do estorno                                                  |
+| payment_methods          | Formas aceitas pela clínica            | nome, ativa, ordem                                                                                                                                                    |
+| expenses                 | Despesas                               | data, valor, categoria, forma de pagamento, descrição, venda ligada (para devolução), cancelada em, motivo                                                            |
+| expense_categories       | Categorias de despesa                  | nome, ativa                                                                                                                                                           |
+| sale_revisions           | Histórico de alterações da venda       | venda, autor, data, motivo, antes e depois (itens, total, parcelas)                                                                                                   |
+| appointment_series       | Regra usada para agendar o pacote      | item da venda, tipo (semanal, mensal, manual), parâmetros da repetição                                                                                                |
+| appointments (já existe) | Ganha a ligação com o pacote           | item da venda (opcional), série (opcional)                                                                                                                            |
 
 Regras que o banco garante:
 
@@ -210,12 +210,12 @@ Regras que o banco garante:
 
 ## Permissões
 
-| Ação | Cliente | Admin (dona) | Root |
-| --- | --- | --- | --- |
-| Ver e criar orçamentos, vendas e baixas | Não | Só da própria clínica | Todas |
-| Estornar pagamento, alterar ou cancelar venda | Não | Sim, com motivo | Sim |
-| Despesas e caixa | Não | Só da própria clínica | Todas |
-| Formas de pagamento e categorias | Não | Sim | Sim |
+| Ação                                          | Cliente | Admin (dona)          | Root  |
+| --------------------------------------------- | ------- | --------------------- | ----- |
+| Ver e criar orçamentos, vendas e baixas       | Não     | Só da própria clínica | Todas |
+| Estornar pagamento, alterar ou cancelar venda | Não     | Sim, com motivo       | Sim   |
+| Despesas e caixa                              | Não     | Só da própria clínica | Todas |
+| Formas de pagamento e categorias              | Não     | Sim                   | Sim   |
 
 ## Testes que precisam existir
 

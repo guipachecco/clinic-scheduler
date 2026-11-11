@@ -40,6 +40,7 @@ Hoje o link da clínica (`zemana.com.br/<endereço>`) abre uma tela com dois ou 
 Uma coluna para celular de 360 px, com no máximo `max-w-md` no computador. Uma barra fixa embaixo com ícones: **Início · Agendar · Meus horários · Perfil**. Perfil leva para entrar ou criar conta quando não há login, e para os dados dela e sair quando há.
 
 **Início (`/<slug>`)**
+
 1. **Topo:** área das fotos do espaço, com fundo neutro e "Fotos em breve" enquanto não houver fotos. Sobre ela, a foto da dona (ou as iniciais), o nome da clínica, a área (`area_label`) e o status "Aberto agora · até 18:00", "Fechado · abre amanhã às 09:00" ou "Fechado hoje", calculado com o expediente e o fuso da clínica.
 2. **Abas:** Serviços · Fotos · Fidelidade (só se ligada) · Produtos (só se houver ativos) · Sobre.
    - **Serviços:** serviços ativos e visíveis online. Cada um tem nome, preço (pelas regras de `price_display`), duração e o botão **Agendar**, que leva ao agendamento já com o serviço escolhido.
@@ -56,6 +57,7 @@ Uma coluna para celular de 360 px, com no máximo `max-w-md` no computador. Uma 
    - **Redes e contato:** WhatsApp, Instagram e e-mail como botões redondos com ícone, e o telefone com botão de copiar.
 
 **Agendar (`/<slug>/marcar`)**
+
 - **Serviço já escolhido:** se veio de um serviço, vai direto para o dia. Senão, mostra a lista de serviços.
 - **Dias:** uma faixa com 5 a 7 dias visíveis e setas, mostrando o mês. Dias sem horário ficam apagados.
 - **Horários:** os chips **Manhã / Tarde / Noite** pulam para o grupo. Os grupos são "até 12:00", "12:00 a 18:00" e "depois das 18:00", cada um com a contagem de horários e uma grade de 3 colunas.
@@ -69,6 +71,7 @@ Uma coluna para celular de 360 px, com no máximo `max-w-md` no computador. Uma 
 ## O que a dona configura no painel
 
 Uma nova seção no menu, **Minha página** (`/admin/pagina`), com ícone de linha:
+
 - **Dados:** a frase de chamada, o "sobre", o WhatsApp, o e-mail, o endereço, o link do mapa e o Instagram (aceita `@usuario` ou o link; guarda só o usuário). Inclui o botão do agendamento online.
 - **Comodidades:** o checklist.
 - **Produtos (`/admin/pagina/produtos`):** listar, criar, editar, ativar/desativar e "Começar com exemplos".
@@ -79,6 +82,7 @@ Uma nova seção no menu, **Minha página** (`/admin/pagina`), com ícone de lin
 ## Banco e segurança
 
 Uma migração nova (`0017`), seguindo o modelo de papéis que já existe:
+
 - **`clinics` ganha:** `instagram_handle` (texto, `^[A-Za-z0-9._]{1,30}$`), `amenities` (`text[]`, cada item da lista fixa, com check), `loyalty_enabled`, `loyalty_visits` (2 a 50) e `loyalty_reward` (até 120).
   - **UPDATE do `app_panel`:** passa a cobrir também `headline`, `about`, `whatsapp_phone`, `contact_email`, `address`, `maps_url`, `instagram_handle`, `amenities`, `online_booking_enabled` e os três de fidelidade. Sempre só na própria clínica.
   - **Link do mapa:** `maps_url` ganha um check `^https://`.

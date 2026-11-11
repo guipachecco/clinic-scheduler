@@ -9,17 +9,17 @@ As clientes de cada dona (Karol, Sirlei, Karina, Grais) passam a entrar no siste
 ## Objetivos
 
 1. **Entrada da cliente:** cadastro, login e "esqueci minha senha" por e-mail, a partir do link da clínica.
-2. **Marcar horário:** depois de entrar, a cliente escolhe o serviço, o dia e um horário livre. **Se o horário está vago, ele entra direto na agenda como confirmado.** *(Decisão de Guilherme.)*
+2. **Marcar horário:** depois de entrar, a cliente escolhe o serviço, o dia e um horário livre. **Se o horário está vago, ele entra direto na agenda como confirmado.** _(Decisão de Guilherme.)_
 3. **Meus horários:** a cliente vê os horários dela, futuros e passados, só para consulta.
 4. **Travas no banco (caminho A):**
    - cada tipo de acesso usa um usuário próprio do PostgreSQL;
    - as tabelas ganham regras por linha (RLS): a dona só alcança a clínica dela, e a cliente só a ficha e os agendamentos dela;
    - a cliente não alcança tabela nenhuma do financeiro.
-5. **Visual Zemana** com o nome da clínica, pensado primeiro para o celular. *(Decisão de Guilherme.)*
+5. **Visual Zemana** com o nome da clínica, pensado primeiro para o celular. _(Decisão de Guilherme.)_
 
 ## Fora do escopo
 
-- A cliente cancelar ou remarcar. **Só a dona desmarca.** *(Decisão de Guilherme.)* A cliente fala com a dona para mudar.
+- A cliente cancelar ou remarcar. **Só a dona desmarca.** _(Decisão de Guilherme.)_ A cliente fala com a dona para mudar.
 - Lembretes e avisos por e-mail ou WhatsApp sobre o agendamento. Fora o e-mail de senha e o de confirmação de cadastro, nada é enviado.
 - Marca própria por clínica (fica com a Zemana), anamnese, pagamento online, NFS-e.
 - A cliente editar a própria ficha depois do cadastro.
@@ -50,11 +50,11 @@ As clientes de cada dona (Karol, Sirlei, Karina, Grais) passam a entrar no siste
 
 ## Caminhos considerados
 
-| Caminho | Resultado |
-| --- | --- |
+| Caminho                                                                             | Resultado                                                                        |
+| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | **A. RLS e usuário de banco por tipo de acesso, para donas e clientes (escolhido)** | Trava de verdade nos dois lados. Mexe na forma como todo módulo fala com o banco |
-| B. RLS só na área da cliente | Metade do trabalho, mas não atende "faz para a dona também" |
-| C. Só código e mais testes | Não protege se uma consulta esquecer o filtro |
+| B. RLS só na área da cliente                                                        | Metade do trabalho, mas não atende "faz para a dona também"                      |
+| C. Só código e mais testes                                                          | Não protege se uma consulta esquecer o filtro                                    |
 
 Guilherme escolheu o A em 05/11/2026.
 
@@ -74,9 +74,9 @@ Guilherme escolheu o A em 05/11/2026.
   - Clínica desativada ou com o online desligado: a página mostra "Agendamento online indisponível" e o contato da clínica (WhatsApp e e-mail, se houver).
   - Slug que não existe: página não encontrada.
 - **Cadastro:** nome, celular (WhatsApp), e-mail e senha, com a mesma regra de senha do painel.
-- **Confirmação de e-mail:** a conta só marca horário depois de confirmar o e-mail pelo link enviado. *(Decisão minha: o e-mail é o único caminho de recuperar a senha, então precisa estar certo.)*
+- **Confirmação de e-mail:** a conta só marca horário depois de confirmar o e-mail pelo link enviado. _(Decisão minha: o e-mail é o único caminho de recuperar a senha, então precisa estar certo.)_
 - **Esqueci minha senha:** link por e-mail, que vale por pouco tempo (o padrão do Better Auth) e encerra as outras sessões.
-- **Sessão da cliente:** dura 30 dias, e ela não precisa entrar toda vez. *(Decisão minha.)* A sessão da dona continua de 12 h.
+- **Sessão da cliente:** dura 30 dias, e ela não precisa entrar toda vez. _(Decisão minha.)_ A sessão da dona continua de 12 h.
 - **Limite de tentativas:** cadastro, login, reenvio de confirmação e "esqueci a senha" têm limite por IP, como o login do painel. A resposta do "esqueci" é sempre a mesma, exista ou não a conta.
 - **Ficha da cliente:** ver "Ficha que já existe" abaixo.
 
@@ -91,10 +91,11 @@ Guilherme escolheu o A em 05/11/2026.
    - respeita a antecedência mínima.
 
    **O cálculo dos horários livres ainda não existe no código** e é parte deste trabalho.
+
 4. **Confirmar:** cria o agendamento com `status = confirmed` e `source = online`, dentro do `lockAgenda`, e registra no histórico com autor `patient`.
    - **Horário tomado:** se alguém pegou o horário um segundo antes, a cliente vê "Esse horário acabou de ser preenchido" e volta à lista atualizada.
    - **Limite de horários:** se ela já tem o limite de horários ativos, vê o aviso e não marca.
-   - **Aprovação do serviço:** o campo `services.requiresApproval` **não vale para o online**. Horário vago entra direto, como Guilherme decidiu, e o campo some da tela de serviços. *(Decisão minha, decorrente da dele.)*
+   - **Aprovação do serviço:** o campo `services.requiresApproval` **não vale para o online**. Horário vago entra direto, como Guilherme decidiu, e o campo some da tela de serviços. _(Decisão minha, decorrente da dele.)_
 5. **Depois de marcar:** a cliente vê a confirmação com dia, hora, serviço e endereço da clínica, e as instruções de preparo, se o serviço tiver. Na agenda, a dona vê o horário marcado como "online".
 
 ### Meus horários
@@ -107,29 +108,32 @@ Guilherme escolheu o A em 05/11/2026.
 
 **Usuários do PostgreSQL:**
 
-| Usuário | Usado por | Pode |
-| --- | --- | --- |
-| `clinic` (atual, dono das tabelas) | Só as migrações | Tudo |
-| `app_auth` | Better Auth | Só as tabelas de login: `users`, `sessions`, `accounts`, `verifications`, `two_factors`, `rate_limits` |
-| `app_panel` | Painel da dona e do root dentro de uma clínica | Tabelas da clínica, sempre filtradas pela clínica da requisição |
-| `app_client` | Área da cliente | Pouco: veja abaixo |
-| `app_platform` | Tela de clínicas do root e o `scripts/admin.ts` | Criar e listar clínicas e contas de dona, sem filtro de clínica |
+| Usuário                            | Usado por                                       | Pode                                                                                                   |
+| ---------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `clinic` (atual, dono das tabelas) | Só as migrações                                 | Tudo                                                                                                   |
+| `app_auth`                         | Better Auth                                     | Só as tabelas de login: `users`, `sessions`, `accounts`, `verifications`, `two_factors`, `rate_limits` |
+| `app_panel`                        | Painel da dona e do root dentro de uma clínica  | Tabelas da clínica, sempre filtradas pela clínica da requisição                                        |
+| `app_client`                       | Área da cliente                                 | Pouco: veja abaixo                                                                                     |
+| `app_platform`                     | Tela de clínicas do root e o `scripts/admin.ts` | Criar e listar clínicas e contas de dona, sem filtro de clínica                                        |
 
 - Cada um tem a própria URL de conexão no ambiente (`DATABASE_URL_AUTH`, `_PANEL`, `_CLIENT`, `_PLATFORM`). `DATABASE_URL` fica para as migrações.
 - Uma migração cria os usuários e as permissões, e as senhas vêm do ambiente.
 - No `docker-compose`, as senhas de desenvolvimento ficam fixas, como hoje.
 
 **Como o banco sabe quem está pedindo:**
+
 - Toda chamada ao banco da dona ou da cliente roda dentro de uma transação que começa com `set_config('app.clinic_id', …, true)`. Na cliente, entram também `app.patient_id` e `app.user_id`.
 - Como o ajuste vale só para a transação, funciona com o pool do Neon.
 - As funções dos módulos, que já recebem `clinicId`, passam a receber essa transação.
 
 **Regras da dona (`app_panel`):**
+
 - Em toda tabela que tem `clinic_id`: `clinic_id = current_setting('app.clinic_id', true)::uuid`, tanto para ler quanto para gravar.
 - Sem o ajuste, o resultado é vazio.
 - O root dentro de uma clínica é igual à dona daquela clínica.
 
 **Regras da cliente (`app_client`)**, para ler:
+
 - `clinics`: só a clínica do link, e só as colunas públicas (nome, endereço, contatos, ajustes de agendamento).
 - `services`: os ativos e online da clínica, só as colunas públicas.
 - `patients`: só a própria ficha (`id = app.patient_id`).
@@ -138,6 +142,7 @@ Guilherme escolheu o A em 05/11/2026.
 - Nenhum acesso a financeiro (orçamentos, vendas, parcelas, pagamentos, despesas, caixa), histórico, mídia ou contas de outras pessoas.
 
 **Regras da cliente (`app_client`)**, para gravar:
+
 - **Inserir agendamento:** só com `patient_id = app.patient_id`, `clinic_id = app.clinic_id`, `source = 'online'` e `status = 'confirmed'`. Não pode alterar nem apagar.
 - **Inserir a própria ficha no cadastro:** com `user_id = app.user_id`.
 - **Inserir registro no histórico** com autor `patient`.
@@ -164,6 +169,7 @@ Guilherme escolheu o A em 05/11/2026.
   - `/<slug>/meus-horarios`.
 
   Os nomes exatos das rotas ficam com quem constrói.
+
 - **Site público `/`:** continua como está.
 
 ## Testes que precisam existir
@@ -199,6 +205,7 @@ Guilherme escolheu o A em 05/11/2026.
   - `register_client_patient(...)` cria a ficha da cliente naquela clínica.
 
   O `user_id` vem sempre da sessão do Better Auth no servidor, nunca do navegador.
+
 - **Cadastro seguro:**
   - o cadastro é uma Server Action própria, que grava `role = 'client'` no servidor; os campos `role` e `clinicId` continuam `input: false`;
   - o endpoint público `/sign-up/email` segue desligado;
@@ -213,7 +220,7 @@ Guilherme escolheu o A em 05/11/2026.
 - **Agenda:** é uma por clínica, sem profissionais separados, como hoje (o `lockAgenda` é por clínica).
 - **Histórico:** o autor `patient` já existe em `audit_actor_type`.
 
-## Ficha que já existe: a dona confirma *(decisão de Guilherme)*
+## Ficha que já existe: a dona confirma _(decisão de Guilherme)_
 
 Quando a cliente se cadastra (ou entra numa clínica nova) com um celular que já está numa ficha daquela clínica sem conta ligada:
 
@@ -233,6 +240,7 @@ Quando a cliente se cadastra (ou entra numa clínica nova) com um celular que j�
 7. **Segurança:** a cliente nunca vê nada da ficha existente antes de a dona confirmar.
 
 Nos testes, isso ganha quatro casos:
+
 - cadastro com celular já existente gera a ficha provisória e o aviso;
 - antes de a dona confirmar, a cliente não vê os horários antigos;
 - "é a mesma" junta os horários das duas fichas;

@@ -5,6 +5,7 @@
 **Goal:** Replace "Site em construção" at `/` with a playful animated Zemana landing page (pencil scribbling a paper agenda, a giant X, "PROBLEMA RESOLVIDO", the app), a WhatsApp quote button, and a client entry: `/entrar` → "Suas clínicas" listing the clinics where she has a record.
 
 **Architecture:**
+
 - **Database:** a new definer function lists a user's clinics.
 - **Client pages:** global client auth pages reuse the existing per-clinic forms.
 - **Landing:** `/` is a static server page; the scroll story and the header's session switch are client islands, using the `motion` package only on `/`.
@@ -46,6 +47,7 @@
    - Requests from a clinic link are unchanged.
 
    Pinned in Task 2.
+
 4. **A 360 px phone with reduced motion.** The whole story is readable, there is no horizontal scroll, and the quote button is present and correct. Pinned in Task 4.
 5. **The landing page when the database is unavailable.** `/` still renders, because it does no server DB query, and the header shows "Entrar". Pinned in Task 3 by a static-render check (the build marks `/` as static, `○` in the `next build` output) plus e2e.
 
@@ -54,11 +56,13 @@
 ### Task 1: `client_my_clinics` function and module
 
 **Files:**
+
 - Create: `drizzle/0019_client_my_clinics.sql` (with a journal entry and snapshot, made the way 0018 was: `npx drizzle-kit generate --custom --name client_my_clinics`, then the SQL)
 - Create: `src/modules/clients/my-clinics.ts`
 - Test: `tests/integration/my-clinics.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - **SQL:** `client_my_clinics(p_user uuid) RETURNS TABLE(slug text, name text, area_label text, has_photo boolean)`.
     - It is `STABLE SECURITY DEFINER`, with `SET search_path = public, pg_temp`, `REVOKE ALL ... FROM PUBLIC` and `GRANT EXECUTE ... TO app_client`.
@@ -88,6 +92,7 @@
 ### Task 2: Global client pages — `/entrar`, `/minhas-clinicas`, `/esqueci-senha`, `/nova-senha`
 
 **Files:**
+
 - Create: `src/app/(zemana)/entrar/page.tsx`, `src/app/(zemana)/minhas-clinicas/page.tsx`, `src/app/(zemana)/esqueci-senha/page.tsx`, `src/app/(zemana)/nova-senha/page.tsx` and a shared `src/app/(zemana)/auth-shell.tsx` (Zemana header, brand card, theme toggle). The route group keeps `/` free for Task 3; adapt it if Next 16 conventions require.
 - Modify:
   - `src/modules/clinics/fields.ts` (`RESERVED_SLUGS`);
@@ -97,6 +102,7 @@
 - Test: `e2e/zemana-entrar.spec.ts`; a unit test for `resetPasswordEmail` without a clinic, next to the existing template tests or in a new `src/modules/email/templates.test.ts`.
 
 **Interfaces:**
+
 - Consumes: `listMyClinics` and `MyClinic` (Task 1); `getClientUser` and `safeNext` (`src/modules/clients/session.ts` and `safe-next.ts`); `authClient` (`src/lib/auth-client.ts`).
 - Produces:
   - **`/entrar`:**
@@ -132,11 +138,13 @@
 ### Task 3: Landing page — static sections, header island, metadata, OG image
 
 **Files:**
+
 - Modify: `src/app/page.tsx` (it becomes the landing page and server-renders static content only), `package.json` and `pnpm-lock.yaml` (`motion`)
 - Create: `src/app/landing/` components: `site-header.tsx` (client island: "Entrar" by default, "Suas clínicas" when `authClient.useSession()` returns a client), `hero.tsx`, `features.tsx`, `final-cta.tsx`, `site-footer.tsx`, `quote-link.ts`. Also `src/app/opengraph-image.tsx` (`next/og`: yellow background, Zemana symbol, headline).
 - Test: `e2e/landing.spec.ts`
 
 **Interfaces:**
+
 - Produces:
   - `export const QUOTE_URL: string` in `quote-link.ts`, the exact URL from Global Constraints.
   - `<StoryPlaceholder />`: a slot in `page.tsx` between the hero and the features, filled by Task 4 with `<ScrollStory />`.
@@ -164,11 +172,13 @@
 ### Task 4: Scroll story — pencil, scribbles, X, stamp, phone
 
 **Files:**
+
 - Create: `src/app/landing/scroll-story.tsx` (client) and focused subcomponents under `src/app/landing/story/` (`paper-agenda.tsx`, `pencil.tsx`, `big-x.tsx`, `stamp.tsx`, `phone-app.tsx`)
 - Modify: `src/app/page.tsx` (replace `<StoryPlaceholder />` with `<ScrollStory />`)
 - Test: extend `e2e/landing.spec.ts`
 
 **Interfaces:**
+
 - Consumes: the Task 3 page layout and `QUOTE_URL` if needed.
 - Produces: `<ScrollStory />`. A sticky stage pinned while its tall section scrolls, driven by `useScroll({ target })` and `useTransform`.
   1. **The paper agenda:** drawn in SVG, it fills progressively. Handwritten entries (e.g. "Ana 14h", "Bia 14h??", "remarcar", arrows and strike-throughs) are drawn as SVG paths whose `pathLength` follows scroll, with the pencil following the current stroke. A post-it drops in, and a phone buzzes "tem horário amanhã?".

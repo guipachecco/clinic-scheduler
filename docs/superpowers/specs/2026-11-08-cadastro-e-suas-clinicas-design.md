@@ -9,12 +9,14 @@ Hoje, em `zemana.com.br/entrar`, a cliente não tem como criar conta: a conta s�
 ## Decisões do dono
 
 **Cadastro pela lista de clínicas ("Isso mesmo"):**
+
 1. **Link em `/entrar`:** "Ainda não tem conta? Criar conta".
 2. **Lista:** "Criar conta" abre `/clinicas`, uma lista das clínicas da Zemana. Cada cartão mostra a capa, a foto da dona (ou as iniciais), o nome e a área.
 3. **Escolha:** um toque leva ao cadastro que já existe na clínica (`/<endereço>/cadastro`), com a volta para "Suas clínicas". A conta e a ficha nascem juntas, como hoje.
 4. **Outra clínica:** "Suas clínicas" ganha "Adicionar outra clínica", que leva à mesma lista. Com a conta já criada, ela só completa a ficha na clínica (o formulário que já existe), sem criar outra senha.
 
 **"Suas clínicas", modelo A (aprovado: "Modelo A"):**
+
 - **Topo:** "Olá, <primeiro nome>" e o título "Suas clínicas".
 - **Cabeça de cada cartão:** a capa (a primeira foto da clínica, ou uma área neutra se não tiver fotos), com a nota das avaliações num selo. Abaixo vêm a foto da dona sobreposta, o nome e a área.
 - **Próximo horário:** um destaque rosa com o próximo horário marcado dela naquela clínica ("Qui, 14/11 às 14h · Esmaltação"). Sem horário, aparece "Nenhum horário marcado".

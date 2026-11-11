@@ -25,17 +25,18 @@ Esta etapa dá a cada clínica uma identidade padrão (nome, inicial, cores e fo
 ## Anti-objetivos
 
 O trabalho falha, mesmo funcionando, se:
+
 - **alguma combinação ficar ilegível**, principalmente para o público mais velho. Toda paleta passa por um teste automático de contraste;
 - **a Grais perder a marca dela** ou mudar de aparência;
 - **uma clínica aparecer com a marca de outra**, no painel ou no ícone da aba.
 
 ## Caminhos considerados
 
-| Caminho | Resultado |
-| --- | --- |
+| Caminho                                                                      | Resultado                                                                                                                             |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | **A. Paletas prontas no código; a clínica guarda qual escolheu (escolhido)** | Contraste garantido e testado, modo escuro previsível, nada muda no resto do sistema. Paleta nova exige uma pequena mudança no código |
-| B. Seletor de cor livre | Liberdade total, mas permite combinação ilegível e modo escuro imprevisível. Vai contra o meio-termo decidido na conversa da MarkHora |
-| C. Tema fixo por clínica, compilado | Cada mudança vira deploy, e a dona não troca nada sozinha |
+| B. Seletor de cor livre                                                      | Liberdade total, mas permite combinação ilegível e modo escuro imprevisível. Vai contra o meio-termo decidido na conversa da MarkHora |
+| C. Tema fixo por clínica, compilado                                          | Cada mudança vira deploy, e a dona não troca nada sozinha                                                                             |
 
 Guilherme escolheu o caminho A em 04/11/2026.
 
@@ -57,9 +58,9 @@ Guilherme escolheu o caminho A em 04/11/2026.
 - **Catálogo no código** (`src/modules/branding/palettes.ts`). Cada paleta tem id, nome, descrição curta e os valores das variáveis de cor que hoje ficam fixas em `globals.css`: `primary`, `primary-pressed`, `primary-foreground`, `highlight`, `highlight-foreground`, `brand`, `brand-foreground`, `brand-muted`, `brand-accent`, `brand-accent-foreground` e `ring`. Há valores para o tema claro e para o escuro.
 - **Os neutros continuam iguais para todas:** fundo, cartões, bordas, texto e a cor de erro. Só a identidade muda.
 - **A paleta "Grais"** é a de hoje, copiada exatamente. Ela é a única oferecida à Grais.
-- **Quais paletas cada clínica vê:** uma lista no código, por endereço da clínica (`karol-pacheco`, `sirlei-massoterapia`, `karina-manicure`). A Grais vê só a dela. Uma clínica fora da lista começa com a **paleta neutra** (abaixo) e pode escolher entre ela e as nove paletas novas. Assim, nenhuma clínica nova aparece com as cores de outra. *(Decisão minha.)*
-- **Paleta neutra ("Painel"):** azul-acinzentado discreto, sem relação com nenhuma clínica. É usada onde ainda não há clínica: login, `/admin/clinicas` do root e as páginas de erro do painel. *(Decisão minha.)*
-- **Como as quatro cores das propostas viram as variáveis:** `brand` (menu lateral) e `primary` (botões) recebem o tom principal escuro, como na Grais. `highlight` (item ativo do menu e destaques) recebe a cor de acento, como o dourado ou o coral, e o texto sobre ela fica no tom principal. `brand-accent` (círculo da inicial e avatar) recebe o tom claro. O fundo de cada proposta não é usado, porque os neutros são iguais para todas. *(Decisão minha.)*
+- **Quais paletas cada clínica vê:** uma lista no código, por endereço da clínica (`karol-pacheco`, `sirlei-massoterapia`, `karina-manicure`). A Grais vê só a dela. Uma clínica fora da lista começa com a **paleta neutra** (abaixo) e pode escolher entre ela e as nove paletas novas. Assim, nenhuma clínica nova aparece com as cores de outra. _(Decisão minha.)_
+- **Paleta neutra ("Painel"):** azul-acinzentado discreto, sem relação com nenhuma clínica. É usada onde ainda não há clínica: login, `/admin/clinicas` do root e as páginas de erro do painel. _(Decisão minha.)_
+- **Como as quatro cores das propostas viram as variáveis:** `brand` (menu lateral) e `primary` (botões) recebem o tom principal escuro, como na Grais. `highlight` (item ativo do menu e destaques) recebe a cor de acento, como o dourado ou o coral, e o texto sobre ela fica no tom principal. `brand-accent` (círculo da inicial e avatar) recebe o tom claro. O fundo de cada proposta não é usado, porque os neutros são iguais para todas. _(Decisão minha.)_
 - **Onde a escolha fica:** em `clinics.theme`, que já existe, no campo `paletteId`. Sem paleta ou com paleta desconhecida, vale a primeira da lista da clínica.
 - **Como as cores entram na página:** o layout do painel escreve as variáveis da paleta numa tag `<style>` (claro em `:root` e escuro em `.dark`), depois de `globals.css`. A CSP atual já permite estilo inline. Componentes e classes não mudam.
 
@@ -80,7 +81,7 @@ Guilherme escolheu o caminho A em 04/11/2026.
 ### Tela Aparência (`/admin/aparencia`)
 
 - Fica no menu do painel de todas as clínicas. A dona da clínica e o root (na clínica aberta) podem usar.
-- **Na Grais:** a seção de paleta mostra "Marca própria" no lugar dos cartões, e a dona pode enviar a foto. O nome curto e a área ficam vazios, porque a Grais usa as imagens de marca dela. *(Decisão minha.)*
+- **Na Grais:** a seção de paleta mostra "Marca própria" no lugar dos cartões, e a dona pode enviar a foto. O nome curto e a área ficam vazios, porque a Grais usa as imagens de marca dela. _(Decisão minha.)_
 - **Escolher a paleta:** as três paletas aparecem como cartões, com um pedaço do painel e da página de agendamento no celular, como na proposta. A atual vem marcada. Escolher salva na hora, e o painel já aparece com as cores novas.
 - **Dados do logo:** campos para o nome curto e a área, com prévia do logo.
 - **Foto:** a dona envia uma foto (JPEG, PNG ou WebP, até 2 MB, limite que a tabela `media` já tem). O servidor remove os metadados (EXIF, que pode conter localização, como exige o comentário da tabela `media`), redimensiona para no máximo 800 px e grava. Também dá para remover a foto.
@@ -90,9 +91,9 @@ Guilherme escolheu o caminho A em 04/11/2026.
 
 - **Menu lateral do painel:** logo (imagem da Grais ou logo gerado) e as cores da paleta.
 - **Ícone da aba:** a inicial da clínica num círculo, na cor da paleta, servida por uma rota que gera um SVG. A Grais continua com o ícone atual.
-- **Tela de login (`/admin/entrar`), configuração do 2FA, `/admin/clinicas` e erros do painel:** usam a paleta neutra, sem logo de clínica e com o título "Painel". Antes do login não se sabe a clínica, e assim nenhuma dona entra vendo a marca de outra. O ícone da aba dessas páginas também é neutro. *(Decisão minha.)*
+- **Tela de login (`/admin/entrar`), configuração do 2FA, `/admin/clinicas` e erros do painel:** usam a paleta neutra, sem logo de clínica e com o título "Painel". Antes do login não se sabe a clínica, e assim nenhuma dona entra vendo a marca de outra. O ícone da aba dessas páginas também é neutro. _(Decisão minha.)_
 - **Site público (`/`):** continua como está ("Site em construção", com a marca da Grais). Quem será a marca do endereço principal fica para a etapa da página das clientes.
-- **Foto da dona no painel:** substitui o círculo com a inicial do nome da usuária no menu lateral, quando existir. Também aparece na tela Aparência. *(Decisão minha.)*
+- **Foto da dona no painel:** substitui o círculo com a inicial do nome da usuária no menu lateral, quando existir. Também aparece na tela Aparência. _(Decisão minha.)_
 
 ### Novas clínicas
 
