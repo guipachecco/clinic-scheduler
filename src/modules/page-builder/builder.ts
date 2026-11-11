@@ -201,7 +201,6 @@ export type BuilderState = {
   published: PublishedPage;
   draft: PageDraft;
   hasDraft: boolean;
-  galleryMedia: { id: string; width: number; height: number }[];
 };
 
 export async function getBuilderState(clinicId: string): Promise<BuilderState> {
@@ -210,15 +209,6 @@ export async function getBuilderState(clinicId: string): Promise<BuilderState> {
     if (!row) throw new Error("Clínica não encontrada.");
     const gallery = (await readGallery(tx, clinicId)).map((p) => p.mediaId);
     const draft = parseDraft(row.pageDraft);
-    const ids = [...new Set([...gallery, ...(draft.gallery ?? [])])];
-    const sizes =
-      ids.length === 0
-        ? []
-        : await tx
-            .select({ id: media.id, width: media.width, height: media.height })
-            .from(media)
-            .where(and(eq(media.clinicId, clinicId), inArray(media.id, ids)));
-    const byId = new Map(sizes.map((m) => [m.id, m]));
     return {
       slug: row.slug,
       name: row.name,
@@ -226,7 +216,6 @@ export async function getBuilderState(clinicId: string): Promise<BuilderState> {
       published: publishedFrom(row, gallery),
       draft,
       hasDraft: row.pageDraft !== null,
-      galleryMedia: ids.flatMap((id) => byId.get(id) ?? []),
     };
   });
 }

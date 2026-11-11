@@ -19,7 +19,10 @@ function initials(name: string) {
 export function coverImage(
   page: ClinicPage,
 ): { src: string; width: number; height: number } | null {
-  if (page.cover) return { src: `/${page.slug}/capa`, ...page.cover };
+  if (page.cover) {
+    const version = page.coverVersion ? `?v=${page.coverVersion}` : "";
+    return { src: `/${page.slug}/capa${version}`, ...page.cover };
+  }
   const photo = page.photos[0];
   return photo
     ? {

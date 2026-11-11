@@ -419,6 +419,8 @@ describe("published page look", () => {
   it("has no logo or cover before publishing", async () => {
     const page = (await getClinicPage(slug))!;
     expect(page.hasLogo).toBe(false);
+    expect(page.logoVersion).toBeNull();
+    expect(page.coverVersion).toBeNull();
     expect(page.cover).toBeNull();
     expect(page.businessType).toBe(saved.businessType);
     expect((await getClinicLook(slug))?.hasLogo).toBe(false);
@@ -444,6 +446,8 @@ describe("published page look", () => {
     expect((await publishDraft(CLINIC, actor)).ok).toBe(true);
     const page = (await getClinicPage(slug))!;
     expect(page.hasLogo).toBe(true);
+    expect(page.logoVersion).toMatch(/^[0-9a-f]{8}$/);
+    expect(page.coverVersion).toMatch(/^[0-9a-f]{8}$/);
     expect(page.cover).toEqual({ width: 1200, height: 800 });
     expect(page.theme).toMatchObject({
       primaryColor: "#0a7d5a",
@@ -454,6 +458,7 @@ describe("published page look", () => {
     expect(await getClinicLook(slug)).toEqual({
       theme: page.theme,
       hasLogo: true,
+      logoVersion: page.logoVersion,
     });
 
     const logo = await getClinicLogo(slug);

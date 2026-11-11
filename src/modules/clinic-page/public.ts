@@ -32,6 +32,10 @@ export type ClinicPage = PublicClinic & {
   theme: ClinicTheme;
   businessType: BusinessType;
   hasLogo: boolean;
+  // First 8 characters of the media id: a ?v= for the image URLs, so a new
+  // image is not hidden by the browser's cache of the old one.
+  logoVersion: string | null;
+  coverVersion: string | null;
   // The cover's size when the owner published one (image at /<slug>/capa);
   // without it the page uses the first photo.
   cover: { width: number; height: number } | null;
@@ -85,12 +89,16 @@ async function enterClinic(tx: Tx, slug: string): Promise<string | null> {
   return row.clinic_id;
 }
 
+const mediaVersion = (id: string | null) => (id ? id.slice(0, 8) : null);
+
 // What every /<slug> screen's layout needs from the published page: the look
 // and whether there is a logo. One read; null when the slug is not an active
 // clinic.
-export async function getClinicLook(
-  slug: string,
-): Promise<{ theme: ClinicTheme; hasLogo: boolean } | null> {
+export async function getClinicLook(slug: string): Promise<{
+  theme: ClinicTheme;
+  hasLogo: boolean;
+  logoVersion: string | null;
+} | null> {
   return clientDb.transaction(async (tx) => {
     const clinicId = await enterClinic(tx, slug);
     if (!clinicId) return null;
@@ -98,7 +106,13 @@ export async function getClinicLook(
       .select({ theme: clinics.theme, logoMediaId: clinics.logoMediaId })
       .from(clinics)
       .where(eq(clinics.id, clinicId));
-    return row ? { theme: row.theme, hasLogo: row.logoMediaId !== null } : null;
+    return row
+      ? {
+          theme: row.theme,
+          hasLogo: row.logoMediaId !== null,
+          logoVersion: mediaVersion(row.logoMediaId),
+        }
+      : null;
   });
 }
 
@@ -134,6 +148,7 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
         theme: clinics.theme,
         businessType: clinics.businessType,
         logoMediaId: clinics.logoMediaId,
+        coverMediaId: clinics.coverMediaId,
         ownerPhotoMediaId: clinics.ownerPhotoMediaId,
         loyaltyEnabled: clinics.loyaltyEnabled,
         loyaltyVisits: clinics.loyaltyVisits,
@@ -229,6 +244,7 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
 
     const {
       logoMediaId,
+      coverMediaId,
       ownerPhotoMediaId,
       loyaltyEnabled,
       loyaltyVisits,
@@ -239,6 +255,8 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
       ...rest,
       amenities: clinic.amenities as Amenity[],
       hasLogo: logoMediaId !== null,
+      logoVersion: mediaVersion(logoMediaId),
+      coverVersion: mediaVersion(coverMediaId),
       cover: coverRow
         ? { width: Number(coverRow.width), height: Number(coverRow.height) }
         : null,
@@ -294,7 +312,7 @@ export async function getClinicPhoto(
   });
 }
 
-type StoredImage = { mimeType: string; data: Buffer };
+export type StoredImage = { mimeType: string; data: Buffer };
 
 // One image of an active clinic read through a definer function that returns
 // (mime_type, data); null when the clinic is not active or has none.

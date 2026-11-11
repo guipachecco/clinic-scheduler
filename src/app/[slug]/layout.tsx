@@ -50,6 +50,7 @@ export default async function ClientLayout({
   const look = (await getClinicLook(clinic.slug)) ?? {
     theme: {},
     hasLogo: false,
+    logoVersion: null,
   };
 
   return (
@@ -64,7 +65,7 @@ export default async function ClientLayout({
             {look.hasLogo ? (
               // eslint-disable-next-line @next/next/no-img-element -- served by the /logo route handler
               <img
-                src={`/${clinic.slug}/logo`}
+                src={`/${clinic.slug}/logo${look.logoVersion ? `?v=${look.logoVersion}` : ""}`}
                 alt=""
                 height={28}
                 className="h-7 w-auto max-w-28 shrink-0 object-contain"

@@ -87,7 +87,7 @@ test("owner builds and publishes her page", async ({ page, context }) => {
   const publicPage = await context.newPage();
   await publicPage.goto(`/${slug}`);
   await expect(publicPage.getByText(HEADLINE)).toHaveCount(0);
-  await expect(publicPage.locator('img[src$="/capa"]')).toHaveCount(0);
+  await expect(publicPage.locator('img[src*="/capa"]')).toHaveCount(0);
 
   // Galeria, then Publicar.
   await page.getByRole("button", { name: "Próximo" }).click();
@@ -100,8 +100,10 @@ test("owner builds and publishes her page", async ({ page, context }) => {
   // The headline lives in the "Sobre" tab.
   await publicPage.getByRole("tab", { name: "Sobre" }).click();
   await expect(publicPage.getByText(HEADLINE)).toBeVisible();
-  await expect(publicPage.locator('header img[src$="/logo"]')).toBeVisible();
-  await expect(publicPage.locator('img[src$="/capa"]').first()).toBeVisible();
+  const logo = publicPage.locator('header img[src*="/logo"]');
+  await expect(logo).toBeVisible();
+  await expect(logo).toHaveAttribute("src", /\/logo\?v=[0-9a-f]{8}$/);
+  await expect(publicPage.locator('img[src*="/capa"]').first()).toBeVisible();
   await expect(
     publicPage.getByRole("link", { name: "Marcar horário" }),
   ).toHaveCSS("background-color", "rgb(10, 125, 90)");
@@ -111,4 +113,14 @@ test("owner builds and publishes her page", async ({ page, context }) => {
   await expect(
     page.getByRole("link", { name: "Clientes" }).first(),
   ).toBeVisible();
+
+  // Leaving the wizard saves what the step has not saved yet.
+  const draftText = "Frase ainda sem Próximo";
+  await page.goto("/admin/pagina/montar?passo=texto");
+  await page.getByLabel("Frase de apresentação").fill(draftText);
+  await page.getByRole("link", { name: "Sair do passo a passo" }).click();
+  await expect(page).toHaveURL(/\/admin\/pagina$/);
+  await page.getByRole("link", { name: "Continuar rascunho" }).click();
+  await page.goto("/admin/pagina/montar?passo=texto");
+  await expect(page.getByLabel("Frase de apresentação")).toHaveValue(draftText);
 });

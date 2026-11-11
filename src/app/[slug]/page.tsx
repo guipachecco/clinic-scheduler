@@ -97,7 +97,11 @@ function clinicJsonLd(page: ClinicPage) {
     ...(page.cover || page.photos.length > 0 || page.hasOwnerPhoto
       ? {
           image: [
-            ...(page.cover ? [`${url}/capa`] : []),
+            ...(page.cover
+              ? [
+                  `${url}/capa${page.coverVersion ? `?v=${page.coverVersion}` : ""}`,
+                ]
+              : []),
             ...page.photos
               .slice(0, 3)
               .map((photo) => `${url}/fotos/${photo.id}`),

@@ -5,7 +5,7 @@ import "@/app/page-fonts";
 import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { FormError } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
@@ -96,13 +96,23 @@ export function BuilderWizard({
   const next = STEP_IDS[index + 1];
   const locked = busy || pending;
 
-  // Saves this step (when it changed something) and opens `target`. An
-  // error keeps the owner on the step.
-  async function go(target: StepId) {
+  const dirty = Object.keys(patch).length > 0;
+
+  // Leaving the tab or the site with changes not saved yet asks first.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  // Saves this step (when it changed something) and opens `href`. An error
+  // keeps the owner on the step.
+  async function saveAndOpen(href: string) {
     if (locked) return;
     setFormError(null);
     setFieldErrors({});
-    if (Object.keys(patch).length > 0) {
+    if (dirty) {
       setPending(true);
       try {
         const result = await saveStepAction(patch);
@@ -122,10 +132,12 @@ export function BuilderWizard({
         return;
       }
     }
-    // Stays pending until the next step replaces this one.
+    // Stays pending until the next page replaces this one.
     setPending(true);
-    router.push(stepHref(target) as Route);
+    router.push(href as Route);
   }
+
+  const go = (target: StepId) => saveAndOpen(stepHref(target));
 
   const back = previous ? (
     <Button
@@ -144,6 +156,10 @@ export function BuilderWizard({
       <div className="flex items-center justify-between gap-3">
         <Link
           href={"/admin/pagina" as Route}
+          onClick={(event) => {
+            event.preventDefault();
+            void saveAndOpen("/admin/pagina");
+          }}
           className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
         >
           Sair do passo a passo

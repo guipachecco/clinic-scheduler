@@ -197,9 +197,6 @@ describe("page builder draft", () => {
     const fresh = await upload("gallery");
     let state = await getBuilderState(CLINIC);
     expect(state.draft.gallery).toEqual([...baseGallery, kept, fresh]);
-    expect(state.galleryMedia.map((m) => m.id).sort()).toEqual(
-      [...baseGallery, kept, fresh].sort(),
-    );
 
     const removed = await upload("gallery");
     const cover = await upload("cover");

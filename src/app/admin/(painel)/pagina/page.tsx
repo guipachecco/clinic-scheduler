@@ -15,11 +15,10 @@ export const metadata: Metadata = { title: "Minha página" };
 
 export default async function ClinicPageSettingsPage() {
   const { clinicId } = await requireAdmin();
-  const [settings, builder] = await Promise.all([
-    getClinicPageSettings(clinicId),
-    getBuilderState(clinicId),
-  ]);
+  // The builder state throws for a missing clinic, so it waits for the check.
+  const settings = await getClinicPageSettings(clinicId);
   if (!settings) notFound();
+  const builder = await getBuilderState(clinicId);
 
   return (
     <div className="grid max-w-3xl gap-8">
