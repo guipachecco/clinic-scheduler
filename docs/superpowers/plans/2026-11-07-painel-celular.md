@@ -5,6 +5,7 @@
 **Goal:** The owner's panel opens on her day: a new Início (greeting, today's numbers, next client, today's list, alerts) on phone and computer, a phone bottom bar with a "Mais" sheet, a phone-only day-list agenda with free intervals, card polish, and cancelled appointments moved out of "Próximos horários" in the client area.
 
 **Architecture:**
+
 - **Pure logic:** day maths (free intervals, summary numbers, greeting, "em N min") lives in pure functions with unit tests.
 - **Data:** one panel data module reads a day's appointments, prices, hours and blocks through `inClinic`.
 - **Pages:** they compose these. The computer agenda calendar is untouched; the phone list is rendered next to it and shown with responsive classes.
@@ -56,9 +57,11 @@
 ### Task 1: Pure day logic
 
 **Files:**
+
 - Create: `src/modules/dashboard/day.ts`, `src/modules/dashboard/day.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - **Types:**
     - `export type DayItem = { id: string; startsAt: Date; endsAt: Date; status: "requested" | "confirmed" | "cancelled" | "completed" | "no_show"; online: boolean; priceCents: number | null; patientId: string; patientName: string; patientPhone: string | null; serviceName: string; durationMinutes: number }`.
@@ -91,9 +94,11 @@
 ### Task 2: Panel day data
 
 **Files:**
+
 - Create: `src/modules/dashboard/dashboard.ts`, `tests/integration/dashboard.test.ts`
 
 **Interfaces:**
+
 - Consumes:
   - `DayItem`, `freeIntervals`, `daySummary`, `nextItem` (Task 1);
   - `inClinic` from `@/db/client`;
@@ -123,11 +128,13 @@
 ### Task 3: Panel shell — phone bottom bar, "Mais" sheet, card polish
 
 **Files:**
+
 - Modify: `src/app/admin/(painel)/layout.tsx`, `src/app/admin/(painel)/panel-nav.tsx`, `src/components/ui/card.tsx` (rounded-2xl, soft border, `shadow-sm`)
 - Create: `src/app/admin/(painel)/mobile-nav.tsx` (client component: bottom bar + "Mais" sheet)
 - Test: `e2e/panel-mobile.spec.ts`
 
 **Interfaces:**
+
 - Consumes: the existing nav items in the layout (hrefs, labels, badge), `ThemeToggle` and `SignOutButton`.
 - Produces: `MobileNav({ items, moreItems, agendaBadge }: { items: NavItem[]; moreItems: NavItem[]; agendaBadge?: number })`.
   - **items:** the bottom bar shows Início, Agenda, Pacientes and a "Mais" button.
@@ -155,11 +162,13 @@
 ### Task 4: New Início
 
 **Files:**
+
 - Modify: `src/app/admin/(painel)/page.tsx`
 - Create: `src/app/admin/(painel)/home/home-header.tsx`, `home/next-card.tsx`, `home/day-list.tsx` (the list is shared with Task 5)
 - Test: `e2e/panel-home.spec.ts`
 
 **Interfaces:**
+
 - Consumes:
   - `getPanelHome`, `greeting` and `startsIn` (Tasks 1 and 2);
   - `PendingLinkNotice`;
@@ -199,11 +208,13 @@
 ### Task 5: Phone agenda list
 
 **Files:**
+
 - Modify: `src/app/admin/(painel)/agenda/page.tsx` (reads `searchParams.dia`; renders the new phone list inside `md:hidden` and wraps the existing calendar/side panel in `hidden md:block`)
 - Create: `src/app/admin/(painel)/agenda/phone/day-strip.tsx`, `agenda/phone/phone-agenda.tsx`
 - Test: `e2e/agenda-phone.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `getDayAgenda` and `getWeekMarks` (Task 2), `DayList` (Task 4), `requestedList` data already loaded by the page.
 - Produces: `/admin/agenda?dia=yyyy-mm-dd`, defaulting to today in the clinic zone. An invalid value falls back to today.
 - **Day strip:**
@@ -239,10 +250,12 @@
 ### Task 6: Client area — cancelled ones leave "Próximos horários"
 
 **Files:**
+
 - Modify: `src/app/[slug]/meus-horarios/page.tsx`
 - Test: `e2e/client-area.spec.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `listMyAppointments` (unchanged).
 - Produces:
   - "Próximos horários" lists upcoming appointments that are not `cancelled`;

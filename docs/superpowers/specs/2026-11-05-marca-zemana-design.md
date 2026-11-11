@@ -26,10 +26,10 @@ O sistema passa a ser a **Zemana**: uma marca só, em todas as telas e para toda
 
 ## Caminhos considerados
 
-| Caminho | Resultado |
-| --- | --- |
+| Caminho                                                           | Resultado                                            |
+| ----------------------------------------------------------------- | ---------------------------------------------------- |
 | **A. Trocar a marca e manter o mecanismo de paletas (escolhido)** | Mexe pouco; reversível se a marca por clínica voltar |
-| B. Remover a identidade por clínica de vez | Código mais enxuto, mas desfaz o trabalho de 04/11 |
+| B. Remover a identidade por clínica de vez                        | Código mais enxuto, mas desfaz o trabalho de 04/11   |
 
 Guilherme escolheu o caminho A em 05/11/2026.
 
@@ -44,16 +44,16 @@ Guilherme escolheu o caminho A em 05/11/2026.
 
 ### Cores (do manual)
 
-| Nome | HEX | Uso no sistema |
-| --- | --- | --- |
-| Roxo Zemana | `#2A0081` | `primary`, `brand` (menu lateral, botões), `ring`, status "confirmado" |
-| Amarelo | `#F5C700` | `highlight` (item ativo do menu, destaques). Texto sobre ele em roxo, nunca amarelo como texto sobre branco |
-| Rosa | `#FFD3F0` | `brand-accent` (avatar, detalhes) |
-| Azul-claro | `#B7E7FC` | Apoio, e cor principal no modo escuro se passar no contraste |
-| Framboesa | `#BA1650` | Apoio. Não substitui a cor de erro, que continua `#B3261E` |
+| Nome        | HEX       | Uso no sistema                                                                                              |
+| ----------- | --------- | ----------------------------------------------------------------------------------------------------------- |
+| Roxo Zemana | `#2A0081` | `primary`, `brand` (menu lateral, botões), `ring`, status "confirmado"                                      |
+| Amarelo     | `#F5C700` | `highlight` (item ativo do menu, destaques). Texto sobre ele em roxo, nunca amarelo como texto sobre branco |
+| Rosa        | `#FFD3F0` | `brand-accent` (avatar, detalhes)                                                                           |
+| Azul-claro  | `#B7E7FC` | Apoio, e cor principal no modo escuro se passar no contraste                                                |
+| Framboesa   | `#BA1650` | Apoio. Não substitui a cor de erro, que continua `#B3261E`                                                  |
 
 - Os neutros atuais (fundo, cartões, bordas, texto) continuam, porque já puxam ao lilás e combinam com o roxo.
-- **Modo escuro:** o `brand` fica num roxo bem escuro, o principal fica num tom claro (azul-claro ou rosa) que passe no teste de contraste, e o destaque continua amarelo. Os valores exatos ficam com quem constrói, desde que passem no teste. *(Decisão minha.)*
+- **Modo escuro:** o `brand` fica num roxo bem escuro, o principal fica num tom claro (azul-claro ou rosa) que passe no teste de contraste, e o destaque continua amarelo. Os valores exatos ficam com quem constrói, desde que passem no teste. _(Decisão minha.)_
 
 ### Fontes
 
@@ -71,6 +71,7 @@ Guilherme escolheu o caminho A em 05/11/2026.
   - logo vertical para a tela de login.
 
   Se Guilherme enviar os arquivos originais (SVG), eles substituem os recortes.
+
 - **Onde aparece:**
   - menu lateral do painel: logo horizontal para fundo roxo, com o nome da clínica aberta abaixo;
   - tela de login e configuração do 2FA: logo vertical;
@@ -81,8 +82,8 @@ Guilherme escolheu o caminho A em 05/11/2026.
 ### Paletas e tela Aparência
 
 - O catálogo ganha a paleta `zemana`. `CLINIC_BRANDING` passa a oferecer só `zemana` a todas as clínicas, e toda clínica fora da lista também usa `zemana`. As outras paletas continuam definidas e testadas, mas não são oferecidas.
-- **Tela Aparência:** sai do menu e a rota `/admin/aparencia` deixa de existir. As funções de paleta, de texto e de foto continuam no código, sem tela. Os dados já gravados (incluindo a foto) continuam no banco, sem uso. *(Decisão de Guilherme.)*
-- **O menu lateral** mostra o logo da Zemana, o nome da clínica e o círculo com a inicial da usuária, como antes. A foto da dona deixa de aparecer, já que não há mais onde trocá-la. *(Decisão minha.)*
+- **Tela Aparência:** sai do menu e a rota `/admin/aparencia` deixa de existir. As funções de paleta, de texto e de foto continuam no código, sem tela. Os dados já gravados (incluindo a foto) continuam no banco, sem uso. _(Decisão de Guilherme.)_
+- **O menu lateral** mostra o logo da Zemana, o nome da clínica e o círculo com a inicial da usuária, como antes. A foto da dona deixa de aparecer, já que não há mais onde trocá-la. _(Decisão minha.)_
 
 ## Testes que precisam existir
 

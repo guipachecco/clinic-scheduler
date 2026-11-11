@@ -5,6 +5,7 @@
 **Goal:** The clinic link (`/<slug>`) becomes an app-like mobile page (photos placeholder, tabs, amenities, reviews, hours, payment, contacts, loyalty, products) with a faster booking flow, and the owner configures all of it in a new "Minha página" panel section, with every new rule enforced by PostgreSQL.
 
 **Architecture:**
+
 - **Migration and visibility:** one migration (`0017_clinic_page`) adds clinic columns and three tables (`products`, `reviews`, `loyalty_redemptions`) with grants and RLS following migrations 0011–0016. What anonymous visitors need beyond RLS (review authors, payment methods, owner photo) goes through `SECURITY DEFINER` functions executable only by `app_client`.
 - **Modules:** a new `src/modules/clinic-page/` holds the zod fields, the public/client reads and writes, and the panel reads and writes.
 - **Panel UI:** under `src/app/admin/(painel)/pagina/`.
@@ -61,11 +62,13 @@
 ### Task 1: Migration 0017 — columns, tables, rules and definer functions
 
 **Files:**
+
 - Modify: `src/db/schema/clinic.ts` (clinics columns + `products`, `reviews`, `loyaltyRedemptions` tables), `src/db/schema/index.ts` if tables are re-exported there
 - Create: `drizzle/0017_clinic_page.sql` (+ `drizzle/meta/_journal.json` entry and snapshot, produced by `npx drizzle-kit generate --name clinic_page` and then hand-extended with grants, policies and functions, like 0013/0016)
 - Test: `tests/integration/clinic-page-rules.test.ts`
 
 **Interfaces:**
+
 - Produces (SQL):
   - **`clinics` columns:** `instagram_handle text`, `amenities text[] not null default '{}'`, `loyalty_enabled boolean not null default false`, `loyalty_visits integer not null default 10`, `loyalty_reward text`.
   - **`clinics` checks:** `clinics_instagram_check`, `clinics_amenities_check` (`amenities <@ ARRAY[...8 keys]`), `clinics_loyalty_visits_check` (2–50), `clinics_loyalty_reward_check` (≤ 120), `clinics_loyalty_check` (`not loyalty_enabled or loyalty_reward is not null`) and `clinics_maps_url_check` (`maps_url is null or maps_url ~ '^https://'`). Before adding that last check, the migration sets `maps_url = null` where it fails it.
@@ -121,10 +124,12 @@
 ### Task 2: Fields and the clinic-page module
 
 **Files:**
+
 - Create: `src/modules/clinic-page/fields.ts`, `src/modules/clinic-page/fields.test.ts`, `src/modules/clinic-page/public.ts` (anonymous and client reads/writes), `src/modules/clinic-page/panel.ts` (owner reads/writes)
 - Test: `tests/integration/clinic-page.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 tables, columns and functions; `asClient`, `inClinic` and `clientDb` from `@/db/client`; `normalizeBrPhone` from `@/modules/patients/fields`; `BookingContext` from `@/modules/booking/booking`.
 - Produces, from `fields.ts`:
   - `export const AMENITIES` (readonly tuple of the 8 keys) and `export type Amenity`.
@@ -190,11 +195,13 @@
 ### Task 3: Panel — "Minha página"
 
 **Files:**
+
 - Create: `src/app/admin/(painel)/pagina/page.tsx`, `pagina/actions.ts`, `pagina/page-form.tsx` (dados + comodidades checklist + online toggle), `pagina/loyalty-form.tsx`, `pagina/produtos/page.tsx`, `pagina/produtos/product-form.tsx`, `pagina/avaliacoes/page.tsx`
 - Modify: `src/app/admin/(painel)/layout.tsx` (nav item `{ href: "/admin/pagina", label: "Minha página", icon: "page" }`), `panel-nav.tsx` (new `page` stroke icon), `src/app/admin/(painel)/pacientes/[id]/page.tsx` (loyalty block)
 - Test: `e2e/clinic-page-panel.spec.ts`
 
 **Interfaces:**
+
 - Consumes: Task 2 `panel.ts` functions and schemas; `requireAdmin()` from `@/modules/auth/session` (returns `{ clinicId, … }`, including the user id used as the actor — read it there).
 - Produces: routes `/admin/pagina`, `/admin/pagina/produtos` and `/admin/pagina/avaliacoes`.
 - Actions follow `src/app/admin/(painel)/expediente/actions.ts`: return values, never redirect; `ActionFailure` with `fieldErrors`.
@@ -231,11 +238,13 @@
 ### Task 4: Client shell — icons, bottom nav, public owner photo
 
 **Files:**
+
 - Create: `src/app/[slug]/icons.tsx`, `src/app/[slug]/bottom-nav.tsx` (client component, active state from `usePathname`), `src/app/[slug]/foto/route.ts`
 - Modify: `src/app/[slug]/layout.tsx` (compact header with the Zemana mark, the theme toggle and the bottom nav; `main` gets bottom padding so content never hides behind the nav), `src/app/[slug]/ui.tsx` (`instagramUrl(handle)`, `mapsLink`, `ClinicContacts` with icons)
 - Test: `e2e/client-area.spec.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `getOwnerPhoto(slug)` (Task 2).
 - Produces:
   - **`icons.tsx`:** `export function Icon({ name, className }: { name: IconName; className?: string })`, with `IconName` = `"home" | "calendar" | "clock" | "person" | "wifi" | "parking" | "accessibility" | "snowflake" | "coffee" | "restroom" | "kids" | "paw" | "star" | "starFilled" | "map" | "whatsapp" | "instagram" | "mail" | "phone" | "copy" | "chevronLeft" | "chevronRight" | "image" | "gift" | "bag" | "check"`.
@@ -261,11 +270,13 @@
 ### Task 5: Client home page — hero, tabs and sections
 
 **Files:**
+
 - Modify: `src/app/[slug]/page.tsx`
 - Create: `src/app/[slug]/home/hero.tsx`, `home/tabs.tsx` (client component; tab state in the URL hash or local state, keyboard-accessible `role="tablist"`), `home/sections.tsx` (amenities, reviews, location, hours, payment, contacts), `home/open-status.ts` + `home/open-status.test.ts`
 - Test: `e2e/clinic-page.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `getClinicPage(slug)`, `canReview`, `getLoyaltyProgress` (Task 2); `Icon` and `AMENITY_ICONS` (Task 4); `priceLabel` and `whatsappUrl` from `ui.tsx`; the Serviços tab uses `ClinicPage.services`.
 - Produces: `export function openStatus(hours: ClinicPage["hours"], zone: string, now: Date): { open: boolean; label: string }`, with labels exactly "Aberto agora · até HH:mm", "Fechado · abre hoje às HH:mm", "Fechado · abre amanhã às HH:mm", "Fechado · abre <weekday> às HH:mm" and "Fechado hoje" (the last only when there are no hours at all in the week).
 
@@ -297,10 +308,12 @@
 ### Task 6: Booking flow redesign
 
 **Files:**
+
 - Modify: `src/app/[slug]/marcar/page.tsx` (reads `searchParams.servico`), `src/app/[slug]/marcar/booking-flow.tsx` (split if it grows: `day-strip.tsx`, `slot-groups.tsx`, `confirm-sheet.tsx`)
 - Test: `e2e/client-area.spec.ts` (update the booking tests), `src/app/[slug]/marcar/slot-groups.test.ts`
 
 **Interfaces:**
+
 - Consumes: the existing `loadDays`, `loadSlots` and `book` actions (unchanged), plus `ServiceOption`.
 - Produces: `export function groupSlots(slots: string[]): { period: "manha" | "tarde" | "noite"; label: "Manhã" | "Tarde" | "Noite"; slots: string[] }[]`. The groups are before 12:00, 12:00–17:59 and ≥ 18:00, read from the slot's HH:mm; empty groups are omitted.
 
@@ -329,11 +342,13 @@
 ### Task 7: Reviews and loyalty for the client
 
 **Files:**
+
 - Create: `src/app/[slug]/avaliar/page.tsx`, `avaliar/review-form.tsx`, `avaliar/actions.ts`
 - Modify: `src/app/[slug]/meus-horarios/page.tsx` (visual refresh, plus "Avaliar" on completed appointments), `src/app/[slug]/home/tabs.tsx` (Fidelidade tab: rule always; with login the stamp card "N de M" or "Você ganhou: <reward>. Avise na próxima visita.")
 - Test: `e2e/clinic-page.spec.ts` (extend)
 
 **Interfaces:**
+
 - Consumes: `createReview`, `canReview` and `getLoyaltyProgress` (Task 2); `requireClient` from `@/modules/clients/session`; `reviewSchema`.
 - Produces: route `/<slug>/avaliar`. Without permission it shows "Você poderá avaliar depois do seu primeiro atendimento." and no form.
 
@@ -358,6 +373,7 @@
 ### Task 8: Docs and full verification
 
 **Files:**
+
 - Modify: `README.md` (Minha página, the reviews rule, loyalty), `docs/decisoes-tecnicas.md` (new tables and functions, and why the definer functions exist)
 
 - [ ] **Step 1: Update the docs** in the repo's style: short Portuguese sentences, no marketing.

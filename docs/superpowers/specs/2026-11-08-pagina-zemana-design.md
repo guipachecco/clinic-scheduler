@@ -10,6 +10,7 @@ Data: 2026-11-08.
 2. **Entrada das clientes:** a cliente entra e vê **as clínicas em que já é cliente**, com um botão para ir a cada uma.
 
 O estilo é divertido e animado. A referência é https://phin.helenadang.work/:
+
 - tipografia gigante;
 - um objeto desenhado que conta a história conforme a página rola;
 - seções de cores fortes trocando com bordas rasgadas;
@@ -18,6 +19,7 @@ O estilo é divertido e animado. A referência é https://phin.helenadang.work/:
 ## Decisões do dono do projeto
 
 **A história, conforme a pessoa rola (aprovada: "tudo correto"):**
+
 1. **Abertura:** fundo amarelo da Zemana, letras gigantes ("SUA AGENDA, SEM BAGUNÇA." ou equivalente), o logo com um leve pulo e o botão **"Quero um orçamento"**.
 2. **O caos:** uma agenda de papel desenhada. Um **lápis escreve** nomes de clientes conforme a rolagem ("Ana 14h", "Bia 14h??", rasuras, "remarcar", setas). Um post-it cai e o celular vibra com "tem horário amanhã?".
 3. **O X:** com a página cheia de rabisco, o lápis risca um **X enorme** de ponta a ponta e aparece um carimbo torto **"PROBLEMA RESOLVIDO"**.
@@ -31,6 +33,7 @@ O estilo é divertido e animado. A referência é https://phin.helenadang.work/:
 7. **Rodapé:** um link discreto **"Sou cliente, quero entrar"**, que também fica no topo como "Entrar".
 
 **Login das clientes (aprovado: "tudo certo"):**
+
 - **`/entrar`:** com o visual da Zemana, pede e-mail, senha e tem "Esqueci minha senha". Não tem "Criar conta", porque a conta nasce pelo link de uma clínica, onde a ficha é criada.
 - **Depois do login:** a cliente vai para **"Suas clínicas"**, um cartão por clínica em que ela tem ficha, com nome, área e foto da dona (ou as iniciais). Cada cartão tem **"Agendar"** (`/<slug>/marcar`) e **"Meus horários"** (`/<slug>/meus-horarios`).
 - **Quantidade de clínicas:** com uma só, a lista aparece igual. Sem nenhuma, aparece: "Você ainda não é cliente de nenhuma clínica. Peça o link para a sua profissional."
@@ -38,6 +41,7 @@ O estilo é divertido e animado. A referência é https://phin.helenadang.work/:
 - **Segurança:** a lista vem de uma **função nova no banco** que devolve só as clínicas daquela conta (endereço, nome de exibição, área e se tem foto). Nada de ficha, contato ou outras clientes.
 
 **Como construir:** a biblioteca **Motion** (pacote `motion`, para React).
+
 - **Lápis:** o traço que escreve é um SVG com o comprimento do traço ligado à rolagem.
 - **Movimentos:** o X, o carimbo e o celular entram com mola.
 - **Escopo:** só a página inicial carrega a biblioteca.

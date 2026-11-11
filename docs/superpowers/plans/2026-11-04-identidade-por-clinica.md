@@ -25,7 +25,7 @@
 - A clinic whose stored `paletteId` was removed from the catalog or is not offered to it: falls back to its first offered palette, never to another clinic's (Task 1, `resolvePalette`).
 - A photo with EXIF orientation (phone portrait): stored upright, not rotated sideways (Task 3, `rotate()` before stripping).
 - Root switching clinics: the new clinic's colors and icon show on the next page, no stale palette (Task 4 e2e).
-- A display name with one word, accents or extra spaces ("  Sirlei  ", "Ângela Souza"): initials "S", "ÂS" (Task 1).
+- A display name with one word, accents or extra spaces (" Sirlei ", "Ângela Souza"): initials "S", "ÂS" (Task 1).
 - A clinic with no photo and no display name: wordmark falls back to `clinics.name`, avatar to the user initial (Task 4).
 
 ---
@@ -33,10 +33,12 @@
 ### Task 1: Palette catalog and contrast check
 
 **Files:**
+
 - Create: `src/modules/branding/palettes.ts`, `src/modules/branding/contrast.ts`
 - Test: `src/modules/branding/palettes.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `type TokenName = "primary" | "primary-pressed" | "primary-foreground" | "highlight" | "highlight-foreground" | "brand" | "brand-foreground" | "brand-muted" | "brand-accent" | "brand-accent-foreground" | "ring"`
   - `type Palette = { id: string; name: string; description: string; light: Record<TokenName, string>; dark: Record<TokenName, string> }`
@@ -50,18 +52,18 @@
 
 Light values from the approved proposals (mapping decided in the spec: `brand`/`primary` = main tone, `highlight` = accent, `brand-accent` = light tint); dark values are the builder's, within the contrast test:
 
-| id | name | slug | primary/brand | highlight | brand-accent |
-| --- | --- | --- | --- | --- | --- |
-| `karol-vinho` | Nude e vinho | karol-pacheco | #6E1F2E | #B08D57 | #E8D3C3 |
-| `karol-preto-ouro` | Preto e dourado | karol-pacheco | #1F1B1A | #B8925A | #ECE3D6 |
-| `karol-rose` | Rosé terroso | karol-pacheco | #A4553F | #D9A38F | #F5DED5 |
-| `sirlei-salvia` | Sálvia | sirlei-massoterapia | #4F6F5A | #A9BFA8 | #E3EBE4 |
-| `sirlei-argila` | Argila | sirlei-massoterapia | #8A5A44 | #C9A88E | #EFE3D6 |
-| `sirlei-grafite` | Grafite e cobre | sirlei-massoterapia | #2E2E33 | #B87348 | #E7E3DE |
-| `karina-marinho-coral` | Marinho e coral | karina-manicure | #22315A | #D9503E | #E6E9F2 |
-| `karina-rosa` | Rosa esmalte | karina-manicure | #B2295B | #E98AAE | #F9DCE6 |
-| `karina-ameixa` | Ameixa e dourado | karina-manicure | #5B3A7A | #C9A84E | #ECE3F6 |
-| `painel` | Painel (neutra) | — | #3E4C63 | #D8E1EE | #C7D3E3 |
+| id                     | name             | slug                | primary/brand | highlight | brand-accent |
+| ---------------------- | ---------------- | ------------------- | ------------- | --------- | ------------ |
+| `karol-vinho`          | Nude e vinho     | karol-pacheco       | #6E1F2E       | #B08D57   | #E8D3C3      |
+| `karol-preto-ouro`     | Preto e dourado  | karol-pacheco       | #1F1B1A       | #B8925A   | #ECE3D6      |
+| `karol-rose`           | Rosé terroso     | karol-pacheco       | #A4553F       | #D9A38F   | #F5DED5      |
+| `sirlei-salvia`        | Sálvia           | sirlei-massoterapia | #4F6F5A       | #A9BFA8   | #E3EBE4      |
+| `sirlei-argila`        | Argila           | sirlei-massoterapia | #8A5A44       | #C9A88E   | #EFE3D6      |
+| `sirlei-grafite`       | Grafite e cobre  | sirlei-massoterapia | #2E2E33       | #B87348   | #E7E3DE      |
+| `karina-marinho-coral` | Marinho e coral  | karina-manicure     | #22315A       | #D9503E   | #E6E9F2      |
+| `karina-rosa`          | Rosa esmalte     | karina-manicure     | #B2295B       | #E98AAE   | #F9DCE6      |
+| `karina-ameixa`        | Ameixa e dourado | karina-manicure     | #5B3A7A       | #C9A84E   | #ECE3F6      |
+| `painel`               | Painel (neutra)  | —                   | #3E4C63       | #D8E1EE   | #C7D3E3      |
 
 Order in `CLINIC_BRANDING` (first = initial): karol `[karol-vinho, karol-preto-ouro, karol-rose]`, displayName "Karol Pacheco", area "Estética"; sirlei `[sirlei-salvia, sirlei-argila, sirlei-grafite]`, "Sirlei", "Massoterapia"; karina `[karina-rosa, karina-marinho-coral, karina-ameixa]`, "Karina", "Manicure"; grais `[grais]`, null, null.
 
@@ -80,6 +82,7 @@ Order in `CLINIC_BRANDING` (first = initial): karol `[karol-vinho, karol-preto-o
 ### Task 2: Clinic branding data and module
 
 **Files:**
+
 - Modify: `src/db/schema/clinic.ts` (clinics: `displayName: text("display_name")`, `areaLabel: text("area_label")`, `ownerPhotoMediaId: uuid("owner_photo_media_id")` → `media.id` on delete set null; checks `char_length between 1 and 40` when not null; `ClinicTheme` gains `paletteId?: string`)
 - Create: migration `drizzle/0010_clinic_branding.sql` via `corepack pnpm exec drizzle-kit generate --name clinic_branding` (pure column adds, no prompt)
 - Create: `src/modules/branding/branding.ts`
@@ -87,6 +90,7 @@ Order in `CLINIC_BRANDING` (first = initial): karol `[karol-vinho, karol-preto-o
 - Test: `tests/integration/branding.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 1 `resolvePalette`, `palettesForClinic`, `CLINIC_BRANDING`.
 - Produces:
   - `type ClinicBranding = { clinicId: string; slug: string; name: string; displayName: string; areaLabel: string | null; palette: Palette; offered: Palette[]; usesBrandImages: boolean; ownerPhotoMediaId: string | null }` (`usesBrandImages` = slug `grais`; `displayName` falls back to `name`)
@@ -109,12 +113,14 @@ Order in `CLINIC_BRANDING` (first = initial): karol `[karol-vinho, karol-preto-o
 ### Task 3: Owner photo
 
 **Files:**
+
 - Modify: `package.json` (`sharp` `^0.35.5`, already in the lockfile through Next)
 - Create: `src/modules/branding/photo.ts`
 - Create: `src/app/admin/(painel)/foto/[id]/route.ts`
 - Test: `tests/integration/owner-photo.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `saveOwnerPhoto(clinicId: string, input: { bytes: Buffer; mimeType: string }, actorUserId: string): Promise<{ ok: true; mediaId: string } | { ok: false; formError: string }>` — refuses mime outside jpeg/png/webp and > 2 MB input; `sharp(bytes).rotate().resize(800, 800, { fit: "inside", withoutEnlargement: true }).webp({ quality: 85 })` (output has no metadata by default); stores `media` row `kind: "photo"`, `clinicId`, `mimeType: "image/webp"`, dimensions from output; sets `clinics.owner_photo_media_id`; deletes the previous photo row; audit `clinic.owner_photo_changed`.
   - `removeOwnerPhoto(clinicId: string, actorUserId: string): Promise<{ ok: true }>`
@@ -132,6 +138,7 @@ Order in `CLINIC_BRANDING` (first = initial): karol `[karol-vinho, karol-preto-o
 ### Task 4: Apply the identity in the panel
 
 **Files:**
+
 - Modify: `src/app/layout.tsx` (import `@fontsource-variable/fraunces`), `src/app/globals.css` (add `--font-wordmark: "Fraunces Variable", Georgia, serif` in `@theme inline`), `package.json` (`@fontsource-variable/fraunces`)
 - Create: `src/components/clinic-wordmark.tsx` — `ClinicWordmark({ displayName, areaLabel }: { displayName: string; areaLabel: string | null })`: monogram circle (`bg-brand-accent text-brand-accent-foreground`, `initialsFor`) + name in `font-wordmark` + area in small spaced uppercase, as in the proposal.
 - Create: `src/components/palette-style.tsx` — `PaletteStyle({ palette }: { palette: Palette })` renders `<style>{paletteCss(palette)}</style>`.
@@ -141,6 +148,7 @@ Order in `CLINIC_BRANDING` (first = initial): karol `[karol-vinho, karol-preto-o
 - Test: `e2e/branding.spec.ts`; update `e2e/admin-auth.spec.ts` / `e2e/site.spec.ts` only where they assert the Grais logo on the sign-in screen.
 
 **Interfaces:**
+
 - Consumes: Task 1 `paletteCss`, `PALETTES`, `initialsFor`; Task 2 `getClinicBranding`; Task 3 photo route.
 - [ ] **Step 1: Failing e2e** `e2e/branding.spec.ts` (serial, signs in with `TEST_ROOT`, creates `karina-manicure` and `sirlei-massoterapia` through `/admin/clinicas` and deletes them in `afterAll` like `e2e/clinics.spec.ts`):
   - `"the sign-in screen is neutral"`: `/admin/entrar` has no `img[alt="Grais Saúde Integrativa"]`; computed `--brand` on `html` is `#3e4c63`.
@@ -155,11 +163,13 @@ Order in `CLINIC_BRANDING` (first = initial): karol `[karol-vinho, karol-preto-o
 ### Task 5: "Aparência" page
 
 **Files:**
+
 - Create: `src/app/admin/(painel)/aparencia/page.tsx`, `actions.ts`, `palette-picker.tsx` (client), `photo-form.tsx` (client), `branding-text-form.tsx` (client)
 - Modify: `src/app/admin/(painel)/layout.tsx` + `panel-nav.tsx` (menu item "Aparência", icon `brush`, after "Financeiro")
 - Test: extend `e2e/branding.spec.ts`
 
 **Interfaces:**
+
 - Consumes: Task 2 `setClinicPalette`, `updateBrandingText`, `brandingTextSchema`, `getClinicBranding`; Task 3 `saveOwnerPhoto`, `removeOwnerPhoto`.
 - Produces: actions `choosePaletteAction(paletteId: string)`, `saveBrandingTextAction(input)`, `uploadOwnerPhotoAction(formData: FormData)` (field `foto`), `removeOwnerPhotoAction()`; all `requireAdmin()` first, return `{ ok, formError?, fieldErrors? }`, `revalidatePath("/admin", "layout")` on success.
 - Page: palette cards (each with a mini sidebar + "Agendar horário" phone preview using the palette's light values inline, the current one marked `aria-pressed="true"`); Grais shows "Marca própria" text instead of cards and hides the name/area form; photo section with preview (`/admin/foto/{id}`), upload (`accept="image/jpeg,image/png,image/webp"`) and "Remover foto".

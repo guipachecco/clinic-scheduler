@@ -5,6 +5,7 @@
 **Goal:** Clients of each clinic sign up, sign in, reset their password by e-mail and book a free slot that lands confirmed in the owner's agenda. PostgreSQL itself (separate login roles and row-level security) keeps every clinic, and every client, inside their own rows.
 
 **Architecture:**
+
 - **Login roles:** migration 0011 creates four NOLOGIN roles (`app_auth`, `app_panel`, `app_client`, `app_platform`), with grants and RLS policies keyed on `current_setting('app.clinic_id', true)` / `app.patient_id` / `app.user_id`. `runMigrations` then turns each role into a LOGIN role with the password from its `DATABASE_URL_*`.
 - **Scoped access:** `src/db/client.ts` exposes one pool per role plus `inClinic(clinicId, fn)` and `asClient(ctx, fn)`. Each opens a transaction and sets the settings with `set_config(..., true)`. Every panel module moves from the owner `db` to `inClinic`.
 - **Client data paths:** clients never read other people's rows; the slug lookup, client signup and busy intervals go through `SECURITY DEFINER` functions.
@@ -60,10 +61,12 @@
 ### Task 1: Database roles, grants and panel RLS
 
 **Files:**
+
 - Create: `drizzle/0011_db_roles.sql` (hand-written; add to `drizzle/meta/_journal.json` like 0007), `tests/integration/db-roles.test.ts`, `tests/helpers/roles.ts`
 - Modify: `src/db/migrate.ts`, `src/lib/env.ts`, `.env.example`, `docker-compose.yml` (comment only), `vitest.config.ts`, `playwright.config.ts`, `src/db/client.ts`
 
 **Interfaces:**
+
 - Produces:
   - `src/db/client.ts`: `db` (owner pool, unchanged), `authDb`, `panelDb`, `clientDb`, `platformDb` (Drizzle instances over separate pools);
   - `inClinic<T>(clinicId: string, fn: (tx: Tx) => Promise<T>): Promise<T>`;
@@ -72,6 +75,7 @@
 - `runMigrations(ownerUrl, roleUrls?: Record<RoleName, string>)`: after migrating, `ALTER ROLE <name> LOGIN PASSWORD <from URL>` for each given URL. The URL's user must equal the role name, otherwise it throws "DATABASE_URL_PANEL deve usar o usuário app_panel".
 
 Steps:
+
 - [ ] **Step 1: Write `tests/integration/db-roles.test.ts`:**
   - `"no app role owns a table or bypasses RLS"`: from `pg_class`/`pg_roles`, no table owned by the 4 roles; `rolbypassrls` false for all.
   - `"every clinic table has RLS and a panel policy"`: every `public` table with a `clinic_id` column has `relrowsecurity` and at least one `pg_policies` row with `app_panel` in `roles`.
@@ -98,10 +102,12 @@ Steps:
 ### Task 2: Panel, auth and platform run on their own roles
 
 **Files:**
-- Modify: every file under `src/modules/**` that imports `db` (appointments, patients, schedule, services, finance/*, branding/*, clinics, auth/admin-accounts), `src/lib/auth.ts` (adapter → `authDb`), `src/modules/auth/session.ts`, `scripts/admin.ts`
+
+- Modify: every file under `src/modules/**` that imports `db` (appointments, patients, schedule, services, finance/_, branding/_, clinics, auth/admin-accounts), `src/lib/auth.ts` (adapter → `authDb`), `src/modules/auth/session.ts`, `scripts/admin.ts`
 - Test: `tests/integration/clinic-isolation.test.ts` (extend), the existing integration suites
 
 **Interfaces:**
+
 - Consumes: Task 1 `inClinic`, `panelDb`, `platformDb`, `authDb`.
 - Produces:
   - every clinic-module function keeps its signature (`clinicId` first), and its body runs in `inClinic(clinicId, tx => …)`;
@@ -110,6 +116,7 @@ Steps:
   - `admin-accounts.ts` uses `platformDb`.
 
 Steps:
+
 - [ ] **Step 1: Extend `clinic-isolation.test.ts`:**
   - `"module calls run as app_panel"`: inside a patched module call, `select current_user` → `app_panel`. Expose `currentDbUser(clinicId)` from `src/db/client.ts` for this.
   - `"a module cannot read another clinic even with a forged id filter"`: build a raw query in `inClinic(A)` with `where clinic_id = B` → `[]`.
@@ -122,6 +129,7 @@ Steps:
 ### Task 3: Client accounts, e-mail and Better Auth flows
 
 **Files:**
+
 - Create: `drizzle/0012_client_accounts.sql` (via `db:generate` + hand edits), `src/modules/email/send.ts`, `src/modules/email/templates.ts`, `src/modules/email/send.test.ts`, `src/modules/clients/accounts.ts`, `tests/integration/client-accounts.test.ts`
 - Modify: `src/db/schema/auth.ts` (`userRole` + check), `src/db/schema/clinic.ts`:
   - `patients.userId` uuid null → `users.id` on delete set null;
@@ -131,6 +139,7 @@ Steps:
 - Also modify: `src/lib/auth.ts`, `src/lib/env.ts`, `.env.example`, `.gitignore` (`.emails/`), `src/modules/clinics/fields.ts` (reserved slugs)
 
 **Interfaces:**
+
 - Produces:
   - `sendEmail(msg: { to: string; subject: string; html: string; text: string }): Promise<void>`;
   - `readOutbox(dir?: string): Promise<Array<{ to: string; subject: string; text: string; html: string; sentAt: string }>>` (tests and e2e);
@@ -144,6 +153,7 @@ Steps:
 - **Signup rate limit:** the signup Server Action (Task 6) calls `createClientAccount`, which is not a Better Auth path. It is rate-limited by IP: 5 per 10 minutes. The limit lives in a `rateLimits` row keyed `signup:<ip>` through `platformDb`; when it is hit, the action returns "Muitas tentativas. Tente de novo em alguns minutos". Test in `client-accounts.test.ts`: `"sixth signup from one IP is refused"`.
 
 Steps:
+
 - [ ] **Step 1: Write the tests:**
   - **`send.test.ts`:** without `RESEND_API_KEY` the message lands in a temp `EMAIL_OUTBOX_DIR`; with `NODE_ENV=production` and no key, env parsing fails with `RESEND_API_KEY`.
   - **`client-accounts.test.ts`:**
@@ -161,10 +171,12 @@ Steps:
 ### Task 4: Client RLS and definer functions
 
 **Files:**
+
 - Create: `drizzle/0013_client_access.sql` (hand-written), `src/modules/clients/context.ts`, `tests/integration/client-access.test.ts`
 - Modify: `src/db/client.ts` (add `asClient`)
 
 **Interfaces:**
+
 - Produces, all definer functions are `SECURITY DEFINER`, `set search_path = public`, with `EXECUTE` granted only to `app_client`:
   - **SQL `client_context(p_slug text, p_user uuid)`** returns `(clinic_id uuid, patient_id uuid, pending boolean)`. It returns the active clinic for the slug and that user's patient row in it (`patient_id` null if none).
   - **SQL `register_client_patient(p_clinic uuid, p_user uuid, p_name text, p_phone text, p_email text)`** returns `uuid`:
@@ -186,6 +198,7 @@ Steps:
   - nothing else.
 
 Steps:
+
 - [ ] **Step 1: Write `client-access.test.ts`.** Set up two clients in one clinic and one in another.
   - `"client reads only her own patient row"`;
   - `"client reads only her own appointments"`;
@@ -202,9 +215,11 @@ Steps:
 ### Task 5: Free slots and online booking
 
 **Files:**
+
 - Create: `src/modules/booking/slots.ts`, `src/modules/booking/slots.test.ts`, `src/modules/booking/booking.ts`, `tests/integration/booking.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 4 `asClient`, the definer functions, `lockAgenda` and the `appointments_no_overlap` constraint.
 - Produces:
   - **`freeSlots(input)`** returns `string[]` (slot start ISO, in the clinic zone). Input: `{ date: string /* yyyy-mm-dd */; zone: string; hours: DayHours[]; busy: Array<{ startsAt: Date; endsAt: Date }>; durationMinutes: number; bufferBeforeMinutes: number; bufferAfterMinutes: number; stepMinutes: number; now: Date; minAdvanceMinutes: number; maxAdvanceDays: number }`. Pure.
@@ -220,6 +235,7 @@ Steps:
   - `ctx` = `{ clinicId, patientId, userId, emailVerified }`.
 
 Steps:
+
 - [ ] **Step 1: Write `slots.test.ts`:**
   - `"slots step through business hours"`: 09:00–12:00, 60-min service, step 30 → `09:00 … 11:00` (5 slots).
   - `"busy interval and buffers remove slots"`: busy 10:00–11:00, buffer after 15 → 09:00 is free; 09:30 and 10:00 are gone; 11:00 is free only if the buffer before is 0.
@@ -241,6 +257,7 @@ Steps:
 ### Task 6: Client pages
 
 **Files:**
+
 - Create under `src/app/[slug]/`:
   - `layout.tsx` (Zemana header + clinic name, `notFound()` for unknown slug or reserved name);
   - `page.tsx` (entry: Marcar / Entrar / Criar conta; "Agendamento online indisponível" + contacts when the clinic is off);
@@ -250,6 +267,7 @@ Steps:
 - Create: `src/modules/clients/session.ts`, `e2e/client-area.spec.ts`; Modify: `e2e/helpers.ts` (outbox reader), `e2e/global-setup.ts`
 
 **Interfaces:**
+
 - Consumes: Tasks 3–5.
 - Produces: `requireClient(slug)` returns `{ ctx, clinic, user }`:
   - without a session → redirect to `/<slug>/entrar?next=…`;
@@ -257,6 +275,7 @@ Steps:
   - with no patient row in this clinic → redirect to `/<slug>/cadastro?completar=1`, which asks for name and phone only and calls `registerClientPatient`.
 
 Steps:
+
 - [ ] **Step 1: Write `e2e/client-area.spec.ts`** (serial; the setup enables online booking and business hours for a test clinic):
   - `"sign up, confirm e-mail, book a slot that shows in the owner's agenda"`;
   - `"unconfirmed client sees Confirme seu e-mail and cannot book"`;
@@ -272,6 +291,7 @@ Steps:
 ### Task 7: Owner side and docs
 
 **Files:**
+
 - Create: `src/modules/patients/links.ts`, `tests/integration/patient-links.test.ts`, `e2e/patient-links.spec.ts`
 - Modify:
   - `src/app/admin/(painel)/page.tsx` (pending-link notices);
@@ -281,6 +301,7 @@ Steps:
   - `docs/multiclinica.md`, `docs/decisoes-tecnicas.md`, README (env vars, roles, Resend, publishing steps for roles on Neon), `.env.example`.
 
 **Interfaces:**
+
 - Produces:
   - **`listPendingLinks(clinicId)`** returns `Promise<Array<{ provisionalId; provisionalName; existingId; existingName; existingHasAccount: boolean; createdAt }>>`.
   - **`confirmLink(clinicId, provisionalId)`** returns `Promise<{ ok: true } | { ok: false; reason: "existing_has_account" }>`. In one `inClinic` transaction it:
@@ -290,6 +311,7 @@ Steps:
   - **`rejectLink(clinicId, provisionalId)`** returns `Promise<{ ok: true } | { ok: false; reason: "same_name_and_phone" }>`. It clears `pending_link_patient_id`, and returns the error when the unique index would clash (the UI asks the owner to adjust the name first).
 
 Steps:
+
 - [ ] **Step 1: Write `patient-links.test.ts`:**
   - `"confirm merges appointments and links the account"` (afterwards the client sees the old appointments through `listMyAppointments`);
   - `"reject keeps both records"`;
