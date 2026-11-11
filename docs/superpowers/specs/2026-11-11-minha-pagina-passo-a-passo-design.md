@@ -91,7 +91,7 @@ Colunas novas em `clinics`:
   `primaryColor` (`#rrggbb`), `buttonShape` (`pill` | `rounded` | `square`),
   `buttonFill` (`solid` | `outline`), `fontId`. `paletteId` fica ignorado
   como hoje.
-- `media_kind` ganha `cover`. (Fotos da galeria continuam `photo`.)
+- `media_kind` não muda: capa e galeria usam `photo`, logo usa `logo`.
 
 Permissões (padrão das migrações 0011/0017/0020):
 
