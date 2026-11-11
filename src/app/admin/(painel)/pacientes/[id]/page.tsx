@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { requireAdmin } from "@/modules/auth/session";
 import {
@@ -47,7 +48,7 @@ export default async function PatientPage({
     }).format(patient.anonymizedAt);
     return (
       <div className="grid max-w-3xl gap-6">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
           {patient.name}
         </h1>
         <p
@@ -88,15 +89,26 @@ export default async function PatientPage({
 
   return (
     <div className="grid max-w-3xl gap-8">
-      <header className="grid gap-2">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
-          {patient.name}
-        </h1>
-        {patient.nickname ? (
-          <p className="text-muted-foreground">Apelido: {patient.nickname}</p>
-        ) : null}
+      <header className="grid gap-3">
+        <div className="flex items-center gap-4">
+          <Avatar
+            name={patient.name}
+            seed={patient.id}
+            className="size-14 text-lg"
+          />
+          <div className="grid min-w-0 gap-0.5">
+            <h1 className="font-heading text-2xl font-bold tracking-tight break-words md:text-3xl">
+              {patient.name}
+            </h1>
+            {patient.nickname ? (
+              <p className="text-muted-foreground">
+                Apelido: {patient.nickname}
+              </p>
+            ) : null}
+          </div>
+        </div>
         {patient.birthDate ? (
-          <p className="flex flex-wrap items-center gap-2">
+          <p className="flex flex-wrap items-center gap-2 text-muted-foreground">
             <span>
               {ageOn(patient.birthDate, today)} anos (
               {formatDate(patient.birthDate)})
@@ -125,8 +137,11 @@ export default async function PatientPage({
         />
       ))}
 
-      <section aria-labelledby="dados" className="grid gap-4">
-        <h2 id="dados" className="font-heading text-lg font-semibold">
+      <section
+        aria-labelledby="dados"
+        className="grid gap-4 rounded-2xl border bg-card p-4 md:p-6"
+      >
+        <h2 id="dados" className="font-heading text-lg font-bold">
           Dados do cadastro
         </h2>
         <PatientForm mode="edit" id={patient.id} defaults={defaults} />
@@ -137,7 +152,7 @@ export default async function PatientPage({
       <PatientFinance patientId={patient.id} canQuote />
       <PatientLoyalty patientId={patient.id} />
 
-      <details className="rounded-2xl border p-4 md:p-6">
+      <details className="rounded-2xl border border-dashed p-4 md:p-6">
         <summary className="flex h-11 cursor-pointer items-center rounded-md text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
           Anonimizar paciente (LGPD)
         </summary>

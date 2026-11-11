@@ -42,7 +42,7 @@ export default async function ExpensesPage({
         aria-labelledby="nova-despesa"
         className="grid gap-3 rounded-2xl border bg-card p-4"
       >
-        <h2 id="nova-despesa" className="font-heading text-lg font-semibold">
+        <h2 id="nova-despesa" className="font-heading text-lg font-bold">
           Nova despesa
         </h2>
         <ExpenseForm categories={categories} methods={methods} today={today} />
@@ -73,7 +73,7 @@ export default async function ExpensesPage({
           {expenses.map((e) => (
             <li
               key={e.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-3"
             >
               <span
                 className={

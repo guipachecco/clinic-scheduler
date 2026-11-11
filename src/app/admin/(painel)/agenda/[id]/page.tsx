@@ -91,7 +91,7 @@ export default async function AppointmentPage({
     <div className="grid max-w-3xl gap-8">
       <header className="grid gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-2xl font-semibold tracking-tight">
+          <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
             Atendimento
           </h1>
           <StatusBadge status={appointment.status} />
@@ -131,7 +131,7 @@ export default async function AppointmentPage({
           aria-labelledby="pagamento"
           className="grid gap-3 rounded-2xl border bg-card p-4"
         >
-          <h2 id="pagamento" className="font-heading text-lg font-semibold">
+          <h2 id="pagamento" className="font-heading text-lg font-bold">
             Pagamento da sessão
           </h2>
           <p>
@@ -160,7 +160,7 @@ export default async function AppointmentPage({
           aria-labelledby="pagamento"
           className="grid gap-3 rounded-2xl border bg-card p-4"
         >
-          <h2 id="pagamento" className="font-heading text-lg font-semibold">
+          <h2 id="pagamento" className="font-heading text-lg font-bold">
             Pagamento
           </h2>
           <p>
@@ -175,7 +175,7 @@ export default async function AppointmentPage({
           aria-labelledby="pagamento"
           className="grid gap-3 rounded-2xl border bg-card p-4"
         >
-          <h2 id="pagamento" className="font-heading text-lg font-semibold">
+          <h2 id="pagamento" className="font-heading text-lg font-bold">
             Pagamento
           </h2>
           <p className="text-sm text-muted-foreground">
@@ -191,7 +191,7 @@ export default async function AppointmentPage({
       ) : null}
 
       <section aria-labelledby="status" className="grid gap-4">
-        <h2 id="status" className="font-heading text-lg font-semibold">
+        <h2 id="status" className="font-heading text-lg font-bold">
           Status
         </h2>
         <StatusActions
@@ -202,7 +202,7 @@ export default async function AppointmentPage({
 
       {appointment.editable ? (
         <section aria-labelledby="alterar" className="grid gap-4">
-          <h2 id="alterar" className="font-heading text-lg font-semibold">
+          <h2 id="alterar" className="font-heading text-lg font-bold">
             Alterar agendamento
           </h2>
           <AppointmentForm

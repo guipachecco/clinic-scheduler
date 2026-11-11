@@ -48,7 +48,7 @@ export default async function ServicePage({
 
   return (
     <div className="grid max-w-3xl gap-6">
-      <h1 className="font-heading text-2xl font-semibold tracking-tight">
+      <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
         {service.name}
       </h1>
       {service.isFlexible ? (

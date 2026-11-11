@@ -4,12 +4,12 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useState } from "react";
 
+import { Avatar } from "@/components/avatar";
 import { FormError } from "@/components/form-message";
 import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import {
   ageOn,
   formatStoredPhone,
@@ -24,26 +24,6 @@ import { searchPatientsAction } from "./actions";
 import { formatDate } from "./format";
 
 type Props = { initialItems: PatientListItem[]; initialNext?: PatientCursor };
-
-const AVATAR_TONES = [
-  "bg-brand-accent text-brand-accent-foreground",
-  "bg-primary text-primary-foreground",
-  "bg-highlight text-highlight-foreground",
-];
-
-// Same color for the same patient on every visit.
-function avatarTone(id: string) {
-  let sum = 0;
-  for (const char of id) sum += char.charCodeAt(0);
-  return AVATAR_TONES[sum % AVATAR_TONES.length];
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return (first + last).toUpperCase();
-}
 
 // The term travels in a Server Action POST body, never in the URL.
 export function PatientSearch({ initialItems, initialNext }: Props) {
@@ -176,17 +156,11 @@ export function PatientSearch({ initialItems, initialNext }: Props) {
                 href={`/admin/pacientes/${patient.id}` as Route}
                 className="flex min-h-16 items-center gap-3 rounded-2xl border bg-card px-4 py-3 outline-none hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
               >
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "inline-flex size-10 shrink-0 items-center justify-center rounded-full font-heading text-sm font-extrabold",
-                    patient.anonymizedAt
-                      ? "bg-muted text-muted-foreground"
-                      : avatarTone(patient.id),
-                  )}
-                >
-                  {initials(patient.name)}
-                </span>
+                <Avatar
+                  name={patient.name}
+                  seed={patient.id}
+                  muted={Boolean(patient.anonymizedAt)}
+                />
                 <span className="grid min-w-0 flex-1 gap-0.5">
                   <span className="font-heading font-semibold break-words">
                     {patient.name}

@@ -91,7 +91,7 @@ export default async function FinancePage() {
 
       <section aria-labelledby="proximas" className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="proximas" className="font-heading text-lg font-semibold">
+          <h2 id="proximas" className="font-heading text-lg font-bold">
             Próximas parcelas
           </h2>
           <Link
@@ -109,7 +109,7 @@ export default async function FinancePage() {
               <li key={r.installmentId}>
                 <Link
                   href={`/admin/financeiro/vendas/${r.saleId}` as Route}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3 hover:bg-muted/50"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-3 hover:bg-muted/50"
                 >
                   <span className="min-w-0 break-words">
                     <span className="font-medium">{r.patientName}</span>{" "}

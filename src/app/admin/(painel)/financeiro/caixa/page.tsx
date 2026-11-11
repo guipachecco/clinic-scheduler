@@ -105,7 +105,7 @@ export default async function CashPage({
           {entries.map((e) => (
             <li
               key={`${e.kind}-${e.id}`}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3"
+              className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-3"
             >
               <span className="min-w-0 break-words">
                 <span className="tabular-nums">{formatDay(e.date)}</span> ·{" "}

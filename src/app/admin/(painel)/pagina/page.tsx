@@ -20,7 +20,7 @@ export default async function ClinicPageSettingsPage() {
   return (
     <div className="grid max-w-3xl gap-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
           Minha página
         </h1>
         <div className="flex flex-wrap gap-2">
@@ -34,7 +34,7 @@ export default async function ClinicPageSettingsPage() {
       </header>
 
       <section aria-labelledby="dados" className="grid gap-4">
-        <h2 id="dados" className="font-heading text-lg font-semibold">
+        <h2 id="dados" className="font-heading text-lg font-bold">
           Dados da página
         </h2>
         <PageForm
@@ -53,7 +53,7 @@ export default async function ClinicPageSettingsPage() {
       </section>
 
       <section aria-labelledby="fidelidade" className="grid gap-4">
-        <h2 id="fidelidade" className="font-heading text-lg font-semibold">
+        <h2 id="fidelidade" className="font-heading text-lg font-bold">
           Cartão fidelidade
         </h2>
         <p className="text-sm text-muted-foreground">

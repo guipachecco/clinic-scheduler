@@ -126,7 +126,7 @@ export default async function SalePage({
       </div>
 
       <section aria-labelledby="sessoes" className="grid gap-3">
-        <h2 id="sessoes" className="font-heading text-lg font-semibold">
+        <h2 id="sessoes" className="font-heading text-lg font-bold">
           Serviços e sessões
         </h2>
         <ul className="grid gap-3">
@@ -185,7 +185,7 @@ export default async function SalePage({
       </section>
 
       <section aria-labelledby="parcelas" className="grid gap-3">
-        <h2 id="parcelas" className="font-heading text-lg font-semibold">
+        <h2 id="parcelas" className="font-heading text-lg font-bold">
           Parcelas
         </h2>
         {conflicts.length > 0 ? (
@@ -213,7 +213,7 @@ export default async function SalePage({
             {sale.installments.map((part) => (
               <li
                 key={part.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3"
               >
                 <span className="min-w-0">
                   <span className="font-medium">Parcela {part.number}</span>{" "}
@@ -267,7 +267,7 @@ export default async function SalePage({
       </section>
 
       <section aria-labelledby="pagamentos" className="grid gap-3">
-        <h2 id="pagamentos" className="font-heading text-lg font-semibold">
+        <h2 id="pagamentos" className="font-heading text-lg font-bold">
           Pagamentos
         </h2>
         {sale.payments.length === 0 ? (
@@ -277,7 +277,7 @@ export default async function SalePage({
             {sale.payments.map((p) => (
               <li
                 key={p.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3"
               >
                 <span
                   className={
@@ -316,7 +316,7 @@ export default async function SalePage({
 
       {active ? (
         <section aria-labelledby="alterar" className="grid gap-3">
-          <h2 id="alterar" className="font-heading text-lg font-semibold">
+          <h2 id="alterar" className="font-heading text-lg font-bold">
             Alterar a venda
           </h2>
           <div className="rounded-2xl border bg-card p-4">
@@ -346,12 +346,15 @@ export default async function SalePage({
 
       {sale.revisions.length > 0 ? (
         <section aria-labelledby="historico" className="grid gap-3">
-          <h2 id="historico" className="font-heading text-lg font-semibold">
+          <h2 id="historico" className="font-heading text-lg font-bold">
             Alterações
           </h2>
           <ol className="grid gap-2">
             {sale.revisions.map((r) => (
-              <li key={r.id} className="rounded-xl border bg-card p-3 text-sm">
+              <li
+                key={r.id}
+                className="rounded-2xl border bg-card px-4 py-3 text-sm"
+              >
                 <p className="font-medium">
                   {formatLocal(r.createdAt, "dd/MM HH:mm")} · {r.reason}
                 </p>

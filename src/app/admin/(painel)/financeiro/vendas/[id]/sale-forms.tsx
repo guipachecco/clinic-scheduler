@@ -380,7 +380,7 @@ export function ScheduleForm({
               return (
                 <li
                   key={slot.key}
-                  className="grid gap-1 rounded-xl border bg-card p-3"
+                  className="grid gap-1 rounded-2xl border bg-card px-4 py-3"
                 >
                   <div className="flex flex-wrap items-end gap-3">
                     <span className="w-20 text-sm font-medium">

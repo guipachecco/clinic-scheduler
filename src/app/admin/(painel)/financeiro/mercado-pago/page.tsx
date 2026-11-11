@@ -69,7 +69,7 @@ export default async function MercadoPagoPage({
           role="status"
           className={
             result.tone === "ok"
-              ? "rounded-xl border bg-card p-3 font-medium"
+              ? "rounded-2xl border bg-card px-4 py-3 font-medium"
               : "rounded-xl border border-destructive/40 bg-card p-3 font-medium text-destructive"
           }
         >

@@ -17,7 +17,7 @@ export default async function ClinicsPage() {
   return (
     <div className="grid gap-8">
       <div className="grid gap-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
           Clínicas
         </h1>
         <p className="text-muted-foreground">

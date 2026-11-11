@@ -11,7 +11,7 @@ export async function PatientLoyalty({ patientId }: { patientId: string }) {
 
   return (
     <section aria-labelledby="fidelidade" className="grid gap-3">
-      <h2 id="fidelidade" className="font-heading text-lg font-semibold">
+      <h2 id="fidelidade" className="font-heading text-lg font-bold">
         Cartão fidelidade
       </h2>
       <p>
