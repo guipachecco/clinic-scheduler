@@ -37,6 +37,11 @@ export function ModulesFieldset({
             }
           />
           {CLINIC_MODULE_LABELS[key]}
+          {key === "anamnesis" && (
+            <span className="text-xs font-normal text-muted-foreground">
+              Só aparece quando a clínica tem um modelo de anamnese.
+            </span>
+          )}
         </label>
       ))}
     </fieldset>

@@ -266,6 +266,7 @@ export async function updateClinic(
   return platformDb.transaction(async (tx): Promise<ClinicResult> => {
     const [current] = await tx
       .select({
+        name: clinics.name,
         businessType: clinics.businessType,
         modules: clinics.modules,
       })
@@ -290,6 +291,7 @@ export async function updateClinic(
       entityType: "clinic",
       entityId: id,
       changes: {
+        name: { before: current.name, after: values.name },
         modules: { before: current.modules, after: values.modules },
         businessType: {
           before: current.businessType,

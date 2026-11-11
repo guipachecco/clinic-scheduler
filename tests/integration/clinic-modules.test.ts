@@ -208,8 +208,11 @@ describe("clinic modules (root)", () => {
       .from(auditLogs)
       .where(eq(auditLogs.clinicId, createdId));
     const log = logs.find((l) => l.action === "clinic.updated");
-    expect(log).toBeDefined();
-    expect(JSON.stringify(log)).toContain("nail_salon");
+    expect(log?.changes).toMatchObject({
+      name: { before: expect.any(String), after: "Clínica Módulos 2" },
+      businessType: { before: "nail_salon", after: "clinic" },
+      modules: { before: ["finance"], after: [] },
+    });
   });
 
   it("updateClinic reports a missing clinic", async () => {
