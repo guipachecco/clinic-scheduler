@@ -30,7 +30,8 @@ export type SaveResult =
     };
 
 export type StatusResult =
-  { ok: true; updatedAt: string } | { ok: false; reason: "session" | "error" };
+  | { ok: true; updatedAt: string }
+  | { ok: false; reason: "session" | "conflict" | "error" };
 
 export type DeleteResult = { ok: false; reason: "session" | "error" };
 
@@ -108,11 +109,13 @@ export async function setStatusAction(
   patientId: string,
   id: string,
   status: "in_progress" | "completed",
+  expectedUpdatedAt: string,
 ): Promise<StatusResult> {
   if (!(await getSession())) return { ok: false, reason: "session" };
   const session = await requireAdmin();
   const parsed = statusSchema.safeParse(status);
-  if (!validIds(patientId, id) || !parsed.success) {
+  const version = z.string().max(40).safeParse(expectedUpdatedAt);
+  if (!validIds(patientId, id) || !parsed.success || !version.success) {
     return { ok: false, reason: "error" };
   }
   try {
@@ -121,9 +124,11 @@ export async function setStatusAction(
       patientId,
       id,
       parsed.data,
+      version.data,
       session.user.id,
     );
-    return result.ok ? result : { ok: false, reason: "error" };
+    if (result.ok) return result;
+    return { ok: false, reason: result.reason ?? "error" };
   } catch {
     return { ok: false, reason: "error" };
   }

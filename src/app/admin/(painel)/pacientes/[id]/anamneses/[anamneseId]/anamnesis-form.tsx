@@ -1,5 +1,7 @@
 "use client";
 
+import type { Route } from "next";
+import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -88,6 +90,7 @@ export function AnamnesisForm({
   const [takenOnError, setTakenOnError] = useState<string | undefined>();
   const [busy, setBusy] = useState(false);
   const [deleting, startDelete] = useTransition();
+  const router = useRouter();
 
   // What the next save sends, read outside React renders.
   const latest = useRef({ answers: initialAnswers, takenOn: initialTakenOn });
@@ -98,7 +101,10 @@ export function AnamnesisForm({
   const savedRevision = useRef(0);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const deleted = useRef(false);
+  // No more saves from this screen: deleted, or left without saving.
+  const closed = useRef(false);
+  // The last save tried before leaving through a link failed.
+  const leaveFailed = useRef(false);
 
   const schema = useMemo(() => answersSchema(template), [template]);
   const pdfUrl = `/admin/pacientes/${patientId}/anamneses/${id}/pdf`;
@@ -117,7 +123,7 @@ export function AnamnesisForm({
       timer.current = null;
     }
     return enqueue(async () => {
-      if (deleted.current) return false;
+      if (closed.current) return false;
       const rev = revision.current;
       if (rev === savedRevision.current) return true;
       const input = { ...latest.current, expectedUpdatedAt: version.current };
@@ -136,6 +142,7 @@ export function AnamnesisForm({
       if (result.ok) {
         version.current = result.updatedAt;
         savedRevision.current = rev;
+        leaveFailed.current = false;
         setSavedAt(new Date());
         setMessage(null);
         setTakenOnError(undefined);
@@ -180,7 +187,7 @@ export function AnamnesisForm({
 
   useEffect(() => {
     const unsaved = () =>
-      !deleted.current && revision.current !== savedRevision.current;
+      !closed.current && revision.current !== savedRevision.current;
     const onVisibility = () => {
       if (document.visibilityState === "hidden" && unsaved()) void save();
     };
@@ -200,12 +207,66 @@ export function AnamnesisForm({
     };
   }, [save]);
 
+  // Links of the panel (Voltar à ficha, the menu) navigate without unloading
+  // the page, so beforeunload does not cover them: with unsaved changes the
+  // click waits for the save and stays on the page when it fails. Clicking
+  // again after a failed save asks before leaving.
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      const link = (event.target as Element | null)?.closest?.("a[href]");
+      if (!(link instanceof HTMLAnchorElement)) return;
+      if (link.target && link.target !== "_self") return;
+      if (link.hasAttribute("download")) return;
+      const url = new URL(link.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      // The section index only jumps within the page.
+      if (
+        url.pathname === window.location.pathname &&
+        url.search === window.location.search &&
+        url.hash
+      ) {
+        return;
+      }
+      if (closed.current || revision.current === savedRevision.current) {
+        return;
+      }
+      event.preventDefault();
+      if (leaveFailed.current) {
+        if (
+          window.confirm(
+            "Sair sem salvar? O que você digitou depois do último salvamento será perdido.",
+          )
+        ) {
+          closed.current = true;
+          router.push((url.pathname + url.search + url.hash) as Route);
+        }
+        return;
+      }
+      void save().then((ok) => {
+        if (ok) router.push((url.pathname + url.search + url.hash) as Route);
+        else leaveFailed.current = true;
+      });
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [router, save]);
+
   const changeStatus = (next: Status) => {
     setBusy(true);
     void enqueue(async () => {
       let result;
       try {
-        result = await setStatusAction(patientId, id, next);
+        result = await setStatusAction(patientId, id, next, version.current);
       } catch {
         result = { ok: false as const, reason: "error" as const };
       }
@@ -215,8 +276,8 @@ export function AnamnesisForm({
         setStatus(next);
       } else {
         setMessage(
-          result.reason === "session"
-            ? MESSAGES.session
+          result.reason === "session" || result.reason === "conflict"
+            ? MESSAGES[result.reason]
             : "Não foi possível mudar a situação. Tente novamente.",
         );
       }
@@ -243,7 +304,7 @@ export function AnamnesisForm({
     }
     startDelete(async () => {
       await enqueue(async () => {
-        deleted.current = true;
+        closed.current = true;
         let result;
         try {
           // Redirects to the patient's record on success.
@@ -252,7 +313,7 @@ export function AnamnesisForm({
           result = { ok: false as const, reason: "error" as const };
         }
         if (result && !result.ok) {
-          deleted.current = false;
+          closed.current = false;
           setMessage(
             result.reason === "session"
               ? MESSAGES.session

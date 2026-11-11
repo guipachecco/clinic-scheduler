@@ -11,6 +11,17 @@ function isProtectedAdminPath(pathname: string) {
   return pathname === "/admin" || pathname.startsWith("/admin/");
 }
 
+// The anamnesis form: /admin/pacientes/<id>/anamneses/<anamneseId>.
+const ANAMNESIS_FORM_PATH = /^\/admin\/pacientes\/[^/]+\/anamneses\/[^/]+$/;
+
+function isAnamnesisFormAction(request: NextRequest) {
+  return (
+    request.method === "POST" &&
+    request.headers.has("next-action") &&
+    ANAMNESIS_FORM_PATH.test(request.nextUrl.pathname)
+  );
+}
+
 export function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const contentSecurityPolicy = buildContentSecurityPolicy({
@@ -22,14 +33,13 @@ export function proxy(request: NextRequest) {
   // Fast path only: it checks that a session cookie exists, not that it is
   // valid. Every panel page and action verifies the session on the server
   // (src/modules/auth/session.ts).
-  // Server Action calls pass through: each action checks the session itself
-  // and answers in a way the page understands (the anamnesis form keeps the
-  // typed text instead of following a redirect it cannot read).
-  const isServerAction =
-    request.method === "POST" && request.headers.has("next-action");
+  // One exception: Server Action calls from the anamnesis form pass through.
+  // Its actions check the session themselves and answer "session expired",
+  // so the form keeps the typed text instead of failing on a redirect it
+  // cannot read. Every other panel action keeps the redirect.
   if (
     isProtectedAdminPath(request.nextUrl.pathname) &&
-    !isServerAction &&
+    !isAnamnesisFormAction(request) &&
     !getSessionCookie(request)
   ) {
     const response = NextResponse.redirect(

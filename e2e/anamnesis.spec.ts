@@ -235,6 +235,49 @@ test.describe("anamnese", () => {
     );
   });
 
+  test("a status change on a stale version shows the conflict", async () => {
+    await page.goto(anamnesisPath);
+    await expect(page.getByLabel("Principais queixas")).toBeVisible();
+    // Another device saves in between.
+    const other = await context.newPage();
+    try {
+      await other.goto(anamnesisPath);
+      await other.getByLabel("Duração dos sintomas").fill("Outro aparelho");
+      await other
+        .getByRole("button", { name: "Salvar", exact: true })
+        .first()
+        .click();
+      await expect(other.getByText(/Salvo às \d{2}:\d{2}/)).toBeVisible({
+        timeout: 10_000,
+      });
+    } finally {
+      await other.close();
+    }
+
+    await page.getByRole("button", { name: "Marcar como concluída" }).click();
+    await expect(conflict()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "Reabrir" })).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByLabel("Duração dos sintomas")).toHaveValue(
+      "Outro aparelho",
+    );
+    await expect(page.getByText("Em andamento", { exact: true })).toBeVisible();
+  });
+
+  test("leaving through Voltar à ficha saves first", async () => {
+    await page.goto(anamnesisPath);
+    await page.getByLabel("Principais queixas").fill("Antes de voltar");
+    // Right away, before the autosave.
+    await page.getByRole("link", { name: "Voltar à ficha" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/admin/pacientes/${PATIENTS.fill.id}$`),
+    );
+    await page.goto(anamnesisPath);
+    await expect(page.getByLabel("Principais queixas")).toHaveValue(
+      "Antes de voltar",
+    );
+  });
+
   test("second anamnesis comes prefilled, diagnosis blank", async () => {
     await openNewAnamnesis(PATIENTS.copy.id);
     await page.getByLabel("Principais queixas").fill("Insônia fictícia");
@@ -308,6 +351,39 @@ test.describe("anamnese", () => {
         "Texto que não se perde",
       );
       expect(new URL(tab.url()).pathname).toBe(anamnesisPath);
+
+      // Leaving through a link would lose the text: the page stays.
+      await tab.getByRole("link", { name: "Voltar à ficha" }).click();
+      // Give the failed save and any navigation time to happen.
+      await tab.waitForTimeout(1_500);
+      await expect(tab.getByText("Sua sessão expirou")).toBeVisible();
+      expect(new URL(tab.url()).pathname).toBe(anamnesisPath);
+      // A second click asks before leaving without saving.
+      let asked = "";
+      tab.once("dialog", (dialog) => {
+        asked = dialog.message();
+        void dialog.dismiss();
+      });
+      await tab.getByRole("link", { name: "Voltar à ficha" }).click();
+      await expect.poll(() => asked).toContain("Sair sem salvar?");
+      expect(new URL(tab.url()).pathname).toBe(anamnesisPath);
+      await expect(tab.getByLabel("Principais queixas")).toHaveValue(
+        "Texto que não se perde",
+      );
+
+      // Only the anamnesis form lets signed-out action calls through; any
+      // other panel action still gets the redirect to the sign-in page.
+      const otherAction = await expired.request.post(
+        `/admin/pacientes/${PATIENTS.fill.id}`,
+        { headers: { "next-action": "0".repeat(42) }, maxRedirects: 0 },
+      );
+      expect(otherAction.status()).toBe(307);
+      expect(otherAction.headers()["location"]).toMatch(/\/admin\/entrar$/);
+      const formAction = await expired.request.post(anamnesisPath, {
+        headers: { "next-action": "0".repeat(42) },
+        maxRedirects: 0,
+      });
+      expect(formAction.status()).not.toBe(307);
     } finally {
       await expired.close();
     }

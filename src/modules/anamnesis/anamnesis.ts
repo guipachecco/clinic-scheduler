@@ -335,13 +335,19 @@ export async function saveAnamnesis(
   });
 }
 
+// Marks an anamnesis completed or in progress. Like saveAnamnesis, it takes
+// the version the person holds: when someone saved in between, nothing is
+// written (conflict), so the next autosave cannot overwrite their answers.
 export async function setAnamnesisStatus(
   clinicId: string,
   patientId: string,
   id: string,
   status: "in_progress" | "completed",
+  expectedUpdatedAt: string,
   actorUserId: string,
-): Promise<{ ok: true; updatedAt: string } | { ok: false }> {
+): Promise<
+  { ok: true; updatedAt: string } | { ok: false; reason?: "conflict" }
+> {
   if (!UUID_PATTERN.test(id)) return { ok: false };
   return inClinic(clinicId, async (tx) => {
     if (!(await patientInScope(tx, clinicId, patientId, true))) {
@@ -353,6 +359,9 @@ export async function setAnamnesisStatus(
       .where(rowOf(clinicId, patientId, id))
       .for("update");
     if (!row) return { ok: false } as const;
+    if (row.updatedAt.toISOString() !== expectedUpdatedAt) {
+      return { ok: false, reason: "conflict" } as const;
+    }
     if (row.status === status) {
       return { ok: true, updatedAt: row.updatedAt.toISOString() } as const;
     }

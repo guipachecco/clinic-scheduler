@@ -65,6 +65,23 @@ async function save(
   );
 }
 
+async function setStatus(
+  id: string,
+  status: "in_progress" | "completed",
+  expected?: string,
+) {
+  const expectedUpdatedAt =
+    expected ?? (await current(id)).updatedAt.toISOString();
+  return setAnamnesisStatus(
+    CLINIC,
+    patientId,
+    id,
+    status,
+    expectedUpdatedAt,
+    actorId,
+  );
+}
+
 async function actions(id: string) {
   const rows = await db
     .select({ action: auditLogs.action })
@@ -224,7 +241,14 @@ describe("anamnesis module", () => {
       await createAnamnesis(other, otherPatientId, actorId, TODAY),
     ).toEqual({ ok: false });
     expect(
-      await setAnamnesisStatus(other, patientId, id, "completed", actorId),
+      await setAnamnesisStatus(
+        other,
+        patientId,
+        id,
+        "completed",
+        (await current(id)).updatedAt.toISOString(),
+        actorId,
+      ),
     ).toEqual({ ok: false });
     expect(await deleteAnamnesis(other, patientId, id, actorId)).toEqual({
       ok: false,
@@ -234,17 +258,35 @@ describe("anamnesis module", () => {
     expect(await getAnamnesis(CLINIC, patientId, "not-a-uuid")).toBeNull();
   });
 
+  it("status change refuses a stale version", async () => {
+    const id = await create();
+    const stale = (await current(id)).updatedAt.toISOString();
+    // Another device saves in between.
+    expect((await save(id, { queixas_principais: "Outro aparelho" })).ok).toBe(
+      true,
+    );
+    const before = await current(id);
+    expect(await setStatus(id, "completed", stale)).toEqual({
+      ok: false,
+      reason: "conflict",
+    });
+    // A status already in place is refused too: adopting the newer version
+    // would let the next autosave overwrite the other device.
+    expect(await setStatus(id, "in_progress", stale)).toEqual({
+      ok: false,
+      reason: "conflict",
+    });
+    const after = await current(id);
+    expect(after.status).toBe("in_progress");
+    expect(after.updatedAt.toISOString()).toBe(before.updatedAt.toISOString());
+    expect(after.answers).toEqual({ queixas_principais: "Outro aparelho" });
+  });
+
   it("status and delete are audited", async () => {
     const id = await create();
-    expect(
-      (await setAnamnesisStatus(CLINIC, patientId, id, "completed", actorId))
-        .ok,
-    ).toBe(true);
+    expect((await setStatus(id, "completed")).ok).toBe(true);
     expect((await current(id)).status).toBe("completed");
-    expect(
-      (await setAnamnesisStatus(CLINIC, patientId, id, "in_progress", actorId))
-        .ok,
-    ).toBe(true);
+    expect((await setStatus(id, "in_progress")).ok).toBe(true);
     await recordPdfGenerated(CLINIC, patientId, id, actorId);
     expect(await deleteAnamnesis(CLINIC, patientId, id, actorId)).toEqual({
       ok: true,
