@@ -33,31 +33,39 @@ const mediaId = z.uuid("Imagem inválida.");
 
 const nullableText = (max: number, label: string) =>
   z
-    .string()
+    .string("Texto inválido.")
     .trim()
     .max(max, `${label} muito longo (máximo de ${max} caracteres).`)
     .transform((value) => value || null)
     .nullable();
 
 const themeShape = {
-  primaryColor: z.string().regex(HEX_COLOR, "Cor inválida.").optional(),
-  buttonShape: z.enum(BUTTON_SHAPES).optional(),
-  buttonFill: z.enum(BUTTON_FILLS).optional(),
+  primaryColor: z
+    .string("Cor inválida.")
+    .regex(HEX_COLOR, "Cor inválida.")
+    .optional(),
+  buttonShape: z.enum(BUTTON_SHAPES, "Formato de botão inválido.").optional(),
+  buttonFill: z
+    .enum(BUTTON_FILLS, "Preenchimento de botão inválido.")
+    .optional(),
   fontId: z
-    .enum(FONTS.map((font) => font.id) as [FontId, ...FontId[]])
+    .enum(
+      FONTS.map((font) => font.id) as [FontId, ...FontId[]],
+      "Fonte inválida.",
+    )
     .optional(),
 };
 
 const draftShape = {
-  businessType: z.enum(BUSINESS_TYPES).optional(),
+  businessType: z.enum(BUSINESS_TYPES, "Tipo de negócio inválido.").optional(),
   logoMediaId: mediaId.nullable().optional(),
   ownerPhotoMediaId: mediaId.nullable().optional(),
   coverMediaId: mediaId.nullable().optional(),
-  theme: z.object(themeShape).optional(),
+  theme: z.object(themeShape, "Estilo inválido.").optional(),
   headline: nullableText(120, "Frase de apresentação").optional(),
   about: nullableText(2000, "Texto sobre o negócio").optional(),
   gallery: z
-    .array(mediaId)
+    .array(mediaId, "Fotos inválidas.")
     .max(
       MAX_CLINIC_PHOTOS,
       `A página pode ter no máximo ${MAX_CLINIC_PHOTOS} fotos.`,
@@ -66,7 +74,7 @@ const draftShape = {
     .optional(),
 };
 
-export const pageDraftSchema = z.object(draftShape);
+export const pageDraftSchema = z.object(draftShape, "Rascunho inválido.");
 
 export type PageDraft = z.infer<typeof pageDraftSchema>;
 

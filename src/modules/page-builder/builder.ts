@@ -79,7 +79,9 @@ async function readClinic(tx: Tx, clinicId: string, lock: boolean) {
     .from(clinics)
     .where(eq(clinics.id, clinicId))
     .limit(1);
-  const [row] = lock ? await query.for("update") : await query;
+  // "no key update" still lets photos.ts insert clinic_photos rows (their
+  // foreign key takes "key share" on this row) while it is held.
+  const [row] = lock ? await query.for("no key update") : await query;
   return row;
 }
 
@@ -178,6 +180,18 @@ function isDraftTooLarge(error: unknown) {
   );
 }
 
+// Turns the draft size check into a form error for the owner.
+async function catchDraftTooLarge<T>(
+  fn: () => Promise<T>,
+): Promise<T | { ok: false; formError: string }> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (isDraftTooLarge(error)) return { ok: false, formError: TOO_LARGE };
+    throw error;
+  }
+}
+
 export type BuilderState = {
   slug: string;
   name: string;
@@ -221,10 +235,13 @@ export async function saveDraftPatch(
 ): Promise<{ ok: true } | { ok: false; formError: string }> {
   const parsed = pageDraftSchema.safeParse(patch);
   if (!parsed.success) {
-    return { ok: false, formError: parsed.error.issues[0]!.message };
+    return {
+      ok: false,
+      formError: parsed.error.issues[0]?.message ?? "Rascunho inválido.",
+    };
   }
-  try {
-    return await inClinic(clinicId, async (tx) => {
+  return catchDraftTooLarge(() =>
+    inClinic(clinicId, async (tx) => {
       const row = await readClinic(tx, clinicId, true);
       if (!row) return { ok: false, formError: "Clínica não encontrada." };
       if (!(await allMediaOfClinic(tx, clinicId, draftMediaIds(parsed.data)))) {
@@ -242,11 +259,8 @@ export async function saveDraftPatch(
         draftMediaIds(next),
       );
       return { ok: true };
-    });
-  } catch (error) {
-    if (isDraftTooLarge(error)) return { ok: false, formError: TOO_LARGE };
-    throw error;
-  }
+    }),
+  );
 }
 
 // Stores an image for one step of the draft. The gallery gets it at the end;
@@ -265,54 +279,56 @@ export async function uploadDraftImage(
   if (!encoded.ok) return encoded;
   const { image } = encoded;
 
-  return inClinic(clinicId, async (tx) => {
-    const row = await readClinic(tx, clinicId, true);
-    if (!row) return { ok: false, formError: "Clínica não encontrada." };
-    const draft = parseDraft(row.pageDraft);
+  return catchDraftTooLarge(() =>
+    inClinic(clinicId, async (tx) => {
+      const row = await readClinic(tx, clinicId, true);
+      if (!row) return { ok: false, formError: "Clínica não encontrada." };
+      const draft = parseDraft(row.pageDraft);
 
-    let gallery: string[] = [];
-    if (config.field === "gallery") {
-      gallery =
-        draft.gallery ??
-        (await readGallery(tx, clinicId)).map((p) => p.mediaId);
-      if (gallery.length >= MAX_CLINIC_PHOTOS) {
-        return {
-          ok: false,
-          formError: `A página pode ter no máximo ${MAX_CLINIC_PHOTOS} fotos.`,
-        };
+      let gallery: string[] = [];
+      if (config.field === "gallery") {
+        gallery =
+          draft.gallery ??
+          (await readGallery(tx, clinicId)).map((p) => p.mediaId);
+        if (gallery.length >= MAX_CLINIC_PHOTOS) {
+          return {
+            ok: false,
+            formError: `A página pode ter no máximo ${MAX_CLINIC_PHOTOS} fotos.`,
+          };
+        }
       }
-    }
 
-    const [created] = await tx
-      .insert(media)
-      .values({
-        clinicId,
-        kind: config.kind,
-        mimeType: "image/webp",
-        data: image.data,
-        byteSize: image.data.length,
-        width: image.width,
-        height: image.height,
-      })
-      .returning({ id: media.id });
-    const mediaId = created!.id;
+      const [created] = await tx
+        .insert(media)
+        .values({
+          clinicId,
+          kind: config.kind,
+          mimeType: "image/webp",
+          data: image.data,
+          byteSize: image.data.length,
+          width: image.width,
+          height: image.height,
+        })
+        .returning({ id: media.id });
+      const mediaId = created!.id;
 
-    if (config.field === "gallery") {
-      await writeDraft(tx, clinicId, {
-        ...draft,
-        gallery: [...gallery, mediaId],
-      });
+      if (config.field === "gallery") {
+        await writeDraft(tx, clinicId, {
+          ...draft,
+          gallery: [...gallery, mediaId],
+        });
+        return { ok: true, mediaId };
+      }
+
+      const previous = draft[config.field];
+      const next: PageDraft = { ...draft, [config.field]: mediaId };
+      await writeDraft(tx, clinicId, next);
+      if (previous) {
+        await deleteUnusedMedia(tx, clinicId, [previous], draftMediaIds(next));
+      }
       return { ok: true, mediaId };
-    }
-
-    const previous = draft[config.field];
-    const next: PageDraft = { ...draft, [config.field]: mediaId };
-    await writeDraft(tx, clinicId, next);
-    if (previous) {
-      await deleteUnusedMedia(tx, clinicId, [previous], draftMediaIds(next));
-    }
-    return { ok: true, mediaId };
-  });
+    }),
+  );
 }
 
 function sameValue(a: unknown, b: unknown) {
@@ -325,11 +341,13 @@ export async function publishDraft(
   actorUserId: string,
 ): Promise<{ ok: true; changed: string[] } | { ok: false; formError: string }> {
   return inClinic(clinicId, async (tx) => {
+    // Photo lock first, then the row: the same order as photos.ts, whose
+    // writes touch the clinic row only after taking the photo lock.
+    await lockPhotos(tx, clinicId);
     const row = await readClinic(tx, clinicId, true);
     if (!row) return { ok: false, formError: "Clínica não encontrada." };
     if (row.pageDraft === null) return { ok: true, changed: [] };
 
-    await lockPhotos(tx, clinicId);
     const photos = await readGallery(tx, clinicId);
     const published = publishedFrom(
       row,

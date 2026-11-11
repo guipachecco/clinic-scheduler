@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, notInArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import sharp from "sharp";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -23,7 +23,10 @@ import { CLINIC, otherClinic } from "../helpers/clinic";
 let slug: string;
 let actor: string;
 let otherMedia: string;
-let originalMedia: string[];
+// Page photos the clinic already had (other test files' data, kept as is).
+let baseGallery: string[];
+// Every media row these tests create, deleted by reset().
+const created = new Set<string>();
 let original: {
   businessType: "clinic" | "barbershop" | "nail_salon" | "other";
   logoMediaId: string | null;
@@ -53,7 +56,24 @@ async function upload(
     mimeType: "image/jpeg",
   });
   if (!result.ok) throw new Error(result.formError);
+  created.add(result.mediaId);
   return result.mediaId;
+}
+
+// A photo published straight from the photo screen; returns its media id.
+async function addPhoto() {
+  const added = await addClinicPhoto(
+    CLINIC,
+    { bytes: await jpeg(), mimeType: "image/jpeg" },
+    { system: true },
+  );
+  if (!added.ok) throw new Error(added.formError);
+  const [row] = await db
+    .select({ mediaId: clinicPhotos.mediaId })
+    .from(clinicPhotos)
+    .where(eq(clinicPhotos.id, added.photoId));
+  created.add(row!.mediaId);
+  return row!.mediaId;
 }
 
 async function clinicRow() {
@@ -69,28 +89,35 @@ async function mediaExists(id: string) {
   return rows.length === 1;
 }
 
-// Back to the clinic as the migrations left it: original columns, no page
-// photos, and no media created by these tests.
+// Back to the clinic as the file found it, without the images the file's
+// media columns pointed at (so publishing never deletes them), and without
+// the rows these tests created. Nothing else of the shared clinic is touched.
 async function reset() {
   await db
     .update(clinics)
-    .set({ ...original, pageDraft: null })
+    .set({
+      ...original,
+      logoMediaId: null,
+      ownerPhotoMediaId: null,
+      coverMediaId: null,
+      pageDraft: null,
+    })
     .where(eq(clinics.id, CLINIC));
-  const photos = await db
-    .delete(clinicPhotos)
-    .where(eq(clinicPhotos.clinicId, CLINIC))
-    .returning({ mediaId: clinicPhotos.mediaId });
-  const created = photos.map((p) => p.mediaId);
-  if (created.length > 0) {
-    await db.delete(media).where(inArray(media.id, created));
+  const ids = [...created];
+  if (ids.length > 0) {
+    await db
+      .delete(clinicPhotos)
+      .where(
+        and(
+          eq(clinicPhotos.clinicId, CLINIC),
+          inArray(clinicPhotos.mediaId, ids),
+        ),
+      );
+    await db
+      .delete(media)
+      .where(and(eq(media.clinicId, CLINIC), inArray(media.id, ids)));
   }
-  await db
-    .delete(media)
-    .where(
-      originalMedia.length > 0
-        ? and(eq(media.clinicId, CLINIC), notInArray(media.id, originalMedia))
-        : eq(media.clinicId, CLINIC),
-    );
+  created.clear();
 }
 
 beforeAll(async () => {
@@ -105,15 +132,16 @@ beforeAll(async () => {
     headline: row.headline,
     about: row.about,
   };
-  const existing = await db
-    .select({ id: media.id })
-    .from(media)
-    .where(eq(media.clinicId, CLINIC));
-  originalMedia = existing
-    .map((m) => m.id)
-    .filter((id) =>
-      [row.logoMediaId, row.ownerPhotoMediaId, row.coverMediaId].includes(id),
+  const photos = await db
+    .select({ mediaId: clinicPhotos.mediaId })
+    .from(clinicPhotos)
+    .where(eq(clinicPhotos.clinicId, CLINIC))
+    .orderBy(
+      asc(clinicPhotos.position),
+      asc(clinicPhotos.createdAt),
+      asc(clinicPhotos.id),
     );
+  baseGallery = photos.map((p) => p.mediaId);
   const other = await otherClinic("page-builder-rascunho-outra");
   const [foreign] = await db
     .insert(media)
@@ -139,6 +167,11 @@ beforeEach(reset);
 
 afterAll(async () => {
   await reset();
+  await db
+    .update(clinics)
+    .set({ ...original, pageDraft: null })
+    .where(eq(clinics.id, CLINIC));
+  await db.delete(media).where(eq(media.id, otherMedia));
   await endPools();
 });
 
@@ -158,24 +191,14 @@ describe("page builder draft", () => {
   });
 
   it("publish copies fields, rewrites the gallery and clears the draft", async () => {
-    const added = await addClinicPhoto(
-      CLINIC,
-      { bytes: await jpeg(), mimeType: "image/jpeg" },
-      { system: true },
-    );
-    if (!added.ok) throw new Error(added.formError);
-    const [published] = await db
-      .select({ mediaId: clinicPhotos.mediaId })
-      .from(clinicPhotos)
-      .where(eq(clinicPhotos.id, added.photoId));
-    const kept = published!.mediaId;
+    const kept = await addPhoto();
 
     // A new gallery image starts from the published gallery.
     const fresh = await upload("gallery");
     let state = await getBuilderState(CLINIC);
-    expect(state.draft.gallery).toEqual([kept, fresh]);
+    expect(state.draft.gallery).toEqual([...baseGallery, kept, fresh]);
     expect(state.galleryMedia.map((m) => m.id).sort()).toEqual(
-      [kept, fresh].sort(),
+      [...baseGallery, kept, fresh].sort(),
     );
 
     const removed = await upload("gallery");
@@ -185,7 +208,7 @@ describe("page builder draft", () => {
         businessType: "barbershop",
         headline: "Publicada",
         theme: { fontId: "oswald", primaryColor: "#123456" },
-        gallery: [fresh, kept],
+        gallery: [fresh, ...baseGallery, kept],
       }),
     ).toEqual({ ok: true });
 
@@ -217,10 +240,12 @@ describe("page builder draft", () => {
       .from(clinicPhotos)
       .where(eq(clinicPhotos.clinicId, CLINIC))
       .orderBy(asc(clinicPhotos.position));
-    expect(photos).toEqual([
-      { mediaId: fresh, position: 0 },
-      { mediaId: kept, position: 1 },
-    ]);
+    expect(photos).toEqual(
+      [fresh, ...baseGallery, kept].map((mediaId, position) => ({
+        mediaId,
+        position,
+      })),
+    );
     // The draft image left out of the gallery is gone.
     expect(await mediaExists(removed)).toBe(false);
 
@@ -244,21 +269,12 @@ describe("page builder draft", () => {
     state = await getBuilderState(CLINIC);
     expect(state.hasDraft).toBe(false);
     expect(state.draft).toEqual({});
-    expect(state.published.gallery).toEqual([fresh, kept]);
+    expect(state.published.gallery).toEqual([fresh, ...baseGallery, kept]);
   });
 
   it("publish removes a gallery photo left out of the list", async () => {
-    const added = await addClinicPhoto(
-      CLINIC,
-      { bytes: await jpeg(), mimeType: "image/jpeg" },
-      { system: true },
-    );
-    if (!added.ok) throw new Error(added.formError);
-    const [row] = await db
-      .select({ mediaId: clinicPhotos.mediaId })
-      .from(clinicPhotos)
-      .where(eq(clinicPhotos.id, added.photoId));
-    expect(await saveDraftPatch(CLINIC, { gallery: [] })).toEqual({
+    const leaving = await addPhoto();
+    expect(await saveDraftPatch(CLINIC, { gallery: baseGallery })).toEqual({
       ok: true,
     });
     expect(await publishDraft(CLINIC, actor)).toEqual({
@@ -266,11 +282,12 @@ describe("page builder draft", () => {
       changed: ["gallery"],
     });
     const left = await db
-      .select()
+      .select({ mediaId: clinicPhotos.mediaId })
       .from(clinicPhotos)
-      .where(eq(clinicPhotos.clinicId, CLINIC));
-    expect(left).toHaveLength(0);
-    expect(await mediaExists(row!.mediaId)).toBe(false);
+      .where(eq(clinicPhotos.clinicId, CLINIC))
+      .orderBy(asc(clinicPhotos.position));
+    expect(left.map((p) => p.mediaId)).toEqual(baseGallery);
+    expect(await mediaExists(leaving)).toBe(false);
   });
 
   it("publish deletes the replaced logo media", async () => {
@@ -311,7 +328,7 @@ describe("page builder draft", () => {
     const result = await publishDraft(CLINIC, actor);
     expect(result.ok).toBe(false);
     const row = await clinicRow();
-    expect(row.coverMediaId).toBe(original.coverMediaId);
+    expect(row.coverMediaId).toBeNull();
     expect(row.headline).toBe(original.headline);
     expect(await mediaExists(otherMedia)).toBe(true);
   });

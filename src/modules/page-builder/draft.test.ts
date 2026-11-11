@@ -68,6 +68,25 @@ describe("pageDraftSchema", () => {
   });
 });
 
+describe("pageDraftSchema messages", () => {
+  it.each([
+    [{ businessType: "padaria" }, "Tipo de negócio inválido."],
+    [{ theme: { buttonShape: "x" } }, "Formato de botão inválido."],
+    [{ theme: { buttonFill: "x" } }, "Preenchimento de botão inválido."],
+    [{ theme: { fontId: "comic" } }, "Fonte inválida."],
+    [{ theme: { primaryColor: 1 } }, "Cor inválida."],
+    [{ theme: "azul" }, "Estilo inválido."],
+    [{ headline: 5 }, "Texto inválido."],
+    [{ gallery: "x" }, "Fotos inválidas."],
+    [{ logoMediaId: 3 }, "Imagem inválida."],
+    ["lixo", "Rascunho inválido."],
+  ])("%j → %s", (input, message) => {
+    const result = pageDraftSchema.safeParse(input);
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0]!.message).toBe(message);
+  });
+});
+
 describe("mergeDraft", () => {
   it("keeps the published logo when the draft does not touch it", () => {
     expect(mergeDraft(published, {}).logoMediaId).toBe(A);
