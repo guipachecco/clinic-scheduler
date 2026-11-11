@@ -16,3 +16,19 @@ export function contrastRatio(a: string, b: string): number {
   const [lighter, darker] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (lighter + 0.05) / (darker + 0.05);
 }
+
+function toHex(value: number): string {
+  return Math.round(Math.min(255, Math.max(0, value)))
+    .toString(16)
+    .padStart(2, "0");
+}
+
+/** Mixes `a` with `b`; `amount` (0 to 1) is how much of `b` goes in. */
+export function mixColors(a: string, b: string, amount: number): string {
+  const parts = [1, 3, 5].map((start) => {
+    const x = parseInt(a.slice(start, start + 2), 16);
+    const y = parseInt(b.slice(start, start + 2), 16);
+    return toHex(x + (y - x) * amount);
+  });
+  return `#${parts.join("")}`;
+}
