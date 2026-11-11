@@ -21,6 +21,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   typedRoutes: true,
+  // In dev, Next logs every Server Function call with its arguments; the
+  // anamnesis answers (health data) must never reach the terminal.
+  logging: { serverFunctions: false },
   // The owner photo (up to 10 MB, checked in saveOwnerPhoto) travels in a Server Action.
   experimental: { serverActions: { bodySizeLimit: "11mb" } },
   turbopack: {

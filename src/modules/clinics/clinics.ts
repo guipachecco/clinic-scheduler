@@ -34,6 +34,7 @@ export type ClinicSummary = {
   slug: string;
   name: string;
   isActive: boolean;
+  anamnesisTemplate: string | null;
 };
 
 export type ClinicResult =
@@ -50,12 +51,47 @@ const summaryColumns = {
   slug: clinics.slug,
   name: clinics.name,
   isActive: clinics.isActive,
+  anamnesisTemplate: clinics.anamnesisTemplate,
 };
 
 export async function getClinic(id: string): Promise<ClinicSummary | null> {
   if (!UUID_PATTERN.test(id)) return null;
   const [row] = await inClinic(id, (tx) =>
     tx.select(summaryColumns).from(clinics).where(eq(clinics.id, id)).limit(1),
+  );
+  return row ?? null;
+}
+
+// What the anamnesis PDF prints at the top of the page. Read on its own so the
+// session type (ClinicSummary) stays small.
+export type ClinicLetterhead = {
+  name: string;
+  professionalName: string | null;
+  professionalRegistration: string | null;
+  address: string | null;
+  whatsappPhone: string | null;
+  contactEmail: string | null;
+  logoMediaId: string | null;
+};
+
+export async function getClinicLetterhead(
+  clinicId: string,
+): Promise<ClinicLetterhead | null> {
+  if (!UUID_PATTERN.test(clinicId)) return null;
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        name: clinics.name,
+        professionalName: clinics.professionalName,
+        professionalRegistration: clinics.professionalRegistration,
+        address: clinics.address,
+        whatsappPhone: clinics.whatsappPhone,
+        contactEmail: clinics.contactEmail,
+        logoMediaId: clinics.logoMediaId,
+      })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId))
+      .limit(1),
   );
   return row ?? null;
 }

@@ -5,6 +5,7 @@ import { aliasedTable, and, asc, eq, isNotNull, isNull } from "drizzle-orm";
 import { inClinic, type Tx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import {
+  anamneses,
   appointments,
   auditLogs,
   loyaltyRedemptions,
@@ -190,6 +191,15 @@ export async function confirmLink(
         and(
           eq(loyaltyRedemptions.clinicId, clinicId),
           eq(loyaltyRedemptions.patientId, provisionalId),
+        ),
+      );
+    await tx
+      .update(anamneses)
+      .set({ patientId: existingId })
+      .where(
+        and(
+          eq(anamneses.clinicId, clinicId),
+          eq(anamneses.patientId, provisionalId),
         ),
       );
     // Its history (owner edits) now belongs to the existing record. The panel

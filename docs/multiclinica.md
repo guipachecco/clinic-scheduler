@@ -36,7 +36,7 @@ Tudo isso roda numa transação só e fica registrado no histórico (`audit_logs
 
 ## Como os dados ficam separados
 
-- **Toda tabela da clínica tem `clinic_id`:** pacientes, serviços, categorias, expediente, bloqueios, agendamentos, imagens e histórico. A tabela `clinics` substituiu a antiga `clinic_settings`, de linha única.
+- **Toda tabela da clínica tem `clinic_id`:** pacientes, serviços, categorias, expediente, bloqueios, agendamentos, imagens, anamneses (só o painel acessa; `app_client` não) e histórico. A tabela `clinics` substituiu a antiga `clinic_settings`, de linha única.
 - **Toda função dos módulos recebe o `clinicId`** como primeiro parâmetro e filtra por ele. O `clinicId` vem sempre da sessão (`requireAdmin()`), nunca do formulário.
 - **O banco também confere:** agendamentos apontam para paciente e serviço da mesma clínica, e serviços para categoria da mesma clínica, por chaves estrangeiras compostas `(clinic_id, id)`. Um agendamento que misture clínicas é recusado mesmo se o código errar.
 - **Cada parte do app entra no banco com um usuário próprio,** e o PostgreSQL limita o que cada um alcança (veja abaixo). Mesmo que uma consulta esqueça o filtro, o banco só devolve as linhas da clínica aberta.
@@ -46,13 +46,13 @@ Tudo isso roda numa transação só e fica registrado no histórico (`audit_logs
 
 ## Usuários do banco
 
-| Usuário               | Usado por                                       | Pode                                                                                                                                                                       |
-| --------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Dono (`DATABASE_URL`) | Só as migrações e os testes                     | Tudo. É o dono das tabelas                                                                                                                                                 |
-| `app_auth`            | Login (Better Auth)                             | Só as tabelas de login: `users`, `sessions`, `accounts`, `verifications`, `two_factors`, `rate_limits`                                                                     |
-| `app_panel`           | Painel da dona, e do root dentro de uma clínica | As tabelas da clínica, sempre filtradas pela clínica da sessão. No histórico, só lê e grava; muda apenas a ficha a que uma linha se refere, ao juntar fichas ("É a mesma") |
-| `app_client`          | Área da cliente                                 | A parte pública da clínica do link, os serviços online, a própria ficha (sem os campos internos) e os próprios horários. Nada de financeiro, histórico, imagens ou contas  |
-| `app_platform`        | Tela de clínicas do root e `pnpm admin`         | Criar e listar clínicas e contas de dona, sem filtro de clínica                                                                                                            |
+| Usuário               | Usado por                                       | Pode                                                                                                                                                                                                |
+| --------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dono (`DATABASE_URL`) | Só as migrações e os testes                     | Tudo. É o dono das tabelas                                                                                                                                                                          |
+| `app_auth`            | Login (Better Auth)                             | Só as tabelas de login: `users`, `sessions`, `accounts`, `verifications`, `two_factors`, `rate_limits`                                                                                              |
+| `app_panel`           | Painel da dona, e do root dentro de uma clínica | As tabelas da clínica (inclusive as anamneses), sempre filtradas pela clínica da sessão. No histórico, só lê e grava; muda apenas a ficha a que uma linha se refere, ao juntar fichas ("É a mesma") |
+| `app_client`          | Área da cliente                                 | A parte pública da clínica do link, os serviços online, a própria ficha (sem os campos internos) e os próprios horários. Nada de financeiro, histórico, imagens ou contas                           |
+| `app_platform`        | Tela de clínicas do root e `pnpm admin`         | Criar e listar clínicas e contas de dona, sem filtro de clínica                                                                                                                                     |
 
 Cada transação do painel começa com `set_config('app.clinic_id', …, true)` (função `inClinic` em `src/db/client.ts`); na área da cliente entram também a ficha e a conta dela (`asClient`). Sem esse ajuste, o banco não devolve nenhuma linha. O que a cliente precisa ver além das próprias linhas, como os horários ocupados, vem de funções do banco que devolvem só início e fim, sem nomes.
 

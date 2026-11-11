@@ -19,6 +19,7 @@ import { formatDate } from "../format";
 import { PatientForm } from "../patient-form";
 import { PendingLinkNotice } from "../pending-link-notice";
 
+import { Anamneses } from "./anamneses";
 import { AnonymizeForm } from "./anonymize-form";
 import { AppointmentHistory } from "./appointment-history";
 import { PatientFinance } from "./patient-finance";
@@ -32,7 +33,7 @@ export default async function PatientPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { clinicId } = await requireAdmin();
+  const { clinicId, clinic } = await requireAdmin();
   const { id } = await params;
   const patient = await getPatient(clinicId, id);
   if (!patient) notFound();
@@ -55,6 +56,7 @@ export default async function PatientPage({
         >
           Dados pessoais apagados em {anonymizedOn} a pedido do titular (LGPD).
           O histórico de agendamentos é mantido.
+          {clinic.anamnesisTemplate ? " As anamneses foram apagadas." : null}
         </p>
         <AppointmentHistory patientId={patient.id} canSchedule={false} />
         <PatientFinance patientId={patient.id} canQuote={false} />
@@ -130,6 +132,7 @@ export default async function PatientPage({
         <PatientForm mode="edit" id={patient.id} defaults={defaults} />
       </section>
 
+      {clinic.anamnesisTemplate ? <Anamneses patientId={patient.id} /> : null}
       <AppointmentHistory patientId={patient.id} canSchedule />
       <PatientFinance patientId={patient.id} canQuote />
       <PatientLoyalty patientId={patient.id} />

@@ -14,7 +14,7 @@ import {
 
 import { inClinic, type Tx } from "@/db/client";
 import { findPgError, isUniqueViolation } from "@/db/errors";
-import { appointments, auditLogs, patients } from "@/db/schema";
+import { anamneses, appointments, auditLogs, patients } from "@/db/schema";
 
 import {
   normalizeName,
@@ -403,6 +403,12 @@ export async function anonymizePatient(
     if (future)
       return { ok: false, reason: "has_future_appointments" } as const;
 
+    // Health data does not outlive the identity it described.
+    await tx
+      .delete(anamneses)
+      .where(
+        and(eq(anamneses.clinicId, clinicId), eq(anamneses.patientId, id)),
+      );
     await tx
       .update(patients)
       .set({

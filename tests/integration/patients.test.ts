@@ -3,6 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db, endPools } from "@/db/owner";
 import {
+  anamneses,
   appointments,
   auditLogs,
   patients,
@@ -145,6 +146,30 @@ describe("createPatient / getPatient", () => {
       await getPatient(CLINIC, "00000000-0000-4000-8000-000000000000"),
     ).toBeNull();
     expect(await getPatient(CLINIC, "not-a-uuid")).toBeNull();
+  });
+
+  it("anonymizing deletes the anamneses", async () => {
+    const id = await created();
+    await db.insert(anamneses).values([
+      {
+        clinicId: CLINIC,
+        patientId: id,
+        template: "integrativa-ads-v1",
+        takenOn: "2026-11-01",
+      },
+      {
+        clinicId: CLINIC,
+        patientId: id,
+        template: "integrativa-ads-v1",
+        takenOn: "2026-11-10",
+      },
+    ]);
+    expect(await anonymizePatient(CLINIC, id, actorId)).toEqual({ ok: true });
+    const left = await db
+      .select({ id: anamneses.id })
+      .from(anamneses)
+      .where(eq(anamneses.patientId, id));
+    expect(left).toHaveLength(0);
   });
 
   it("returns an anonymized patient with anonymizedAt set", async () => {

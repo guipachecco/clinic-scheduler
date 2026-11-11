@@ -128,3 +128,20 @@ export const TEST_ADMIN_AGENDA_PHONE = {
   name: "Dona da Agenda no Celular",
   password: "senha-de-teste-agenda-celular-bem-longa",
 };
+
+// Owner used by the anamnesis suite (e2e/anamnesis.spec.ts).
+export const TEST_ADMIN_ANAMNESIS = {
+  role: "admin" as const,
+  clinicSlug: "grais",
+  email: "anamnese@example.test",
+  name: "Administradora da Anamnese",
+  password: "senha-de-teste-anamnese-bem-longa",
+};
+
+// Root account of the anamnesis suite: opens a clinic without anamnesis.
+export const TEST_ROOT_ANAMNESIS = {
+  role: "root" as const,
+  email: "root-anamnese@example.test",
+  name: "Root da Anamnese",
+  password: "senha-de-teste-root-anamnese-bem-longa",
+};
