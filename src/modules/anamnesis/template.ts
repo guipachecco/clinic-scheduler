@@ -5,8 +5,7 @@
 export type Option = { value: string; label: string };
 
 export type Question = { id: string; label: string; help?: string } & (
-  | { type: "text" | "long" }
-  | { type: "single" | "multi"; options: Option[] }
+  { type: "text" | "long" } | { type: "single" | "multi"; options: Option[] }
 );
 
 export type Section = {
@@ -149,10 +148,7 @@ const integrativa: AnamnesisTemplate = {
         ]),
         long("gestacional_complicacoes", "Complicações no parto?"),
         long("gestacional_uti", "Precisou de oxigenação ou UTI neonatal?"),
-        long(
-          "gestacional_primeiro_dia",
-          "Reação após o primeiro dia de vida?",
-        ),
+        long("gestacional_primeiro_dia", "Reação após o primeiro dia de vida?"),
         text("gestacional_amamentacao", "Tempo de amamentação?"),
         text("gestacional_alta_dias", "Alta hospitalar em quantos dias?"),
       ],

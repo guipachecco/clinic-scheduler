@@ -66,7 +66,13 @@ describe("anamnesis template", () => {
     expect(q.type).toBe("single");
     if (q.type !== "single") throw new Error("unreachable");
     expect(q.options.map((o) => o.value)).toEqual([
-      "1", "2", "3", "4", "5", "6", "7",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
     ]);
   });
 
@@ -82,7 +88,10 @@ describe("anamnesis template", () => {
       "setenios_0_7",
       "diagnostico_estado_geral",
     ]) {
-      expect(all.some((q) => q.id === id), id).toBe(true);
+      expect(
+        all.some((q) => q.id === id),
+        id,
+      ).toBe(true);
     }
     const parto = all.find((q) => q.id === "gestacional_parto_tipo")!;
     expect(parto.type).toBe("multi");
@@ -113,9 +122,9 @@ describe("answersSchema", () => {
     expect(
       schema.safeParse({ pregressas_doencas: ["diabetes", "zzz"] }).success,
     ).toBe(false);
-    expect(
-      schema.safeParse({ identificacao_atuacao: "clt" }).success,
-    ).toBe(true);
+    expect(schema.safeParse({ identificacao_atuacao: "clt" }).success).toBe(
+      true,
+    );
   });
 
   it("enforces limits", () => {
@@ -134,7 +143,10 @@ describe("answersSchema", () => {
   });
 
   it("drops empty answers", () => {
-    const r = schema.safeParse({ queixas_principais: "", pregressas_doencas: [] });
+    const r = schema.safeParse({
+      queixas_principais: "",
+      pregressas_doencas: [],
+    });
     expect(r.success).toBe(true);
     if (r.success) expect(r.data).toEqual({});
   });

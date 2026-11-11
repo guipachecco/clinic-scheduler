@@ -1,6 +1,6 @@
 # Anamnese na ficha da paciente
 
-Conversado com Guilherme em 10/11/2026. Itens marcados *(decisão minha)* foram propostos por Claude e podem ser revistos.
+Conversado com Guilherme em 10/11/2026. Itens marcados _(decisão minha)_ foram propostos por Claude e podem ser revistos.
 
 ## Intenção
 
@@ -43,7 +43,7 @@ O modelo vem do Word, que está em `C:\Users\Guilherme\Videos\Retiro 2026\ANAMNE
 4. **História de vida**: história pessoal, momentos marcantes, eventos traumáticos ou estressores.
 5. **Antecedentes pessoais e familiares**: doenças na família, doenças pessoais/cirurgias/acidentes, problema crônico.
 6. **Histórico gestacional**: concepção (programada ou surpresa), aceitação pelos pais, histórico materno, estado emocional dos pais, abortos anteriores, tipo de parto (marcar um ou mais: normal, cesárea, fórceps, trauma no parto), complicações, oxigenação/UTI neonatal, reação após o primeiro dia, tempo de amamentação, dias até a alta.
-7. **Setênios da vida**: um campo por fase (0–7, 7–14, 14–21, 21–28, 28–35, 35–42, 42–49), com a descrição de cada fase como ajuda. *(Decisão minha: acrescentar "49 anos ou mais", porque há pacientes acima dessa idade.)*
+7. **Setênios da vida**: um campo por fase (0–7, 7–14, 14–21, 21–28, 28–35, 35–42, 42–49), com a descrição de cada fase como ajuda. _(Decisão minha: acrescentar "49 anos ou mais", porque há pacientes acima dessa idade.)_
 8. **Impactos desencadeadores**: medos, preocupações, o que estressa, satisfação com a vida, realização, felicidade.
 9. **Impactos clínicos**: infância, adolescência, intestino (com o tipo de fezes da Escala de Bristol, escolha de 1 a 7, mais um texto), pele/cabelos/unhas, olhos e língua, flacidez ou celulite, circunferência abdominal.
 10. **Doenças pregressas**: marcar (diabetes, hipertensão, câncer, obesidade, enxaqueca, problemas articulares, dores crônicas) mais "Outras".
@@ -64,21 +64,21 @@ Os rótulos ficam como no Word, com a ortografia corrigida ("Fórceps", "Preciso
 
 - Nova seção **"Anamneses"**, só quando a clínica tem anamnese ligada. Mostra a lista da mais nova para a mais antiga: data da anamnese, "Em andamento" ou "Concluída" e "atualizada em dd/mm/aaaa".
 - Botão **"Nova anamnese"**. Se a paciente já tem anamnese, a nova é criada com as respostas da mais recente copiadas e a data de hoje. Se não tem, começa em branco.
-  - "Mais recente" é a de `taken_on` maior, com desempate por `updated_at`, esteja ela concluída ou em andamento. *(Decisão minha.)*
+  - "Mais recente" é a de `taken_on` maior, com desempate por `updated_at`, esteja ela concluída ou em andamento. _(Decisão minha.)_
   - **Diagnóstico biopsicossomático (seção 13) e protocolos de tratamento (seção 14) não são copiados**: começam em branco, porque são a avaliação da Greice naquele momento e um diagnóstico antigo copiado poderia ir para o PDF assinado sem ela perceber. (Decidido por Guilherme.)
-  - A cópia usa sempre a versão atual do modelo: respostas a perguntas que não existem mais ficam de fora da cópia e continuam só na anamnese antiga. Assim cada anamnese tem uma versão só. *(Decisão minha.)*
+  - A cópia usa sempre a versão atual do modelo: respostas a perguntas que não existem mais ficam de fora da cópia e continuam só na anamnese antiga. Assim cada anamnese tem uma versão só. _(Decisão minha.)_
 - Paciente anonimizada: a seção some, porque não há mais anamneses.
 
 ### Preenchimento (`/admin/pacientes/<id>/anamneses/<anamneseId>`)
 
 - Página própria, com as seções acima em blocos recolhíveis e um índice das seções, para pular direto a qualquer uma.
 - No topo: a data da anamnese (editável, para registrar uma feita em outro dia) e a situação.
-- **Salvar** grava tudo e continua na página. Há também um salvamento automático alguns segundos depois da última digitação e ao sair da página, para não perder texto. *(Decisão minha: a ficha é longa demais para depender de um botão só.)*
-- **Rascunho só no servidor.** Nada da anamnese fica no navegador (`localStorage`, IndexedDB), porque o celular pode ser compartilhado. Se a sessão expirar, o texto continua na tela e aparece "Sua sessão expirou. Entre de novo em outra aba e depois clique em Salvar". *(Decisão minha.)*
-- **Dois aparelhos ao mesmo tempo:** cada salvamento leva a versão que a tela carregou (`updated_at`). Se a anamnese mudou em outro lugar, o salvamento é recusado com "Esta anamnese foi alterada em outro aparelho. Copie o que digitou e recarregue a página", em vez de sobrescrever. *(Decisão minha.)*
+- **Salvar** grava tudo e continua na página. Há também um salvamento automático alguns segundos depois da última digitação e ao sair da página, para não perder texto. _(Decisão minha: a ficha é longa demais para depender de um botão só.)_
+- **Rascunho só no servidor.** Nada da anamnese fica no navegador (`localStorage`, IndexedDB), porque o celular pode ser compartilhado. Se a sessão expirar, o texto continua na tela e aparece "Sua sessão expirou. Entre de novo em outra aba e depois clique em Salvar". _(Decisão minha.)_
+- **Dois aparelhos ao mesmo tempo:** cada salvamento leva a versão que a tela carregou (`updated_at`). Se a anamnese mudou em outro lugar, o salvamento é recusado com "Esta anamnese foi alterada em outro aparelho. Copie o que digitou e recarregue a página", em vez de sobrescrever. _(Decisão minha.)_
 - **"Marcar como concluída"** e **"Reabrir"**. Concluída continua editável. A situação só serve para a Greice saber o que falta.
 - **"Gerar PDF"** baixa o arquivo com o que está salvo. Se houver alteração não salva, salva antes.
-- **Excluir anamnese**: com confirmação, para uma criada por engano. *(Decisão minha.)*
+- **Excluir anamnese**: com confirmação, para uma criada por engano. _(Decisão minha.)_
 - Validação: tamanhos máximos por campo (texto curto 200, texto longo 5.000 caracteres) e opções só da lista do modelo, no navegador e no servidor. Nenhum campo é obrigatório.
 
 ### O PDF
@@ -89,19 +89,19 @@ Os rótulos ficam como no Word, com a ortografia corrigida ("Fórceps", "Preciso
 - **Só as perguntas respondidas**; seção sem nenhuma resposta não aparece. Marcações aparecem como lista do que foi marcado.
 - Texto longo quebra entre páginas sem cortar; rodapé com "página X de Y".
 - No fim: linhas para assinatura da paciente e da profissional, com local e data.
-- Nome do arquivo: `anamnese-AAAA-MM-DD.pdf`, sem o nome da paciente, que ficaria no histórico de downloads de outros aparelhos. *(Decisão minha.)*
+- Nome do arquivo: `anamnese-AAAA-MM-DD.pdf`, sem o nome da paciente, que ficaria no histórico de downloads de outros aparelhos. _(Decisão minha.)_
 - Gerado no servidor com `@react-pdf/renderer`, numa rota do painel que exige `requireAdmin()` e responde com `Cache-Control: no-store`.
 
 ### Quem vê
 
 - Só o painel da clínica (`requireAdmin()`, com 2FA), como o resto da ficha. Root dentro da Grais também vê, como vê o resto.
-- A paciente nunca vê, nem pelo link da clínica. *(Decisão minha: é dado de saúde e inclui o diagnóstico da Greice.)*
+- A paciente nunca vê, nem pelo link da clínica. _(Decisão minha: é dado de saúde e inclui o diagnóstico da Greice.)_
 
 ## Banco de dados
 
 Uma migração nova, só com acréscimos:
 
-- **`clinics.anamnesis_template`** (`text`, nulo). É o modelo que a clínica usa; nulo quer dizer sem anamnese. A migração liga `'integrativa-ads-v1'` na clínica de endereço `grais`. *(Decisão minha: uma coluna em vez do endereço fixo no código, para poder ligar outro modelo em outra clínica sem mexer no código de permissão.)*
+- **`clinics.anamnesis_template`** (`text`, nulo). É o modelo que a clínica usa; nulo quer dizer sem anamnese. A migração liga `'integrativa-ads-v1'` na clínica de endereço `grais`. _(Decisão minha: uma coluna em vez do endereço fixo no código, para poder ligar outro modelo em outra clínica sem mexer no código de permissão.)_
 - **Tabela `anamneses`**:
   - colunas: `id`, `clinic_id`, `patient_id`, `template` (modelo e versão usados), `taken_on` (date), `status` (`in_progress` | `completed`), `answers` (jsonb), `created_by_user_id`, `updated_by_user_id`, `created_at`, `updated_at`;
   - chave estrangeira composta `(clinic_id, patient_id)` para `patients`, como os outros registros da clínica;
@@ -114,25 +114,25 @@ Uma migração nova, só com acréscimos:
 
 - **Anonimizar a paciente apaga todas as anamneses dela**, na mesma transação da anonimização. O aviso da ficha anonimizada passa a dizer que as anamneses foram apagadas.
 - **Juntar fichas ("É a mesma")**: as anamneses da ficha provisória passam para a ficha antiga, junto com horários e vendas.
-- **Histórico de ações**: `anamnesis.created`, `anamnesis.updated`, `anamnesis.completed`, `anamnesis.reopened`, `anamnesis.deleted` e `anamnesis.pdf_generated`, com os ids da paciente e da anamnese. Nunca o conteúdo, nem os nomes das perguntas alteradas, porque o nome da pergunta já revela o assunto. *(Decisão minha: o salvamento automático não grava uma linha a cada salvamento; grava no máximo uma `anamnesis.updated` por anamnese a cada 30 minutos.)*
+- **Histórico de ações**: `anamnesis.created`, `anamnesis.updated`, `anamnesis.completed`, `anamnesis.reopened`, `anamnesis.deleted` e `anamnesis.pdf_generated`, com os ids da paciente e da anamnese. Nunca o conteúdo, nem os nomes das perguntas alteradas, porque o nome da pergunta já revela o assunto. _(Decisão minha: o salvamento automático não grava uma linha a cada salvamento; grava no máximo uma `anamnesis.updated` por anamnese a cada 30 minutos.)_
 - Nada de respostas em `console`, logs de erro ou na resposta de erro das Server Actions.
 
 ## Abordagens consideradas
 
 **Como guardar as respostas**
 
-| Abordagem                                         | A favor                                                                 | Contra                                                 | Escolha       |
-| ------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------ | ------------- |
-| Modelo no código + respostas em JSON com versão   | Uma definição gera formulário, validação, cópia e PDF; ajustar é barato | O banco não confere cada campo; a validação é do app   | **Escolhida** |
-| Uma coluna por pergunta                           | O banco valida tudo                                                     | Mais de 100 colunas; cada ajuste vira migração         | —             |
-| Editor de perguntas no painel                     | Cada clínica monta a sua                                                | Muito trabalho para um modelo só                       | —             |
+| Abordagem                                       | A favor                                                                 | Contra                                               | Escolha       |
+| ----------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------- | ------------- |
+| Modelo no código + respostas em JSON com versão | Uma definição gera formulário, validação, cópia e PDF; ajustar é barato | O banco não confere cada campo; a validação é do app | **Escolhida** |
+| Uma coluna por pergunta                         | O banco valida tudo                                                     | Mais de 100 colunas; cada ajuste vira migração       | —             |
+| Editor de perguntas no painel                   | Cada clínica monta a sua                                                | Muito trabalho para um modelo só                     | —             |
 
 **Como gerar o PDF** (Guilherme escolheu a primeira)
 
-| Abordagem                                     | A favor                                                                         | Contra                                                                           | Escolha       |
-| --------------------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------- |
-| PDF no servidor (`@react-pdf/renderer`)       | Botão baixa o arquivo, igual em qualquer aparelho, pronto para mandar no WhatsApp | Dependência nova; layout do PDF escrito à parte da tela                          | **Escolhida** |
-| Página de impressão + "Salvar como PDF"       | Sem dependência nova                                                            | No celular o caminho é escondido e muda entre aparelhos; quebras dependem do navegador | —             |
+| Abordagem                               | A favor                                                                           | Contra                                                                                 | Escolha       |
+| --------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ------------- |
+| PDF no servidor (`@react-pdf/renderer`) | Botão baixa o arquivo, igual em qualquer aparelho, pronto para mandar no WhatsApp | Dependência nova; layout do PDF escrito à parte da tela                                | **Escolhida** |
+| Página de impressão + "Salvar como PDF" | Sem dependência nova                                                              | No celular o caminho é escondido e muda entre aparelhos; quebras dependem do navegador | —             |
 
 ## Deixado para quem constrói
 
