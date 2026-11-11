@@ -22,6 +22,7 @@ import {
   type SignupValues,
 } from "@/modules/clients/forms";
 import { safeNext } from "@/modules/clients/safe-next";
+import { formatBrPhoneInput } from "@/modules/patients/fields";
 
 import { TextField } from "../text-field";
 
@@ -123,6 +124,7 @@ export function SignupForm({ slug, next }: { slug: string; next: string }) {
         autoComplete="tel-national"
         error={errors.phone?.message}
         placeholder="(11) 98765-4321"
+        mask={formatBrPhoneInput}
         registration={register("phone")}
       />
       <TextField
@@ -196,6 +198,7 @@ export function CompleteForm({
         autoComplete="tel-national"
         error={errors.phone?.message}
         placeholder="(11) 98765-4321"
+        mask={formatBrPhoneInput}
         registration={register("phone")}
       />
       <FormError message={formError} />

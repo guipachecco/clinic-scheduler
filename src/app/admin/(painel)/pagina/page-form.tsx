@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { applyMask } from "@/lib/input-mask";
 import {
   AMENITIES,
   AMENITY_LABELS,
   type Amenity,
 } from "@/modules/clinic-page/fields";
+import { formatBrPhoneInput } from "@/modules/patients/fields";
 
 import { savePageAction } from "./actions";
 
@@ -81,7 +83,12 @@ export function PageForm({ defaults }: { defaults: PageFormDefaults }) {
   function field(
     id: keyof Omit<PageFormDefaults, "amenities" | "onlineBookingEnabled">,
     label: string,
-    options: { help?: string; type?: string; multiline?: boolean } = {},
+    options: {
+      help?: string;
+      type?: string;
+      multiline?: boolean;
+      mask?: (value: string) => string;
+    } = {},
   ) {
     const error = errors[id];
     const describedBy =
@@ -106,7 +113,12 @@ export function PageForm({ defaults }: { defaults: PageFormDefaults }) {
           <Input
             {...common}
             type={options.type ?? "text"}
-            onChange={(event) => set(id, event.target.value)}
+            inputMode={options.type === "tel" ? "tel" : undefined}
+            onChange={(event) => {
+              const { mask } = options;
+              if (mask) applyMask(event, mask, (value) => set(id, value));
+              else set(id, event.target.value);
+            }}
           />
         )}
         {options.help ? (
@@ -123,7 +135,10 @@ export function PageForm({ defaults }: { defaults: PageFormDefaults }) {
     <form onSubmit={onSubmit} noValidate className="grid gap-5">
       {field("headline", "Frase de apresentação")}
       {field("about", "Sobre a clínica", { multiline: true })}
-      {field("whatsappPhone", "WhatsApp", { type: "tel" })}
+      {field("whatsappPhone", "WhatsApp", {
+        type: "tel",
+        mask: formatBrPhoneInput,
+      })}
       {field("contactEmail", "E-mail de contato", { type: "email" })}
       {field("address", "Endereço")}
       {field("mapsUrl", "Link do mapa", {

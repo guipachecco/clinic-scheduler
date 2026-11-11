@@ -56,7 +56,10 @@ async function signUp(page: Page, person: typeof CLIENT) {
   await page.getByRole("link", { name: "Criar conta" }).click();
   await expect(page).toHaveURL(new RegExp(`/${A.slug}/cadastro`));
   await page.getByLabel("Nome").fill(person.name);
-  await page.getByLabel("Celular (WhatsApp)").fill(person.phone);
+  // Typed as bare digits, it is formatted as she types.
+  const phone = page.getByLabel("Celular (WhatsApp)");
+  await phone.pressSequentially(person.phone.replace(/\D/g, ""));
+  await expect(phone).toHaveValue(person.phone);
   await page.getByLabel("E-mail").fill(person.email);
   await page.getByLabel("Senha").fill(person.password);
   await page.getByRole("button", { name: "Criar conta" }).click();
