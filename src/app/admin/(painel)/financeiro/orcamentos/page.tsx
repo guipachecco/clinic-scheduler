@@ -2,7 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { QUOTE_STATUS_LABELS } from "@/modules/finance/fields";
 import { listQuotes, type QuoteStatus } from "@/modules/finance/quotes";
 import { todayLocal } from "@/modules/schedule/time";
@@ -24,7 +24,7 @@ export default async function QuotesPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const { status } = await searchParams;
   const filter = FILTERS.find((f) => f.value === status)?.value;
   const today = todayLocal();

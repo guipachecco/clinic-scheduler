@@ -4,7 +4,7 @@ import { BrandImage } from "@/components/brand-image";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getTheme } from "@/lib/theme-server";
 import { countRequestedFrom } from "@/modules/appointments/appointments";
-import { requireAdmin } from "@/modules/auth/session";
+import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import { vocabulary } from "@/modules/business-type/vocabulary";
 
 import { MobileNav } from "./mobile-nav";
@@ -38,7 +38,16 @@ export default async function PanelLayout({
     },
     { href: "/admin/servicos", label: "Serviços", icon: "services" },
     { href: "/admin/expediente", label: "Expediente", icon: "clock" },
-    { href: "/admin/financeiro", label: "Financeiro", icon: "money" },
+    // Optional module: off, it leaves the menu (the routes answer 404).
+    ...(moduleActive(session, "finance")
+      ? [
+          {
+            href: "/admin/financeiro",
+            label: "Financeiro",
+            icon: "money",
+          } as const,
+        ]
+      : []),
     { href: "/admin/pagina", label: "Minha página", icon: "page" },
   ];
   const switchClinic = session.isRoot ? (

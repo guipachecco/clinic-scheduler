@@ -1,9 +1,11 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { requireClient } from "@/modules/clients/session";
 import { canReview } from "@/modules/clinic-page/public";
+import { hasModule } from "@/modules/clinics/modules";
 
 import { clinicName, PageTitle } from "../ui";
 
@@ -18,6 +20,7 @@ export default async function ReviewPage({
 }: PageProps<"/[slug]/avaliar">) {
   const { slug } = await params;
   const { ctx, clinic } = await requireClient(slug, `/${slug}/avaliar`);
+  if (!hasModule(clinic, "reviews")) notFound();
   const allowed = await canReview(ctx);
 
   return (

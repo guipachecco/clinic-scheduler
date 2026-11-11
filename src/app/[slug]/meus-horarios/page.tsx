@@ -9,6 +9,7 @@ import {
   type MyAppointment,
 } from "@/modules/booking/booking";
 import { requireClient } from "@/modules/clients/session";
+import { hasModule } from "@/modules/clinics/modules";
 
 import { Icon } from "../icons";
 import { clinicName, PageTitle, whatsappUrl } from "../ui";
@@ -40,6 +41,8 @@ export default async function MyAppointmentsPage({
     .filter((item) => item.status === "cancelled")
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   const name = clinicName(clinic);
+  // The reviews module off hides the "Avaliar" link.
+  const reviewsOn = hasModule(clinic, "reviews");
 
   return (
     <>
@@ -55,6 +58,7 @@ export default async function MyAppointmentsPage({
             items={upcoming}
             timezone={clinic.timezone}
             slug={clinic.slug}
+            reviewsOn={reviewsOn}
           />
         )}
         <Button asChild size="lg" variant="outline">
@@ -85,6 +89,7 @@ export default async function MyAppointmentsPage({
             items={past}
             timezone={clinic.timezone}
             slug={clinic.slug}
+            reviewsOn={reviewsOn}
           />
         </section>
       ) : null}
@@ -98,6 +103,7 @@ export default async function MyAppointmentsPage({
             items={cancelled}
             timezone={clinic.timezone}
             slug={clinic.slug}
+            reviewsOn={reviewsOn}
           />
         </section>
       ) : null}
@@ -109,10 +115,12 @@ function AppointmentList({
   items,
   timezone,
   slug,
+  reviewsOn,
 }: {
   items: MyAppointment[];
   timezone: string;
   slug: string;
+  reviewsOn: boolean;
 }) {
   return (
     <ul className="grid gap-2">
@@ -149,7 +157,7 @@ function AppointmentList({
             >
               {STATUS_TEXT[item.status]}
             </span>
-            {item.status === "completed" ? (
+            {reviewsOn && item.status === "completed" ? (
               <Button
                 asChild
                 size="sm"

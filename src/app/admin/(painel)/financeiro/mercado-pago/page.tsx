@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 import { Button } from "@/components/ui/button";
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import {
   getConnection,
   mercadoPagoConfig,
@@ -53,7 +53,7 @@ export default async function MercadoPagoPage({
 }: {
   searchParams: Promise<{ conexao?: string }>;
 }) {
-  const { clinicId, isRoot } = await requireAdmin();
+  const { clinicId, isRoot } = await requireModule("finance");
   const { conexao } = await searchParams;
   const config = mercadoPagoConfig();
   const connection = config ? await getConnection(clinicId) : null;

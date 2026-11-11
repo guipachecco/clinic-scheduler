@@ -4,6 +4,7 @@ import { eq, sql } from "drizzle-orm";
 
 import { clientDb } from "@/db/client";
 import { clinics } from "@/db/schema";
+import type { ClinicModule } from "@/modules/clinics/modules";
 import { normalizeBrPhone } from "@/modules/patients/fields";
 
 // Who the signed-in client is in a clinic, read through the definer functions
@@ -26,6 +27,7 @@ const publicClinicColumns = {
   slotStepMinutes: clinics.slotStepMinutes,
   maxActiveAppointmentsPerPhone: clinics.maxActiveAppointmentsPerPhone,
   timezone: clinics.timezone,
+  modules: clinics.modules,
 };
 
 export type PublicClinic = {
@@ -43,6 +45,9 @@ export type PublicClinic = {
   slotStepMinutes: number;
   maxActiveAppointmentsPerPhone: number;
   timezone: string;
+  // The clinic's modules: a module turned off hides its pages and sections
+  // (products, reviews...) even though its data stays stored.
+  modules: ClinicModule[];
 };
 
 export type ClientContext = {

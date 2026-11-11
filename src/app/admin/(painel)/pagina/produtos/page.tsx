@@ -2,7 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { listProducts } from "@/modules/clinic-page/panel";
 import { formatCents } from "@/modules/services/fields";
 
@@ -16,7 +16,7 @@ function priceInput(cents: number | null) {
 }
 
 export default async function ProductsPage() {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("products");
   const products = await listProducts(clinicId);
 
   return (

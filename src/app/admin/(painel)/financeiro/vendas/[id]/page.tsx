@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { STATUS_LABELS, type Status } from "@/modules/appointments/fields";
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { PAYMENT_PLAN_LABELS } from "@/modules/finance/fields";
 import { getSale, listPaymentMethods } from "@/modules/finance/sales";
 import {
@@ -34,7 +34,7 @@ export default async function SalePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { clinicId, clinic } = await requireAdmin();
+  const { clinicId, clinic } = await requireModule("finance");
   const { id } = await params;
   const today = todayLocal();
   const [sale, methods, catalog, connection] = await Promise.all([

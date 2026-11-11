@@ -623,6 +623,7 @@ describe("client access", () => {
         "maxActiveAppointmentsPerPhone",
         "maxAdvanceDays",
         "minAdvanceMinutes",
+        "modules",
         "name",
         "onlineBookingEnabled",
         "slotStepMinutes",

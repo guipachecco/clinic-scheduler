@@ -11,6 +11,7 @@ import {
 } from "@/modules/clinic-page/public";
 import { getClientContext } from "@/modules/clients/context";
 import { getClientUser, requireClinic } from "@/modules/clients/session";
+import { hasModule } from "@/modules/clinics/modules";
 
 import { coverImage, Hero } from "./home/hero";
 import {
@@ -121,6 +122,7 @@ async function clientExtras(
   slug: string,
   clinicId: string,
   loyaltyVisits: number | null,
+  reviewsOn: boolean,
 ) {
   const none = { mayReview: false, progress: null, needsRecord: false };
   const user = await getClientUser();
@@ -135,7 +137,7 @@ async function clientExtras(
     emailVerified: user.emailVerified,
   };
   const [mayReview, progress] = await Promise.all([
-    canReview(ctx),
+    reviewsOn ? canReview(ctx) : false,
     loyaltyVisits ? getLoyaltyProgress(ctx, loyaltyVisits) : null,
   ]);
   return { mayReview, progress, needsRecord: false };
@@ -152,6 +154,7 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
     slug,
     clinic.id,
     page.loyalty?.visits ?? null,
+    hasModule(page, "reviews"),
   );
 
   const now = new Date();
@@ -185,7 +188,8 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
       ),
     });
   }
-  if (page.products.length > 0) {
+  // A module turned off hides its tab by itself, not by an empty list.
+  if (hasModule(page, "products") && page.products.length > 0) {
     tabs.push({
       id: "produtos",
       label: "Produtos",

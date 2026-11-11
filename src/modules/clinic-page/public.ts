@@ -9,6 +9,7 @@ import type { ClinicTheme } from "@/db/schema/clinic";
 import type { BookingContext } from "@/modules/booking/booking";
 import type { BusinessType } from "@/modules/business-type/vocabulary";
 import type { PublicClinic } from "@/modules/clients/context";
+import { hasModule } from "@/modules/clinics/modules";
 import type { DayHours } from "@/modules/schedule/schedule";
 
 import { type Amenity, type ReviewInput } from "./fields";
@@ -153,6 +154,7 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
         loyaltyEnabled: clinics.loyaltyEnabled,
         loyaltyVisits: clinics.loyaltyVisits,
         loyaltyReward: clinics.loyaltyReward,
+        modules: clinics.modules,
       })
       .from(clinics)
       .where(eq(clinics.id, clinicId));
@@ -200,33 +202,52 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
       )
       .orderBy(asc(services.sortOrder), asc(services.name), asc(services.id));
 
-    const productRows = await tx
-      .select({
-        id: products.id,
-        name: products.name,
-        priceCents: products.priceCents,
-        description: products.description,
-      })
-      .from(products)
-      .where(and(eq(products.clinicId, clinicId), eq(products.isActive, true)))
-      .orderBy(asc(products.sortOrder), asc(products.name), asc(products.id));
+    const productsOn = hasModule(clinic, "products");
+    const reviewsOn = hasModule(clinic, "reviews");
 
-    const reviewRows = await tx.execute<{
-      id: string;
-      rating: number;
-      comment: string | null;
-      created_at: string | Date;
-      author: string;
-    }>(
-      sql`select id, rating, comment, created_at, author from client_public_reviews(${clinicId}::uuid, ${REVIEWS_SHOWN})`,
-    );
-    const summaryResult = await tx.execute<{
-      average: string | null;
-      total: number;
-    }>(
-      sql`select average, total from client_review_summary(${clinicId}::uuid)`,
-    );
-    const summary = summaryResult.rows[0];
+    const productRows = !productsOn
+      ? []
+      : await tx
+          .select({
+            id: products.id,
+            name: products.name,
+            priceCents: products.priceCents,
+            description: products.description,
+          })
+          .from(products)
+          .where(
+            and(eq(products.clinicId, clinicId), eq(products.isActive, true)),
+          )
+          .orderBy(
+            asc(products.sortOrder),
+            asc(products.name),
+            asc(products.id),
+          );
+
+    // With reviews off, the review functions do not even run.
+    const reviewRows = reviewsOn
+      ? (
+          await tx.execute<{
+            id: string;
+            rating: number;
+            comment: string | null;
+            created_at: string | Date;
+            author: string;
+          }>(
+            sql`select id, rating, comment, created_at, author from client_public_reviews(${clinicId}::uuid, ${REVIEWS_SHOWN})`,
+          )
+        ).rows
+      : [];
+    const summary = reviewsOn
+      ? (
+          await tx.execute<{
+            average: string | null;
+            total: number;
+          }>(
+            sql`select average, total from client_review_summary(${clinicId}::uuid)`,
+          )
+        ).rows[0]
+      : undefined;
 
     const photoRows = await tx.execute<{
       id: string;
@@ -277,7 +298,7 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
         priceCents: row.priceDisplay === "hidden" ? null : row.priceCents,
       })),
       products: productRows,
-      reviews: reviewRows.rows.map((row) => ({
+      reviews: reviewRows.map((row) => ({
         id: row.id,
         rating: Number(row.rating),
         comment: row.comment,
@@ -393,7 +414,9 @@ export async function canReview(ctx: BookingContext): Promise<boolean> {
 export async function createReview(
   ctx: BookingContext,
   input: ReviewInput,
-): Promise<{ ok: true } | { ok: false; reason: "not_allowed" | "invalid" }> {
+): Promise<
+  { ok: true } | { ok: false; reason: "not_allowed" | "invalid" | "module_off" }
+> {
   // The input is already parsed (reviewSchema); this guards the same limits.
   const { rating, comment } = input;
   if (
@@ -406,13 +429,22 @@ export async function createReview(
   }
   if (!validContext(ctx)) return { ok: false, reason: "not_allowed" };
   try {
-    await asClient(scope(ctx), (tx) =>
-      tx.execute(sql`
+    return await asClient(scope(ctx), async (tx) => {
+      // The reviews module turned off closes the form; checked here, next to
+      // the insert, so a direct call is refused too.
+      const [clinic] = await tx
+        .select({ modules: clinics.modules })
+        .from(clinics)
+        .where(eq(clinics.id, ctx.clinicId));
+      if (!clinic || !hasModule(clinic, "reviews")) {
+        return { ok: false, reason: "module_off" } as const;
+      }
+      await tx.execute(sql`
         insert into reviews (clinic_id, patient_id, rating, comment)
         values (${ctx.clinicId}::uuid, ${ctx.patientId}::uuid, ${rating}, ${comment})
-      `),
-    );
-    return { ok: true };
+      `);
+      return { ok: true } as const;
+    });
   } catch (error) {
     const code = findPgError(error)?.code;
     if (code === "42501" || code === "23503") {

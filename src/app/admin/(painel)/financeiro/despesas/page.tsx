@@ -1,7 +1,7 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import {
   listExpenseCategories,
   listExpenses,
@@ -20,7 +20,7 @@ export default async function ExpensesPage({
 }: {
   searchParams: Promise<{ mes?: string }>;
 }) {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const { mes } = await searchParams;
   const today = todayLocal();
   const month = monthRange(mes, today);
