@@ -1,6 +1,8 @@
 import type { Route } from "next";
 import Link from "next/link";
 
+import { Icon, type IconName } from "@/components/icon";
+import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
 import { formatCents } from "@/modules/services/fields";
 
@@ -95,39 +97,85 @@ export function PageTitle({
   title: string;
   children?: React.ReactNode;
 }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h1 className="font-heading text-2xl font-semibold tracking-tight">
-        {title}
-      </h1>
-      {children}
-    </div>
-  );
+  return <PageHeader title={title}>{children}</PageHeader>;
 }
+
+const ICON_TONES = {
+  blue: "bg-primary text-primary-foreground",
+  pink: "bg-brand-accent text-brand-accent-foreground",
+  muted: "bg-muted text-muted-foreground",
+  alert: "bg-destructive text-destructive-foreground",
+} as const;
 
 export function Stat({
   label,
   value,
   hint,
   tone = "default",
+  icon,
+  iconTone = "muted",
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: "default" | "alert";
+  icon?: IconName;
+  iconTone?: keyof typeof ICON_TONES;
 }) {
   return (
-    <div className="grid gap-1 rounded-2xl border bg-card p-4">
+    <div className="grid content-start gap-1 rounded-2xl border bg-card p-4">
+      {icon ? (
+        <span
+          className={cn(
+            "mb-2 inline-flex size-9 items-center justify-center rounded-xl",
+            ICON_TONES[tone === "alert" ? "alert" : iconTone],
+          )}
+        >
+          <Icon name={icon} className="size-5" />
+        </span>
+      ) : null}
       <p className="text-sm text-muted-foreground">{label}</p>
       <p
         className={cn(
-          "font-heading text-2xl font-semibold tabular-nums",
+          "font-heading text-2xl font-bold tabular-nums",
           tone === "alert" && "text-destructive",
         )}
       >
         {value}
       </p>
       {hint ? <p className="text-sm text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+// The figure a screen is about, in Zemana yellow (the month's balance).
+export function HighlightStat({
+  label,
+  value,
+  details,
+}: {
+  label: string;
+  value: string;
+  details?: { label: string; value: string }[];
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-highlight p-5 text-highlight-foreground">
+      <div className="grid gap-1">
+        <p className="text-sm font-semibold">{label}</p>
+        <p className="font-heading text-3xl font-extrabold tabular-nums md:text-4xl">
+          {value}
+        </p>
+      </div>
+      {details && details.length > 0 ? (
+        <dl className="grid gap-1 text-sm font-semibold sm:text-right">
+          {details.map((detail) => (
+            <div key={detail.label} className="flex gap-2 sm:justify-end">
+              <dt>{detail.label}</dt>
+              <dd className="tabular-nums">{detail.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
     </div>
   );
 }

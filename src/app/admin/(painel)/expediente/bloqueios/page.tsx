@@ -45,7 +45,7 @@ export default async function BlocksPage() {
   return (
     <div className="grid max-w-3xl gap-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
           Bloqueios e feriados
         </h1>
         <Button asChild variant="outline">
@@ -54,21 +54,21 @@ export default async function BlocksPage() {
       </header>
 
       <section aria-labelledby="novo-bloqueio" className="grid gap-4">
-        <h2 id="novo-bloqueio" className="font-heading text-lg font-semibold">
+        <h2 id="novo-bloqueio" className="font-heading text-lg font-bold">
           Novo bloqueio
         </h2>
         <TimeBlockForm today={today} />
       </section>
 
       <section aria-labelledby="proximos" className="grid gap-3">
-        <h2 id="proximos" className="font-heading text-lg font-semibold">
+        <h2 id="proximos" className="font-heading text-lg font-bold">
           Próximos bloqueios
         </h2>
         <BlockList blocks={rows} />
       </section>
 
       <section aria-labelledby="feriados" className="grid gap-3">
-        <h2 id="feriados" className="font-heading text-lg font-semibold">
+        <h2 id="feriados" className="font-heading text-lg font-bold">
           Feriados nacionais
         </h2>
         <HolidaysButton years={[year, year + 1]} />

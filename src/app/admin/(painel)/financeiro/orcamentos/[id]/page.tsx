@@ -139,7 +139,7 @@ export default async function QuotePage({
               <td colSpan={4} className="p-3 text-right font-semibold">
                 Total
               </td>
-              <td className="p-3 text-right font-heading text-lg font-semibold tabular-nums">
+              <td className="p-3 text-right font-heading text-lg font-bold tabular-nums">
                 {money(quote.totalCents)}
               </td>
             </tr>

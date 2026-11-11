@@ -26,7 +26,7 @@ export default async function ReceivablesPage() {
       {items.map((r) => (
         <li
           key={r.installmentId}
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-3"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3"
         >
           <Link
             href={`/admin/financeiro/vendas/${r.saleId}` as Route}
@@ -62,7 +62,7 @@ export default async function ReceivablesPage() {
       <PageTitle title="A receber" />
       <FinanceTabs current="/admin/financeiro/receber" />
       <section aria-labelledby="com-vencimento" className="grid gap-3">
-        <h2 id="com-vencimento" className="font-heading text-lg font-semibold">
+        <h2 id="com-vencimento" className="font-heading text-lg font-bold">
           Com vencimento
         </h2>
         {dated.length === 0 ? (
@@ -73,7 +73,7 @@ export default async function ReceivablesPage() {
       </section>
       {undated.length > 0 ? (
         <section aria-labelledby="sem-data" className="grid gap-3">
-          <h2 id="sem-data" className="font-heading text-lg font-semibold">
+          <h2 id="sem-data" className="font-heading text-lg font-bold">
             Sessões ainda não agendadas
           </h2>
           <p className="text-sm text-muted-foreground">

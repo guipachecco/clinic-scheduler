@@ -31,7 +31,7 @@ export async function PatientFinance({
   return (
     <section aria-labelledby="financeiro" className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="financeiro" className="font-heading text-lg font-semibold">
+        <h2 id="financeiro" className="font-heading text-lg font-bold">
           Financeiro
         </h2>
         {canQuote ? (
@@ -56,7 +56,7 @@ export async function PatientFinance({
             <li key={sale.id}>
               <Link
                 href={`/admin/financeiro/vendas/${sale.id}` as Route}
-                className="flex flex-wrap justify-between gap-2 rounded-xl border bg-card p-3 hover:bg-muted/50"
+                className="flex flex-wrap justify-between gap-2 rounded-2xl border bg-card px-4 py-3 hover:bg-muted/50"
               >
                 <span>
                   Venda do orçamento {sale.quoteNumber}
@@ -79,7 +79,7 @@ export async function PatientFinance({
             <li key={quote.id}>
               <Link
                 href={`/admin/financeiro/orcamentos/${quote.id}` as Route}
-                className="flex flex-wrap justify-between gap-2 rounded-xl border bg-card p-3 hover:bg-muted/50"
+                className="flex flex-wrap justify-between gap-2 rounded-2xl border bg-card px-4 py-3 hover:bg-muted/50"
               >
                 <span>
                   Orçamento nº {quote.number} ·{" "}

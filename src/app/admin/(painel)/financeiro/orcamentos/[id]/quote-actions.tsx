@@ -209,7 +209,7 @@ function ApproveForm({
       aria-labelledby="aprovar"
       className="grid gap-4 rounded-2xl border bg-card p-4"
     >
-      <h2 id="aprovar" className="font-heading text-lg font-semibold">
+      <h2 id="aprovar" className="font-heading text-lg font-bold">
         Cliente aprovou
       </h2>
       <fieldset className="grid gap-2">

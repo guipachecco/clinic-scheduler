@@ -64,7 +64,7 @@ export default async function QuotesPage({
             <li key={quote.id}>
               <Link
                 href={`/admin/financeiro/orcamentos/${quote.id}` as Route}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3 hover:bg-muted/50"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-3 hover:bg-muted/50"
               >
                 <span className="min-w-0 break-words">
                   <span className="font-medium">

@@ -9,6 +9,7 @@ import { todayLocal } from "@/modules/schedule/time";
 import {
   FinanceTabs,
   formatDay,
+  HighlightStat,
   money,
   monthRange,
   PageTitle,
@@ -29,7 +30,7 @@ export default async function FinancePage() {
   const next = receivables.filter((r) => r.dueDate !== null).slice(0, 8);
 
   return (
-    <div className="grid gap-6">
+    <div className="grid max-w-5xl gap-6">
       <PageTitle title="Financeiro">
         <div className="flex flex-wrap gap-2">
           <Button asChild>
@@ -42,43 +43,55 @@ export default async function FinancePage() {
       </PageTitle>
       <FinanceTabs current="/admin/financeiro" />
 
-      <section
-        aria-label="Resumo"
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-      >
-        <Stat label="Entrou hoje" value={money(summary.receivedTodayCents)} />
-        <Stat
-          label={`Entrou em ${month.label}`}
-          value={money(summary.receivedMonthCents)}
-          hint={
-            summary.receivedMonthByMethod.length > 0
-              ? summary.receivedMonthByMethod
-                  .map((m) => `${m.methodName}: ${money(m.amountCents)}`)
-                  .join(" · ")
-              : undefined
-          }
+      <section aria-label="Resumo" className="grid gap-3">
+        <HighlightStat
+          label="Saldo do mês"
+          value={money(summary.balanceMonthCents)}
+          details={[
+            {
+              label: `Entrou em ${month.label}`,
+              value: money(summary.receivedMonthCents),
+            },
+            {
+              label: `Saiu em ${month.label}`,
+              value: money(summary.spentMonthCents),
+            },
+          ]}
         />
-        <Stat
-          label={`Saiu em ${month.label}`}
-          value={money(summary.spentMonthCents)}
-        />
-        <Stat label="Saldo do mês" value={money(summary.balanceMonthCents)} />
-        <Stat
-          label="Parcelas atrasadas"
-          value={money(summary.overdueCents)}
-          hint={`${summary.overdueCount} parcela(s)`}
-          tone={summary.overdueCount > 0 ? "alert" : "default"}
-        />
-        <Stat
-          label="A receber"
-          value={money(summary.receivableDatedCents)}
-          hint={`Mais ${money(summary.receivableUnscheduledCents)} de sessões ainda não agendadas`}
-        />
+        {summary.receivedMonthByMethod.length > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {summary.receivedMonthByMethod
+              .map((m) => `${m.methodName}: ${money(m.amountCents)}`)
+              .join(" · ")}
+          </p>
+        ) : null}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Stat
+            icon="arrowIn"
+            iconTone="blue"
+            label="Entrou hoje"
+            value={money(summary.receivedTodayCents)}
+          />
+          <Stat
+            icon="clock"
+            iconTone="pink"
+            label="A receber"
+            value={money(summary.receivableDatedCents)}
+            hint={`Mais ${money(summary.receivableUnscheduledCents)} de sessões ainda não agendadas`}
+          />
+          <Stat
+            icon="alert"
+            label="Parcelas atrasadas"
+            value={money(summary.overdueCents)}
+            hint={`${summary.overdueCount} parcela(s)`}
+            tone={summary.overdueCount > 0 ? "alert" : "default"}
+          />
+        </div>
       </section>
 
       <section aria-labelledby="proximas" className="grid gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="proximas" className="font-heading text-lg font-semibold">
+          <h2 id="proximas" className="font-heading text-lg font-bold">
             Próximas parcelas
           </h2>
           <Link
@@ -96,7 +109,7 @@ export default async function FinancePage() {
               <li key={r.installmentId}>
                 <Link
                   href={`/admin/financeiro/vendas/${r.saleId}` as Route}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card p-3 hover:bg-muted/50"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card px-4 py-3 hover:bg-muted/50"
                 >
                   <span className="min-w-0 break-words">
                     <span className="font-medium">{r.patientName}</span>{" "}

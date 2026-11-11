@@ -56,7 +56,7 @@ export async function AppointmentHistory({
   return (
     <section aria-labelledby="atendimentos" className="grid gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="atendimentos" className="font-heading text-lg font-semibold">
+        <h2 id="atendimentos" className="font-heading text-lg font-bold">
           Atendimentos
         </h2>
         {canSchedule ? (

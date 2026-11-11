@@ -33,7 +33,7 @@ export async function Anamneses({ patientId }: { patientId: string }) {
     <section aria-labelledby="anamneses" className="grid gap-4">
       <RefreshWhenChanged patientId={patientId} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="anamneses" className="font-heading text-lg font-semibold">
+        <h2 id="anamneses" className="font-heading text-lg font-bold">
           Anamneses
         </h2>
         <NewAnamnesisButton patientId={patientId} />

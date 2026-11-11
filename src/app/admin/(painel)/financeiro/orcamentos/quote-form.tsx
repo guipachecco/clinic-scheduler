@@ -138,7 +138,7 @@ export function QuoteForm({
   return (
     <form onSubmit={onSubmit} noValidate className="grid gap-6">
       <fieldset className="grid gap-3">
-        <legend className="mb-2 font-heading text-lg font-semibold">
+        <legend className="mb-2 font-heading text-lg font-bold">
           Paciente
         </legend>
         {patient ? (
@@ -215,7 +215,7 @@ export function QuoteForm({
       </fieldset>
 
       <fieldset className="grid gap-4">
-        <legend className="mb-2 font-heading text-lg font-semibold">
+        <legend className="mb-2 font-heading text-lg font-bold">
           Serviços
         </legend>
         {items.map((item, index) => {
