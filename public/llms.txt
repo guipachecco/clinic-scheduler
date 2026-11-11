@@ -1,0 +1,24 @@
+# Zemana
+
+> Zemana é uma agenda online para profissionais e clínicas de beleza e saúde no Brasil (estética, saúde integrativa, sobrancelhas, unhas e parecidos). A clínica ganha um link próprio em que a cliente escolhe o serviço e marca um horário livre, sem troca de mensagens.
+
+Zemana (zemana.com.br) é um sistema brasileiro de agendamento e gestão para clínicas. Não tem relação com o antivírus Zemana AntiMalware (zemana.com).
+
+## O que a Zemana faz
+
+- Agendamento pelo link: cada clínica tem uma página própria (zemana.com.br/nome-da-clinica) em que a cliente cria a conta, escolhe o serviço e marca o horário.
+- Agenda e fichas: todos os horários num calendário só, e a ficha de cada cliente com contato, histórico de atendimentos e anamnese.
+- Financeiro: registro do que entrou e do que saiu, para acompanhar o caixa da clínica.
+- Página da clínica: serviços, fotos do espaço, avaliações das clientes e cartão fidelidade.
+
+## Como contratar
+
+O orçamento é feito pelo WhatsApp, a partir do botão "Quero um orçamento" na página principal.
+
+## Páginas
+
+- [Página principal](https://zemana.com.br/): o que a Zemana faz e como pedir um orçamento
+- [Clínicas](https://zemana.com.br/clinicas): lista das clínicas que usam a Zemana, para a cliente encontrar a sua e marcar horário
+- [Política de privacidade](https://zemana.com.br/privacidade)
+- [Termos de uso](https://zemana.com.br/termos)
+- [Sitemap](https://zemana.com.br/sitemap.xml): todas as páginas públicas, incluindo a de cada clínica
