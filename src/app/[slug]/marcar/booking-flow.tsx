@@ -197,7 +197,7 @@ export function BookingFlow({
                   type="button"
                   disabled={pending}
                   onClick={() => chooseService(item)}
-                  className="grid w-full gap-1 rounded-2xl border bg-card p-4 text-left outline-none hover:border-primary focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
+                  className="grid w-full gap-1 rounded-2xl border bg-card p-4 text-left outline-none hover:border-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
                 >
                   <span className="font-semibold">{item.name}</span>
                   <span className="text-sm text-muted-foreground">
@@ -340,7 +340,7 @@ function Done({
                     href={confirmation.mapsUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-primary underline underline-offset-4"
+                    className="font-semibold text-primary-text underline underline-offset-4"
                   >
                     Ver no mapa
                   </a>

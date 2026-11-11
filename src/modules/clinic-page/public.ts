@@ -85,6 +85,23 @@ async function enterClinic(tx: Tx, slug: string): Promise<string | null> {
   return row.clinic_id;
 }
 
+// What every /<slug> screen's layout needs from the published page: the look
+// and whether there is a logo. One read; null when the slug is not an active
+// clinic.
+export async function getClinicLook(
+  slug: string,
+): Promise<{ theme: ClinicTheme; hasLogo: boolean } | null> {
+  return clientDb.transaction(async (tx) => {
+    const clinicId = await enterClinic(tx, slug);
+    if (!clinicId) return null;
+    const [row] = await tx
+      .select({ theme: clinics.theme, logoMediaId: clinics.logoMediaId })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId));
+    return row ? { theme: row.theme, hasLogo: row.logoMediaId !== null } : null;
+  });
+}
+
 // Null when the slug is not an active clinic.
 export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
   return clientDb.transaction(async (tx) => {

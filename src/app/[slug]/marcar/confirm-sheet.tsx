@@ -30,7 +30,7 @@ function Row({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <Icon name={icon} className="mt-0.5 size-5 shrink-0 text-primary" />
+      <Icon name={icon} className="mt-0.5 size-5 shrink-0 text-primary-text" />
       <div>
         <dt className="text-sm text-muted-foreground">{label}</dt>
         <dd className="font-semibold">{children}</dd>

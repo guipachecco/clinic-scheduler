@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 
 import { BrandImage } from "@/components/brand-image";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { getTheme } from "@/lib/theme-server";
+import { getClinicLook } from "@/modules/clinic-page/public";
 import {
   findClinic,
   getClientUser,
@@ -14,7 +14,6 @@ import {
 import "../page-fonts";
 
 import { BottomNav } from "./bottom-nav";
-import { loadClinicPage } from "./load-page";
 import { PageTheme } from "./page-theme";
 import { clinicName } from "./ui";
 
@@ -47,23 +46,26 @@ export default async function ClientLayout({
   const clinic = await requireClinic((await params).slug);
   const theme = await getTheme();
   const user = await getClientUser();
-  const page = await loadClinicPage(clinic.slug);
-  if (!page) notFound();
+  // Only the look and the logo: the full page is read by the home page alone.
+  const look = (await getClinicLook(clinic.slug)) ?? {
+    theme: {},
+    hasLogo: false,
+  };
 
   return (
     <div className="clinic-page flex flex-1 flex-col bg-background">
-      <PageTheme theme={page.theme} scopeClass="clinic-page" />
+      <PageTheme theme={look.theme} scopeClass="clinic-page" />
       <header className="border-b bg-card">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-3">
           <Link
             href={`/${clinic.slug}`}
             className="flex min-w-0 items-center gap-2.5"
           >
-            {page.hasLogo ? (
+            {look.hasLogo ? (
               // eslint-disable-next-line @next/next/no-img-element -- served by the /logo route handler
               <img
                 src={`/${clinic.slug}/logo`}
-                alt={clinicName(clinic)}
+                alt=""
                 height={28}
                 className="h-7 w-auto max-w-28 shrink-0 object-contain"
               />

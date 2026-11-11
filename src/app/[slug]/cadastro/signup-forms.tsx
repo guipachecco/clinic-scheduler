@@ -31,7 +31,7 @@ import { completeRegistration, signUp } from "./actions";
 const GENERIC_ERROR = "Não foi possível concluir. Tente novamente.";
 
 const legalLinkClass =
-  "font-semibold text-primary underline underline-offset-4";
+  "font-semibold text-primary-text underline underline-offset-4";
 
 // Under the buttons that create the account or the clinic record.
 function LegalNotice() {

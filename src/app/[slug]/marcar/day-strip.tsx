@@ -105,7 +105,7 @@ export function DayStrip({
                 chosen
                   ? "border-primary bg-primary text-primary-foreground"
                   : free
-                    ? "bg-card hover:border-primary"
+                    ? "bg-card hover:border-primary-text"
                     : "border-transparent bg-transparent text-muted-foreground/50",
               )}
             >

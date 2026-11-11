@@ -2,12 +2,10 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { AMENITY_LABELS } from "@/modules/clinic-page/fields";
 import type { ClinicPage } from "@/modules/clinic-page/public";
 
 import { AMENITY_ICONS, Icon, type IconName } from "../icons";
-import { customColor } from "../page-theme";
 import {
   clinicName,
   instagramUrl,
@@ -16,6 +14,7 @@ import {
   whatsappUrl,
 } from "../ui";
 
+import { bookingButtonClass } from "./booking-button";
 import { CopyPhone } from "./copy-phone";
 import { WEEKDAY_NAMES } from "./open-status";
 import { PhotoGallery } from "./photo-gallery";
@@ -359,19 +358,7 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
 // The one strong action of the page, fixed above the bottom navigation:
 // "Marcar horário", or the clinic's WhatsApp when online booking is off.
 export function BookingBar({ page }: { page: ClinicPage }) {
-  const className = cn(
-    // The shape the owner chose (--radius-button, page-theme.tsx).
-    "flex min-h-13 w-full items-center justify-center gap-2 rounded-[var(--radius-button)] font-heading text-base font-extrabold shadow-[0_0_0_4px_var(--background)] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-    page.theme.buttonFill === "outline"
-      ? // The page background behind the outline keeps the label readable
-        // over the content that scrolls under the fixed bar.
-        "border-2 border-primary-text bg-background text-primary-text hover:bg-muted"
-      : customColor(page.theme)
-        ? // The owner's color, in both themes.
-          "bg-primary text-primary-foreground hover:bg-primary-pressed"
-        : // Purple in the light theme, the Zemana yellow in the dark one.
-          "bg-primary text-primary-foreground hover:bg-primary-pressed dark:bg-highlight dark:text-highlight-foreground dark:hover:bg-highlight/90",
-  );
+  const className = bookingButtonClass(page.theme);
   let action: React.ReactNode = null;
   if (page.onlineBookingEnabled) {
     action = (

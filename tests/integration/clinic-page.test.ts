@@ -23,6 +23,7 @@ import {
   createReview,
   getClinicCover,
   getClinicLogo,
+  getClinicLook,
   getClinicPage,
   getLoyaltyProgress,
   getOwnerPhoto,
@@ -421,6 +422,7 @@ describe("published page look", () => {
     expect(page.hasLogo).toBe(false);
     expect(page.cover).toBeNull();
     expect(page.businessType).toBe(saved.businessType);
+    expect((await getClinicLook(slug))?.hasLogo).toBe(false);
     expect(await getClinicLogo(slug)).toBeNull();
     expect(await getClinicCover(slug)).toBeNull();
   });
@@ -450,6 +452,11 @@ describe("published page look", () => {
       fontId: "oswald",
     });
 
+    expect(await getClinicLook(slug)).toEqual({
+      theme: page.theme,
+      hasLogo: true,
+    });
+
     const logo = await getClinicLogo(slug);
     expect(logo?.mimeType).toBe("image/webp");
     expect(logo?.data.length).toBeGreaterThan(0);
@@ -464,6 +471,7 @@ describe("published page look", () => {
     try {
       expect(await getClinicLogo(slug)).toBeNull();
       expect(await getClinicCover(slug)).toBeNull();
+      expect(await getClinicLook(slug)).toBeNull();
     } finally {
       await db
         .update(clinics)
@@ -475,5 +483,6 @@ describe("published page look", () => {
   it("serves nothing for an unknown slug", async () => {
     expect(await getClinicLogo("nao-existe")).toBeNull();
     expect(await getClinicCover("nao-existe")).toBeNull();
+    expect(await getClinicLook("nao-existe")).toBeNull();
   });
 });

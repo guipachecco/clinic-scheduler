@@ -23,7 +23,8 @@ export default async function ClientLoginPage({
     safeNext(clinic.slug, (await searchParams).next) ??
     `/${clinic.slug}/marcar`;
   if (await getClientUser()) redirect(next);
-  const linkClass = "font-semibold text-primary underline underline-offset-4";
+  const linkClass =
+    "font-semibold text-primary-text underline underline-offset-4";
 
   return (
     <>
