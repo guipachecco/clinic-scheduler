@@ -323,8 +323,6 @@ describe("clinic page module", () => {
 
   it("updates the page and loyalty settings", async () => {
     await panel.updateClinicPage(CLINIC, {
-      headline: "Olá",
-      about: null,
       whatsappPhone: null,
       contactEmail: null,
       address: null,
@@ -340,12 +338,13 @@ describe("clinic page module", () => {
     });
     const settings = await panel.getClinicPageSettings(CLINIC);
     expect(settings).toMatchObject({
-      headline: "Olá",
       instagramHandle: "outro",
       amenities: ["banheiro"],
       loyaltyVisits: 5,
       loyaltyReward: "Outro brinde",
     });
+    // Headline and about belong to the page builder now.
+    expect(settings).not.toHaveProperty("headline");
   });
 });
 

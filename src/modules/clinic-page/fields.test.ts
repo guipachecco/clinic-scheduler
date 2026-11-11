@@ -12,8 +12,6 @@ import {
 } from "./fields";
 
 const page = {
-  headline: "",
-  about: "",
   whatsappPhone: "",
   contactEmail: "",
   address: "",
@@ -76,7 +74,7 @@ describe("parsePriceInput", () => {
 describe("clinicPageSchema", () => {
   it("turns empty strings into null and carries the handle", () => {
     const parsed = clinicPageSchema.parse({ ...page, instagram: "@zemana" });
-    expect(parsed.headline).toBeNull();
+    expect(parsed.address).toBeNull();
     expect(parsed.mapsUrl).toBeNull();
     expect(parsed.instagramHandle).toBe("zemana");
     expect(parsed).not.toHaveProperty("instagram");
@@ -113,11 +111,13 @@ describe("clinicPageSchema", () => {
 
   it("limits the lengths", () => {
     expect(
-      clinicPageSchema.safeParse({ ...page, headline: "a".repeat(121) })
-        .success,
+      clinicPageSchema.safeParse({ ...page, address: "a".repeat(201) }).success,
     ).toBe(false);
     expect(
-      clinicPageSchema.safeParse({ ...page, about: "a".repeat(2001) }).success,
+      clinicPageSchema.safeParse({
+        ...page,
+        mapsUrl: `https://${"a".repeat(500)}`,
+      }).success,
     ).toBe(false);
   });
 });

@@ -41,8 +41,6 @@ export async function getClinicPageSettings(
   return inClinic(clinicId, async (tx) => {
     const [row] = await tx
       .select({
-        headline: clinics.headline,
-        about: clinics.about,
         whatsappPhone: clinics.whatsappPhone,
         contactEmail: clinics.contactEmail,
         address: clinics.address,
@@ -68,8 +66,6 @@ export async function updateClinicPage(
     tx
       .update(clinics)
       .set({
-        headline: input.headline,
-        about: input.about,
         whatsappPhone: input.whatsappPhone,
         contactEmail: input.contactEmail,
         address: input.address,
