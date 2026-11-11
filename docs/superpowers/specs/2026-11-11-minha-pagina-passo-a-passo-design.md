@@ -96,10 +96,10 @@ Colunas novas em `clinics`:
 Permissões (padrão das migrações 0011/0017/0020):
 
 - `app_panel`: `GRANT UPDATE (logo_media_id, cover_media_id, business_type,
-  page_draft, headline, about, theme)` — as que faltarem. A policy
+page_draft, headline, about, theme)` — as que faltarem. A policy
   `clinics_panel` já limita à própria clínica.
 - `app_client`: `GRANT SELECT (business_type, cover_media_id, logo_media_id,
-  theme)` — nunca `page_draft`.
+theme)` — nunca `page_draft`.
 - Funções definer `client_clinic_logo(p_clinic)` e `client_clinic_cover(p_clinic)`,
   no molde de `client_owner_photo`, só para clínica ativa.
 - Teste de integração: o cliente não lê `page_draft`; um painel não grava

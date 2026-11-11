@@ -35,11 +35,13 @@
 ### Task 1: Migração 0025 e schema
 
 **Files:**
+
 - Create: `drizzle/0025_page_builder.sql` (via `pnpm db:generate` e depois SQL manual de grants/funções, como em `0020_clinic_photos.sql`), snapshot e `_journal.json` gerados.
 - Modify: `src/db/schema/clinic.ts` (enum, colunas, FK, `ClinicTheme`)
 - Test: `tests/integration/page-builder-db.test.ts`
 
 **Interfaces — Produces:**
+
 - `businessType = pgEnum("business_type", ["clinic", "barbershop", "nail_salon", "other"])`
 - `clinics.businessType` (not null default `clinic`), `clinics.coverMediaId` (uuid, FK composta `clinics_cover_media_fk` como a do logo), `clinics.pageDraft` (`jsonb().$type<unknown>()`, nulo).
 - Check `clinics_page_draft_size_check`: `page_draft is null or pg_column_size(page_draft) <= 16384`.
@@ -64,15 +66,18 @@
 ### Task 2: Cor livre → paleta legível
 
 **Files:**
+
 - Create: `src/modules/branding/derive.ts`, `src/modules/branding/derive.test.ts`
 - Modify: `src/modules/branding/contrast.ts` (exportar helpers de mistura se úteis)
 
 **Interfaces — Produces:**
+
 - `HEX_COLOR = /^#[0-9a-f]{6}$/` (minúsculas; normalizar entrada com `.toLowerCase()`).
 - `paletteFromColor(hex: string): Palette` — `Palette` de `palettes.ts` (`id: "custom"`).
 - `readableOn(hex: string): "#ffffff" | "#1c1a22"` — o de maior contraste.
 
 Regras (todas pinadas por teste):
+
 - `light.primary`, `light.brand` = a cor exata. `light["primary-foreground"]`, `light["brand-foreground"]` = `readableOn(cor)`.
 - `light["primary-pressed"]`, `light["brand-muted"]` = cor escurecida 12% (mistura com preto).
 - `light["brand-accent"]` = cor misturada 85% com branco; `light["brand-accent-foreground"]` = cor escurecida até contraste ≥ 4.5 sobre `brand-accent`.
@@ -96,11 +101,13 @@ Regras (todas pinadas por teste):
 ### Task 3: Fontes, botões e vocabulário por tipo de negócio
 
 **Files:**
+
 - Create: `src/modules/page-style/fonts.ts`, `src/modules/page-style/buttons.ts`, `src/modules/page-style/page-style.test.ts`, `src/modules/business-type/vocabulary.ts`, `src/modules/business-type/vocabulary.test.ts`
 - Modify: `package.json` (+ `@fontsource-variable/playfair-display`, `@fontsource-variable/oswald`, `@fontsource-variable/quicksand`, `@fontsource-variable/dm-sans`), `pnpm-lock.yaml`
 - Create: `src/app/page-fonts.ts` (só os `import "@fontsource-variable/..."`, importado pela página pública e pelo assistente)
 
 **Interfaces — Produces:**
+
 - `FONTS = [{ id: "bricolage", label: "Moderna", family: '"Bricolage Grotesque Variable"' }, { id: "playfair", label: "Elegante", family: '"Playfair Display Variable"' }, { id: "oswald", label: "Forte", family: '"Oswald Variable"' }, { id: "quicksand", label: "Delicada", family: '"Quicksand Variable"' }, { id: "dmsans", label: "Simples", family: '"DM Sans Variable"' }] as const`; `type FontId`; `fontFamily(id: FontId | undefined): string` (padrão `bricolage`).
 - `BUTTON_SHAPES = ["pill", "rounded", "square"] as const`, `BUTTON_FILLS = ["solid", "outline"] as const`; `buttonRadius(shape): "9999px" | "0.75rem" | "0.25rem"` (padrão `pill`).
 - `pageStyleVars(theme: ClinicTheme): Record<string, string>` → `{ "--font-heading": …, "--radius-button": … }`.
@@ -117,11 +124,13 @@ Regras (todas pinadas por teste):
 ### Task 4: Rascunho — gravar, enviar imagem, publicar, descartar
 
 **Files:**
+
 - Create: `src/modules/page-builder/draft.ts` (zod + merge, puro), `src/modules/page-builder/draft.test.ts`, `src/modules/page-builder/builder.ts` (`server-only`, banco), `tests/integration/page-builder.test.ts`
 
 **Interfaces — Consumes:** Task 1 colunas; Task 3 `FONTS`, `BUTTON_*`, `BUSINESS_TYPES`; Task 2 `HEX_COLOR`.
 
 **Interfaces — Produces (draft.ts):**
+
 - `pageDraftSchema` (zod, todos os campos opcionais): `businessType`, `logoMediaId: uuid|null`, `ownerPhotoMediaId: uuid|null`, `coverMediaId: uuid|null`, `theme: { primaryColor?, buttonShape?, buttonFill?, fontId? }`, `headline: string(≤120)|null`, `about: string(≤2000)|null`, `gallery: uuid[] (≤ MAX_CLINIC_PHOTOS)`.
 - `type PageDraft = z.infer<typeof pageDraftSchema>`
 - `parseDraft(raw: unknown): PageDraft` — campos inválidos são descartados um a um (nunca lança).
@@ -131,6 +140,7 @@ Regras (todas pinadas por teste):
 - `STEP_IDS = ["tipo", "logo", "perfil", "capa", "cor", "botoes", "fonte", "texto", "galeria", "publicar"] as const`; `type StepId`.
 
 **Interfaces — Produces (builder.ts), todas `(clinicId, …, actorUserId: string)` dentro de `inClinic`:**
+
 - `getBuilderState(clinicId): Promise<{ slug: string; name: string; published: PublishedPage; draft: PageDraft; hasDraft: boolean; galleryMedia: { id: string; width: number; height: number }[] }>` — `galleryMedia` cobre publicadas + do rascunho.
 - `saveDraftPatch(clinicId, patch: PageDraft): Promise<{ ok: true } | { ok: false; formError: string }>` — `select … for update`, `mergeDraft` em nível de rascunho (patch sobre rascunho atual), recusa media id que não seja da clínica.
 - `uploadDraftImage(clinicId, slot: "logo" | "ownerPhoto" | "cover" | "gallery", input: { bytes: Buffer; mimeType: string }): Promise<{ ok: true; mediaId: string } | { ok: false; formError: string }>` — `reencodeImage` (logo/perfil `maxSide 800`, capa/galeria `1600`, quality 85/80), insere `media` (`kind` `logo` para logo, `photo` para o resto); para `gallery` acrescenta ao fim de `draft.gallery` (partindo da galeria publicada se ausente); para os outros grava no slot. Rascunho anterior daquele slot que não esteja publicado é apagado.
@@ -155,6 +165,7 @@ Regras (todas pinadas por teste):
 ### Task 5: Página pública lê o que foi publicado
 
 **Files:**
+
 - Modify: `src/modules/clinic-page/public.ts` (`ClinicPage` + `getClinicPage` + `getClinicLogo(slug)`, `getClinicCover(slug)`), `src/modules/clients/session.ts` ou o tipo que `requireClinic` devolve (se o layout precisar de `theme`/`hasLogo`, preferir ler de `getClinicPage` em cache)
 - Create: `src/app/[slug]/logo/route.ts`, `src/app/[slug]/capa/route.ts` (molde de `src/app/[slug]/foto/route.ts`), `src/app/[slug]/page-theme.tsx`
 - Modify: `src/app/[slug]/layout.tsx`, `src/app/[slug]/page.tsx` (`describe`, Open Graph, JSON-LD com capa), `src/app/[slug]/home/hero.tsx`, `src/app/[slug]/home/sections.tsx` (botão de agendar e botões principais), `src/app/globals.css` (`--radius-button` default `9999px`, `--primary-text`)
@@ -162,6 +173,7 @@ Regras (todas pinadas por teste):
 
 **Interfaces — Consumes:** `paletteFromColor`, `paletteCss`-like bloco; `pageStyleVars`; Task 1 funções definer.
 **Interfaces — Produces:**
+
 - `ClinicPage` ganha `theme: ClinicTheme`, `businessType: BusinessType`, `hasLogo: boolean`, `cover: { width: number; height: number } | null` (capa própria; senão o `Hero` usa `photos[0]` como hoje).
 - `pageThemeCss(theme: ClinicTheme, scope: string): string` em `page-theme.tsx` — `""` sem `primaryColor`; senão `${scope}{--primary:…;…}.dark ${scope}{…}` com os tokens de `paletteFromColor`. Componente `<PageTheme theme scopeClass="clinic-page" />` que renderiza `<style>` com isso e as `pageStyleVars`.
 - No layout: contêiner raiz ganha `className="clinic-page …"`; cabeçalho mostra `<img src="/<slug>/logo">` (altura 28, `alt` = nome) quando `hasLogo`, senão o `BrandImage` atual.
@@ -178,16 +190,19 @@ Regras (todas pinadas por teste):
 ### Task 6: Assistente "Monte a cara da sua página" no painel
 
 **Files:**
+
 - Create: `src/app/admin/(painel)/pagina/montar/page.tsx` (server: `requireAdmin`, `getBuilderState`, lê `searchParams.passo` validado contra `STEP_IDS`), `.../montar/builder-wizard.tsx` (client), `.../montar/steps/*.tsx` (um componente por passo), `.../montar/page-preview.tsx` (client), `.../montar/actions.ts`
 - Modify: `src/app/admin/(painel)/pagina/page.tsx` (cartão no topo: "Monte a cara da sua página" + `Começar` ou `Continuar rascunho`), `.../pagina/page-form.tsx` e `src/modules/clinic-page/fields.ts` / `panel.ts` (tirar `headline` e `about` do formulário, do schema e do `update`), `e2e/clinic-page-panel.spec.ts` (o teste "owner edits her page" deixa de preencher frase/sobre)
 
 **Interfaces — Consumes:** Task 4 (`getBuilderState`, `saveDraftPatch`, `uploadDraftImage`, `publishDraft`, `discardDraft`, `STEP_IDS`, `mergeDraft`), Task 2 `paletteFromColor`, Task 3 listas.
 **Interfaces — Produces (actions.ts, `"use server"`, cada uma chama `requireAdmin()` primeiro e devolve valores, nunca redirect, no molde de `pagina/actions.ts`):**
+
 - `saveStepAction(patch: unknown): Promise<{ ok: true } | ActionFailure>` (valida com `pageDraftSchema`)
 - `uploadImageAction(formData: FormData): Promise<{ ok: true; mediaId: string } | ActionFailure>` (`slot` + `file`; reaproveitar o limite de tamanho do envio de foto do dono se houver em `next.config`)
 - `publishAction(): Promise<{ ok: true } | ActionFailure>`; `discardAction(): Promise<{ ok: true } | ActionFailure>`
 
 Comportamento:
+
 - Layout do passo (modelo A): topo "Passo N de 10 · <nome>" + barra de progresso; prévia; título em pergunta ("Qual a cor do seu negócio?"); controle; rodapé com `Voltar` e `Próximo` (no último: `Publicar` e `Descartar rascunho`). Um índice (`<details>` "Ver todos os passos") leva a qualquer passo.
 - `Próximo` grava o patch do passo (`saveStepAction`) e navega para `?passo=<próximo>` com `router.push`; erro mostra `FormError` e não avança.
 - Prévia (`page-preview.tsx`): recebe `PublishedPage` mesclado com o estado local e renderiza capa, foto de perfil (iniciais quando não há), nome, frase, botão "Agendar horário" com forma/preenchimento/fonte, e um `<style>` com `pageThemeCss(theme, ".page-preview")`. Imagens do rascunho via `/admin/foto/<mediaId>`.
@@ -205,6 +220,7 @@ Comportamento:
 ### Task 7: Vocabulário no painel
 
 **Files:**
+
 - Modify: `src/modules/clinics/clinics.ts` (`ClinicSummary` + `businessType`, lido onde o resumo já é montado), `src/app/admin/(painel)/layout.tsx` (rótulo do menu = `vocabulary(session.clinic.businessType).People`), `src/app/admin/(painel)/pacientes/page.tsx` (título e botão novo), `src/app/admin/(painel)/pacientes/novo/page.tsx` (título)
 - Test: `src/modules/business-type/vocabulary.test.ts` já cobre o mapa; e2e na Task 8.
 
@@ -215,6 +231,7 @@ Comportamento:
 ### Task 8: E2E e PR
 
 **Files:**
+
 - Create: `e2e/page-builder.spec.ts`, fixtures de imagem geradas em tempo de teste com `sharp` (sem binários no repo)
 - Modify: `e2e/test-account.ts` (`PAGE_BUILDER_CLINIC_SLUG = "barbearia-montar-pagina"` e `TEST_ADMIN_PAGE_BUILDER`), `e2e/global-setup.ts` (inserir a clínica e criar o admin, como `PANEL_HOME_CLINIC_SLUG`)
 
