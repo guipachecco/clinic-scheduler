@@ -36,7 +36,7 @@ Tudo isso roda numa transação só e fica registrado no histórico (`audit_logs
 
 ## Como os dados ficam separados
 
-- **Toda tabela da clínica tem `clinic_id`:** pacientes, serviços, categorias, expediente, bloqueios, agendamentos, imagens e histórico. A tabela `clinics` substituiu a antiga `clinic_settings`, de linha única.
+- **Toda tabela da clínica tem `clinic_id`:** pacientes, serviços, categorias, expediente, bloqueios, agendamentos, imagens, anamneses (só o painel acessa; `app_client` não) e histórico. A tabela `clinics` substituiu a antiga `clinic_settings`, de linha única.
 - **Toda função dos módulos recebe o `clinicId`** como primeiro parâmetro e filtra por ele. O `clinicId` vem sempre da sessão (`requireAdmin()`), nunca do formulário.
 - **O banco também confere:** agendamentos apontam para paciente e serviço da mesma clínica, e serviços para categoria da mesma clínica, por chaves estrangeiras compostas `(clinic_id, id)`. Um agendamento que misture clínicas é recusado mesmo se o código errar.
 - **Cada parte do app entra no banco com um usuário próprio,** e o PostgreSQL limita o que cada um alcança (veja abaixo). Mesmo que uma consulta esqueça o filtro, o banco só devolve as linhas da clínica aberta.

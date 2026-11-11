@@ -16,7 +16,7 @@ A profissional e a equipe precisam cadastrar, encontrar e atualizar pacientes no
 
 ## Fora do escopo
 
-- Prontuário, informações clínicas, documentos e termos: etapa própria, com validação jurídica.
+- Prontuário, documentos e termos: etapa própria, com validação jurídica. A anamnese já existe (só na Grais): veja [anamnese](anamnese.md).
 - Histórico de atendimentos na ficha: entra com a agenda.
 - Exportar os dados do paciente (direito do titular): entrega seguinte.
 - Excluir paciente: não existe; o caminho é anonimizar.
@@ -60,7 +60,7 @@ Data de nascimento e os demais campos novos ficam **opcionais no banco**: o agen
 - **Lista:** todos os pacientes em ordem alfabética, 50 por vez com "Carregar mais"; cada linha mostra nome, apelido, idade e WhatsApp. Pacientes anonimizados ficam ocultos por padrão; a caixa "Mostrar anonimizados" os traz de volta como "Paciente anonimizado", com a etiqueta discreta "Anonimizado", e eles abrem a ficha normalmente.
 - **Máscaras:** CPF e WhatsApp (e telefone fixo) são formatados enquanto a pessoa digita (`000.000.000-00`, `(00) 00000-0000`) e aparecem formatados na ficha e na lista. O banco guarda só os dígitos (CPF) e o formato internacional (telefone).
 - **Duplicidade:** o banco já recusa o mesmo WhatsApp com o mesmo nome; passa a recusar também o mesmo CPF. O formulário mostra o erro no campo, com link para a ficha que já existe.
-- **Anonimizar:** opcional, só a pedido do titular (LGPD). Fica numa seção recolhida ("Anonimizar paciente (LGPD)") no fim da ficha, com confirmação digitada. Apaga todos os dados pessoais, troca o nome por "Paciente anonimizado" e mantém os agendamentos. É recusado enquanto o paciente tiver agendamento futuro solicitado ou confirmado. Depois de anonimizar, a pessoa continua na ficha, que mostra o aviso "Dados pessoais apagados em dd/mm/aaaa a pedido do titular (LGPD). O histórico de agendamentos é mantido." e não tem mais formulário de edição nem a seção de anonimizar.
+- **Anonimizar:** opcional, só a pedido do titular (LGPD). Fica numa seção recolhida ("Anonimizar paciente (LGPD)") no fim da ficha, com confirmação digitada. Apaga todos os dados pessoais e as anamneses da paciente (na mesma transação), troca o nome por "Paciente anonimizado" e mantém os agendamentos. É recusado enquanto o paciente tiver agendamento futuro solicitado ou confirmado. Depois de anonimizar, a pessoa continua na ficha, que mostra o aviso "Dados pessoais apagados em dd/mm/aaaa a pedido do titular (LGPD). O histórico de agendamentos é mantido." e não tem mais formulário de edição nem a seção de anonimizar.
 - **Histórico de ações:** `patient.created`, `patient.updated` e `patient.anonymized`, com o id do paciente e, na edição, só os nomes dos campos alterados, nunca os valores.
 - **Permissão:** todas as páginas e ações chamam `requireAdmin()`. Quando houver outros papéis, esta tela ganha a regra de quem pode ver.
 - **Menu:** "Pacientes" entra no menu lateral do painel.
