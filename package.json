@@ -37,7 +37,7 @@
     "@fullcalendar/interaction": "6.1.22",
     "@fullcalendar/list": "6.1.22",
     "@fullcalendar/luxon3": "6.1.22",
-    "@fullcalendar/react": "6.1.22",
+    "@fullcalendar/react": "7.1.4",
     "@fullcalendar/timegrid": "6.1.22",
     "@hookform/resolvers": "^6.0.2",
     "@react-pdf/renderer": "4.9.0",
