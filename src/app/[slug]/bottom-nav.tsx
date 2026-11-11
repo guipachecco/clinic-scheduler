@@ -49,7 +49,7 @@ export function BottomNav({
                 className={cn(
                   "flex h-16 flex-col items-center justify-center gap-1 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                   active
-                    ? "font-bold text-primary"
+                    ? "font-bold text-primary-text"
                     : "font-medium text-muted-foreground",
                 )}
               >

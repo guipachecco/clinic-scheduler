@@ -2,10 +2,12 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { AMENITY_LABELS } from "@/modules/clinic-page/fields";
 import type { ClinicPage } from "@/modules/clinic-page/public";
 
 import { AMENITY_ICONS, Icon, type IconName } from "../icons";
+import { customColor } from "../page-theme";
 import {
   clinicName,
   instagramUrl,
@@ -68,7 +70,7 @@ export function Amenities({
           <li key={key} className="inline-flex items-center gap-2 text-sm">
             <Icon
               name={AMENITY_ICONS[key]}
-              className="size-5 shrink-0 text-primary"
+              className="size-5 shrink-0 text-primary-text"
             />
             {AMENITY_LABELS[key]}
           </li>
@@ -237,7 +239,7 @@ function RoundLink({
       href={href}
       aria-label={label}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className="inline-flex size-11 items-center justify-center rounded-full bg-secondary text-primary hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+      className="inline-flex size-11 items-center justify-center rounded-full bg-secondary text-primary-text hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
     >
       <Icon name={icon} />
     </a>
@@ -338,7 +340,7 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
                   {body}
                   <Icon
                     name="chevronRight"
-                    className="size-5 shrink-0 text-primary"
+                    className="size-5 shrink-0 text-primary-text"
                   />
                 </Link>
               ) : (
@@ -357,9 +359,19 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
 // The one strong action of the page, fixed above the bottom navigation:
 // "Marcar horário", or the clinic's WhatsApp when online booking is off.
 export function BookingBar({ page }: { page: ClinicPage }) {
-  const className =
-    // Purple in the light theme, the Zemana yellow in the dark one.
-    "flex min-h-13 w-full items-center justify-center gap-2 rounded-full bg-primary font-heading text-base font-extrabold text-primary-foreground shadow-[0_0_0_4px_var(--background)] outline-none hover:bg-primary-pressed focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-highlight dark:text-highlight-foreground dark:hover:bg-highlight/90";
+  const className = cn(
+    // The shape the owner chose (--radius-button, page-theme.tsx).
+    "flex min-h-13 w-full items-center justify-center gap-2 rounded-[var(--radius-button)] font-heading text-base font-extrabold shadow-[0_0_0_4px_var(--background)] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+    page.theme.buttonFill === "outline"
+      ? // The page background behind the outline keeps the label readable
+        // over the content that scrolls under the fixed bar.
+        "border-2 border-primary-text bg-background text-primary-text hover:bg-muted"
+      : customColor(page.theme)
+        ? // The owner's color, in both themes.
+          "bg-primary text-primary-foreground hover:bg-primary-pressed"
+        : // Purple in the light theme, the Zemana yellow in the dark one.
+          "bg-primary text-primary-foreground hover:bg-primary-pressed dark:bg-highlight dark:text-highlight-foreground dark:hover:bg-highlight/90",
+  );
   let action: React.ReactNode = null;
   if (page.onlineBookingEnabled) {
     action = (

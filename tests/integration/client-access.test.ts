@@ -899,6 +899,7 @@ describe("client access", () => {
         "client_business_hours",
         "client_busy_intervals",
         "client_clinic_cover",
+        "client_clinic_cover_size",
         "client_clinic_logo",
         "client_clinic_photo",
         "client_clinic_photos",

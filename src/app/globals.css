@@ -50,15 +50,22 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --font-sans: "Figtree Variable", system-ui, sans-serif;
-  --font-heading: "Bricolage Grotesque Variable", system-ui, sans-serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* Not inline: `font-heading` reads var(--font-heading), so the clinic page
+   can swap the heading font inside its container (src/app/[slug]/page-theme.tsx). */
+@theme {
+  --font-heading: "Bricolage Grotesque Variable", system-ui, sans-serif;
+}
+
 :root {
   --radius: 0.625rem;
+  /* Shape of the clinic page's main buttons; the page builder can change it. */
+  --radius-button: 9999px;
   --background: #f7f5f8;
   --foreground: #1c1a22;
   --card: #ffffff;

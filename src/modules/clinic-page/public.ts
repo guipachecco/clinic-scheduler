@@ -1,11 +1,13 @@
 import "server-only";
 
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 
 import { asClient, clientDb, type Tx } from "@/db/client";
 import { findPgError } from "@/db/errors";
 import { appointments, clinics, products, services } from "@/db/schema";
+import type { ClinicTheme } from "@/db/schema/clinic";
 import type { BookingContext } from "@/modules/booking/booking";
+import type { BusinessType } from "@/modules/business-type/vocabulary";
 import type { PublicClinic } from "@/modules/clients/context";
 import type { DayHours } from "@/modules/schedule/schedule";
 
@@ -25,11 +27,18 @@ export type ClinicPage = PublicClinic & {
   professionalRegistration: string | null;
   instagramHandle: string | null;
   amenities: Amenity[];
+  // What the page builder published (migration 0025): the look of the page,
+  // the kind of business and whether /<slug>/logo has an image.
+  theme: ClinicTheme;
+  businessType: BusinessType;
+  hasLogo: boolean;
+  // The cover's size when the owner published one (image at /<slug>/capa);
+  // without it the page uses the first photo.
+  cover: { width: number; height: number } | null;
   hasOwnerPhoto: boolean;
   loyalty: { visits: number; reward: string } | null;
   paymentMethods: string[];
-  // In page order; the first one is the cover. Images come from
-  // /<slug>/fotos/<id>.
+  // In page order. Images come from /<slug>/fotos/<id>.
   photos: { id: string; width: number; height: number }[];
   hours: DayHours[];
   services: {
@@ -105,6 +114,9 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
         professionalRegistration: clinics.professionalRegistration,
         instagramHandle: clinics.instagramHandle,
         amenities: clinics.amenities,
+        theme: clinics.theme,
+        businessType: clinics.businessType,
+        logoMediaId: clinics.logoMediaId,
         ownerPhotoMediaId: clinics.ownerPhotoMediaId,
         loyaltyEnabled: clinics.loyaltyEnabled,
         loyaltyVisits: clinics.loyaltyVisits,
@@ -192,7 +204,14 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
       sql`select id, width, height from client_clinic_photos(${clinicId}::uuid)`,
     );
 
+    // No row when the owner has not published a cover.
+    const coverRows = await tx.execute<{ width: number; height: number }>(
+      sql`select width, height from client_clinic_cover_size(${clinicId}::uuid)`,
+    );
+    const coverRow = coverRows.rows[0];
+
     const {
+      logoMediaId,
       ownerPhotoMediaId,
       loyaltyEnabled,
       loyaltyVisits,
@@ -202,6 +221,10 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
     return {
       ...rest,
       amenities: clinic.amenities as Amenity[],
+      hasLogo: logoMediaId !== null,
+      cover: coverRow
+        ? { width: Number(coverRow.width), height: Number(coverRow.height) }
+        : null,
       hasOwnerPhoto: ownerPhotoMediaId !== null,
       loyalty:
         loyaltyEnabled && loyaltyReward
@@ -254,19 +277,50 @@ export async function getClinicPhoto(
   });
 }
 
-// The owner's photo of an active clinic; null when there is none.
-export async function getOwnerPhoto(
+type StoredImage = { mimeType: string; data: Buffer };
+
+// One image of an active clinic read through a definer function that returns
+// (mime_type, data); null when the clinic is not active or has none.
+function readImage(
   slug: string,
-): Promise<{ mimeType: string; data: Buffer } | null> {
+  read: (clinicId: string) => SQL,
+): Promise<StoredImage | null> {
   return clientDb.transaction(async (tx) => {
     const clinicId = await enterClinic(tx, slug);
     if (!clinicId) return null;
     const result = await tx.execute<{ mime_type: string; data: Buffer }>(
-      sql`select mime_type, data from client_owner_photo(${clinicId}::uuid)`,
+      read(clinicId),
     );
     const row = result.rows[0];
     return row ? { mimeType: row.mime_type, data: row.data } : null;
   });
+}
+
+// The owner's photo of an active clinic; null when there is none.
+export function getOwnerPhoto(slug: string): Promise<StoredImage | null> {
+  return readImage(
+    slug,
+    (clinicId) =>
+      sql`select mime_type, data from client_owner_photo(${clinicId}::uuid)`,
+  );
+}
+
+// The published logo of an active clinic; null when there is none.
+export function getClinicLogo(slug: string): Promise<StoredImage | null> {
+  return readImage(
+    slug,
+    (clinicId) =>
+      sql`select mime_type, data from client_clinic_logo(${clinicId}::uuid)`,
+  );
+}
+
+// The published cover of an active clinic; null when there is none.
+export function getClinicCover(slug: string): Promise<StoredImage | null> {
+  return readImage(
+    slug,
+    (clinicId) =>
+      sql`select mime_type, data from client_clinic_cover(${clinicId}::uuid)`,
+  );
 }
 
 const scope = (ctx: BookingContext) => ({

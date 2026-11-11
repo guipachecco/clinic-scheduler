@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import { BrandImage } from "@/components/brand-image";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -10,7 +11,11 @@ import {
   requireClinic,
 } from "@/modules/clients/session";
 
+import "../page-fonts";
+
 import { BottomNav } from "./bottom-nav";
+import { loadClinicPage } from "./load-page";
+import { PageTheme } from "./page-theme";
 import { clinicName } from "./ui";
 
 export async function generateMetadata({
@@ -30,9 +35,11 @@ export async function generateMetadata({
 }
 
 // The clinic link (/<slug>) that the owner shares: a compact header with the
-// Zemana mark and the clinic's name, one column made for a 360 px phone and a
-// bottom navigation. Unknown, deactivated and reserved names are not found
-// (src/modules/clients/session.ts).
+// clinic's logo (the Zemana mark without one) and name, one column made for a
+// 360 px phone and a bottom navigation. Unknown, deactivated and reserved
+// names are not found (src/modules/clients/session.ts). The look the owner
+// published (color, buttons, heading font) applies only inside the
+// clinic-page container.
 export default async function ClientLayout({
   children,
   params,
@@ -40,16 +47,29 @@ export default async function ClientLayout({
   const clinic = await requireClinic((await params).slug);
   const theme = await getTheme();
   const user = await getClientUser();
+  const page = await loadClinicPage(clinic.slug);
+  if (!page) notFound();
 
   return (
-    <div className="flex flex-1 flex-col bg-background">
+    <div className="clinic-page flex flex-1 flex-col bg-background">
+      <PageTheme theme={page.theme} scopeClass="clinic-page" />
       <header className="border-b bg-card">
         <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-3">
           <Link
             href={`/${clinic.slug}`}
             className="flex min-w-0 items-center gap-2.5"
           >
-            <BrandImage kind="symbol" size={28} className="shrink-0" />
+            {page.hasLogo ? (
+              // eslint-disable-next-line @next/next/no-img-element -- served by the /logo route handler
+              <img
+                src={`/${clinic.slug}/logo`}
+                alt={clinicName(clinic)}
+                height={28}
+                className="h-7 w-auto max-w-28 shrink-0 object-contain"
+              />
+            ) : (
+              <BrandImage kind="symbol" size={28} className="shrink-0" />
+            )}
             <span className="truncate font-heading text-lg font-semibold">
               {clinicName(clinic)}
             </span>

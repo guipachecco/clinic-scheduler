@@ -183,6 +183,13 @@
       "when": 1794427017674,
       "tag": "0025_page_builder",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794428912241,
+      "tag": "0026_cover_size",
+      "breakpoints": true
     }
   ]
 }

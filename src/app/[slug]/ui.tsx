@@ -63,7 +63,7 @@ function ContactLink({
     <a
       href={href}
       {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-      className={`inline-flex items-center gap-2 font-semibold text-primary underline underline-offset-4 ${className}`}
+      className={`inline-flex items-center gap-2 font-semibold text-primary-text underline underline-offset-4 ${className}`}
     >
       <Icon name={icon} />
       {children}

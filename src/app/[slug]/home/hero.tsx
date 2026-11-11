@@ -14,6 +14,22 @@ function initials(name: string) {
     .join("");
 }
 
+// The image at the top of the page: the cover the owner published, else the
+// first photo of the gallery (also what a shared link shows).
+export function coverImage(
+  page: ClinicPage,
+): { src: string; width: number; height: number } | null {
+  if (page.cover) return { src: `/${page.slug}/capa`, ...page.cover };
+  const photo = page.photos[0];
+  return photo
+    ? {
+        src: `/${page.slug}/fotos/${photo.id}`,
+        width: photo.width,
+        height: photo.height,
+      }
+    : null;
+}
+
 const score = new Intl.NumberFormat("pt-BR", {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
@@ -26,7 +42,7 @@ const score = new Intl.NumberFormat("pt-BR", {
 export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
   const name = clinicName(page);
   const status = openStatus(page.hours, page.timezone, now);
-  const cover = page.photos[0];
+  const cover = coverImage(page);
   const { average, total } = page.reviewSummary;
 
   return (
@@ -35,9 +51,9 @@ export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
           edge to edge in the column. */}
       <div className="-mx-4 -mt-6">
         {cover ? (
-          // eslint-disable-next-line @next/next/no-img-element -- served by the /fotos route handler
+          // eslint-disable-next-line @next/next/no-img-element -- served by the /capa and /fotos route handlers
           <img
-            src={`/${page.slug}/fotos/${cover.id}`}
+            src={cover.src}
             alt={`Espaço de ${name}`}
             width={cover.width}
             height={cover.height}
@@ -88,7 +104,7 @@ export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
       ) : null}
 
       <p className="mt-3 text-sm text-muted-foreground">
-        <span className={status.open ? "font-semibold text-primary" : ""}>
+        <span className={status.open ? "font-semibold text-primary-text" : ""}>
           {status.label}
         </span>
         {average !== null ? (

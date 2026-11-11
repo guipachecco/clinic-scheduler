@@ -1,4 +1,5 @@
-import { eq, inArray, like } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
+import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, endPools } from "@/db/owner";
@@ -6,6 +7,7 @@ import {
   appointments,
   clinics,
   loyaltyRedemptions,
+  media,
   patients,
   paymentMethods,
   products,
@@ -19,10 +21,17 @@ import * as panel from "@/modules/clinic-page/panel";
 import {
   canReview,
   createReview,
+  getClinicCover,
+  getClinicLogo,
   getClinicPage,
   getLoyaltyProgress,
   getOwnerPhoto,
 } from "@/modules/clinic-page/public";
+import {
+  publishDraft,
+  saveDraftPatch,
+  uploadDraftImage,
+} from "@/modules/page-builder/builder";
 
 import { CLINIC, otherClinic } from "../helpers/clinic";
 
@@ -336,5 +345,135 @@ describe("clinic page module", () => {
       loyaltyVisits: 5,
       loyaltyReward: "Outro brinde",
     });
+  });
+});
+
+// What the page builder publishes reaches the public page: logo, cover and
+// the chosen look. The clinic's own images stay untouched: the media columns
+// are cleared first, so publishing has nothing of theirs to replace.
+describe("published page look", () => {
+  let saved: Pick<
+    typeof clinics.$inferSelect,
+    | "logoMediaId"
+    | "ownerPhotoMediaId"
+    | "coverMediaId"
+    | "theme"
+    | "businessType"
+    | "headline"
+    | "about"
+    | "pageDraft"
+  >;
+  const made = new Set<string>();
+
+  async function upload(slot: "logo" | "cover", width: number, height: number) {
+    const bytes = await sharp({
+      create: { width, height, channels: 3, background: "#0a7d5a" },
+    })
+      .jpeg()
+      .toBuffer();
+    const result = await uploadDraftImage(CLINIC, slot, {
+      bytes,
+      mimeType: "image/jpeg",
+    });
+    if (!result.ok) throw new Error(result.formError);
+    made.add(result.mediaId);
+    return result.mediaId;
+  }
+
+  beforeAll(async () => {
+    const [row] = await db.select().from(clinics).where(eq(clinics.id, CLINIC));
+    saved = {
+      logoMediaId: row!.logoMediaId,
+      ownerPhotoMediaId: row!.ownerPhotoMediaId,
+      coverMediaId: row!.coverMediaId,
+      theme: row!.theme,
+      businessType: row!.businessType,
+      headline: row!.headline,
+      about: row!.about,
+      pageDraft: row!.pageDraft,
+    };
+    await db
+      .update(clinics)
+      .set({
+        logoMediaId: null,
+        ownerPhotoMediaId: null,
+        coverMediaId: null,
+        pageDraft: null,
+      })
+      .where(eq(clinics.id, CLINIC));
+  });
+
+  afterAll(async () => {
+    await db
+      .update(clinics)
+      .set({ ...saved, isActive: true })
+      .where(eq(clinics.id, CLINIC));
+    const ids = [...made];
+    if (ids.length > 0) {
+      await db
+        .delete(media)
+        .where(and(eq(media.clinicId, CLINIC), inArray(media.id, ids)));
+    }
+  });
+
+  it("has no logo or cover before publishing", async () => {
+    const page = (await getClinicPage(slug))!;
+    expect(page.hasLogo).toBe(false);
+    expect(page.cover).toBeNull();
+    expect(page.businessType).toBe(saved.businessType);
+    expect(await getClinicLogo(slug)).toBeNull();
+    expect(await getClinicCover(slug)).toBeNull();
+  });
+
+  it("shows the published logo, cover and theme", async () => {
+    await upload("logo", 400, 200);
+    await upload("cover", 1200, 800);
+    expect(
+      await saveDraftPatch(CLINIC, {
+        theme: {
+          primaryColor: "#0a7d5a",
+          buttonFill: "outline",
+          fontId: "oswald",
+        },
+      }),
+    ).toEqual({ ok: true });
+    // Nothing shows before "Publicar".
+    expect((await getClinicPage(slug))!.hasLogo).toBe(false);
+
+    expect((await publishDraft(CLINIC, actor)).ok).toBe(true);
+    const page = (await getClinicPage(slug))!;
+    expect(page.hasLogo).toBe(true);
+    expect(page.cover).toEqual({ width: 1200, height: 800 });
+    expect(page.theme).toMatchObject({
+      primaryColor: "#0a7d5a",
+      buttonFill: "outline",
+      fontId: "oswald",
+    });
+
+    const logo = await getClinicLogo(slug);
+    expect(logo?.mimeType).toBe("image/webp");
+    expect(logo?.data.length).toBeGreaterThan(0);
+    expect((await getClinicCover(slug))?.mimeType).toBe("image/webp");
+  });
+
+  it("serves nothing for an inactive clinic", async () => {
+    await db
+      .update(clinics)
+      .set({ isActive: false })
+      .where(eq(clinics.id, CLINIC));
+    try {
+      expect(await getClinicLogo(slug)).toBeNull();
+      expect(await getClinicCover(slug)).toBeNull();
+    } finally {
+      await db
+        .update(clinics)
+        .set({ isActive: true })
+        .where(eq(clinics.id, CLINIC));
+    }
+  });
+
+  it("serves nothing for an unknown slug", async () => {
+    expect(await getClinicLogo("nao-existe")).toBeNull();
+    expect(await getClinicCover("nao-existe")).toBeNull();
   });
 });
