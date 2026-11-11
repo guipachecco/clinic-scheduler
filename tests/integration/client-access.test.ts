@@ -154,7 +154,7 @@ async function cleanup() {
 beforeAll(async () => {
   await cleanup();
   const [grais] = await db
-    .select({ online: clinics.onlineBookingEnabled })
+    .select({ online: clinics.onlineBookingChoice })
     .from(clinics)
     .where(eq(clinics.id, CLINIC));
   onlineBefore = grais!.online;

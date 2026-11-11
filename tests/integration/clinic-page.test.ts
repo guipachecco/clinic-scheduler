@@ -329,7 +329,7 @@ describe("clinic page module", () => {
       mapsUrl: "https://maps.example.test/x",
       instagramHandle: "outro",
       amenities: ["banheiro"],
-      onlineBookingEnabled: original.onlineBookingEnabled,
+      onlineBookingEnabled: original.onlineBookingChoice,
     });
     await panel.updateLoyalty(CLINIC, {
       enabled: true,

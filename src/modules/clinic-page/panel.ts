@@ -47,8 +47,8 @@ export async function getClinicPageSettings(
         mapsUrl: clinics.mapsUrl,
         instagramHandle: clinics.instagramHandle,
         amenities: clinics.amenities,
-        onlineBookingEnabled: clinics.onlineBookingEnabled,
-        loyaltyEnabled: clinics.loyaltyEnabled,
+        onlineBookingEnabled: clinics.onlineBookingChoice,
+        loyaltyEnabled: clinics.loyaltyChoice,
         loyaltyVisits: clinics.loyaltyVisits,
         loyaltyReward: clinics.loyaltyReward,
       })

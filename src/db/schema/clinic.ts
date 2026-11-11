@@ -22,6 +22,7 @@ import {
 
 import { users } from "./auth";
 import { createdAt, updatedAt } from "./columns";
+import type { ClinicModule } from "@/modules/clinics/modules";
 
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => "bytea",
@@ -201,6 +202,7 @@ export const clinics = pgTable(
     // every reader, including the SECURITY DEFINER functions, obeys the module.
     modules: text("modules")
       .array()
+      .$type<ClinicModule[]>()
       .notNull()
       .default(
         sql`'{products,finance,online_booking,loyalty,anamnesis,reviews}'`,
