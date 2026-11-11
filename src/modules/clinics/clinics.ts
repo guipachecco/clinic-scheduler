@@ -17,6 +17,7 @@ import {
   services,
 } from "@/db/schema";
 
+import type { BusinessType } from "@/modules/business-type/vocabulary";
 import { CLINIC_BRANDING, resolvePalette } from "@/modules/branding/palettes";
 
 import {
@@ -35,6 +36,7 @@ export type ClinicSummary = {
   name: string;
   isActive: boolean;
   anamnesisTemplate: string | null;
+  businessType: BusinessType;
 };
 
 export type ClinicResult =
@@ -52,6 +54,7 @@ const summaryColumns = {
   name: clinics.name,
   isActive: clinics.isActive,
   anamnesisTemplate: clinics.anamnesisTemplate,
+  businessType: clinics.businessType,
 };
 
 export async function getClinic(id: string): Promise<ClinicSummary | null> {

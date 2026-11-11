@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { getTheme } from "@/lib/theme-server";
 import { countRequestedFrom } from "@/modules/appointments/appointments";
 import { requireAdmin } from "@/modules/auth/session";
+import { vocabulary } from "@/modules/business-type/vocabulary";
 
 import { MobileNav } from "./mobile-nav";
 import { PanelNav, type NavItem } from "./panel-nav";
@@ -30,7 +31,11 @@ export default async function PanelLayout({
       badge: pendingRequests,
       badgeLabel: "aguardando confirmação",
     },
-    { href: "/admin/pacientes", label: "Pacientes", icon: "person" },
+    {
+      href: "/admin/pacientes",
+      label: vocabulary(session.clinic.businessType).People,
+      icon: "person",
+    },
     { href: "/admin/servicos", label: "Serviços", icon: "services" },
     { href: "/admin/expediente", label: "Expediente", icon: "clock" },
     { href: "/admin/financeiro", label: "Financeiro", icon: "money" },
