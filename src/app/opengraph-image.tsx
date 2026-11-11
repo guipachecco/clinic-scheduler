@@ -44,7 +44,6 @@ export default async function OpenGraphImage() {
           transform: "rotate(-6deg)",
         }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse renders plain img only */}
         <img src={symbolSrc} width={200} height={200} alt="" />
       </div>
       <div
