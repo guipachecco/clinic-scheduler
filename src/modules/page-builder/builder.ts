@@ -67,6 +67,7 @@ async function readClinic(tx: Tx, clinicId: string, lock: boolean) {
     .select({
       slug: clinics.slug,
       name: clinics.name,
+      displayName: clinics.displayName,
       businessType: clinics.businessType,
       logoMediaId: clinics.logoMediaId,
       ownerPhotoMediaId: clinics.ownerPhotoMediaId,
@@ -195,6 +196,8 @@ async function catchDraftTooLarge<T>(
 export type BuilderState = {
   slug: string;
   name: string;
+  // The name the public page shows (display name, else the name).
+  pageName: string;
   published: PublishedPage;
   draft: PageDraft;
   hasDraft: boolean;
@@ -219,6 +222,7 @@ export async function getBuilderState(clinicId: string): Promise<BuilderState> {
     return {
       slug: row.slug,
       name: row.name,
+      pageName: row.displayName ?? row.name,
       published: publishedFrom(row, gallery),
       draft,
       hasDraft: row.pageDraft !== null,
