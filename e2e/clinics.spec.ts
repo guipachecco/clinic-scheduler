@@ -34,6 +34,8 @@ test.describe("clinicas", () => {
         [NEW_SLUG],
       );
       for (const table of [
+        "products",
+        "product_categories",
         "services",
         "service_categories",
         "payment_methods",
@@ -94,7 +96,7 @@ test.describe("clinicas", () => {
     const nav = page.getByRole("navigation", { name: "Menu principal" });
     await expect(nav.getByRole("link", { name: "Clientes" })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Financeiro" })).toHaveCount(0);
-    for (const path of ["/admin/financeiro", "/admin/pagina/produtos"]) {
+    for (const path of ["/admin/financeiro", "/admin/produtos"]) {
       const response = await page.goto(path);
       expect(response?.status()).toBe(404);
       await expect(

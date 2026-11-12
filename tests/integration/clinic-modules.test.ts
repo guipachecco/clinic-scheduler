@@ -9,6 +9,7 @@ import {
   expenseCategories,
   patients,
   paymentMethods,
+  productCategories,
   products,
   reviews,
   serviceCategories,
@@ -25,7 +26,7 @@ import {
   updateClinic,
 } from "@/modules/clinics/clinics";
 
-import { otherClinic } from "../helpers/clinic";
+import { otherClinic, productCategory } from "../helpers/clinic";
 
 // Root creating and editing a clinic with its modules and type. Every record
 // is fictitious.
@@ -48,6 +49,9 @@ async function cleanup() {
   for (const { id } of rows) {
     await db.delete(auditLogs).where(eq(auditLogs.clinicId, id));
     await db.delete(services).where(eq(services.clinicId, id));
+    await db
+      .delete(productCategories)
+      .where(eq(productCategories.clinicId, id));
     await db
       .delete(serviceCategories)
       .where(eq(serviceCategories.clinicId, id));
@@ -153,9 +157,12 @@ beforeAll(async () => {
     status: "completed",
     source: "admin",
   });
-  await db
-    .insert(products)
-    .values({ clinicId: pageClinic, name: "Produto T5", priceCents: 1000 });
+  await db.insert(products).values({
+    clinicId: pageClinic,
+    categoryId: await productCategory(pageClinic),
+    name: "Produto T5",
+    priceCents: 1000,
+  });
 });
 
 afterAll(async () => {

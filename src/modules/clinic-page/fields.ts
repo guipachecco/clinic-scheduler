@@ -172,26 +172,6 @@ export const loyaltySchema = z
 
 export type LoyaltyInput = z.infer<typeof loyaltySchema>;
 
-export const productSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Informe o nome do produto.")
-    .max(80, "Nome muito longo (máximo de 80 caracteres)."),
-  price: z.string().transform((value, ctx): number | null => {
-    const cents = parsePriceInput(value);
-    if (cents === "invalid") {
-      ctx.addIssue({ code: "custom", message: "Preço inválido." });
-      return z.NEVER;
-    }
-    return cents;
-  }),
-  description: optionalText(300, "Descrição"),
-  isActive: z.boolean(),
-});
-
-export type ProductInput = z.infer<typeof productSchema>;
-
 export const reviewSchema = z.object({
   rating: z.coerce
     .number()

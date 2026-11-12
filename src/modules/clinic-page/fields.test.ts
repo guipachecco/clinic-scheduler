@@ -7,7 +7,6 @@ import {
   loyaltySchema,
   parseInstagram,
   parsePriceInput,
-  productSchema,
   reviewSchema,
 } from "./fields";
 
@@ -156,31 +155,6 @@ describe("loyaltySchema", () => {
           .success,
       ).toBe(false);
     }
-  });
-});
-
-describe("productSchema", () => {
-  it("parses the price and requires a name", () => {
-    const parsed = productSchema.parse({
-      name: " Hidratante ",
-      price: "R$ 69,90",
-      description: "",
-      isActive: true,
-    });
-    expect(parsed).toEqual({
-      name: "Hidratante",
-      price: 6990,
-      description: null,
-      isActive: true,
-    });
-    expect(
-      productSchema.safeParse({
-        name: "",
-        price: "",
-        description: "",
-        isActive: true,
-      }).success,
-    ).toBe(false);
   });
 });
 

@@ -98,7 +98,15 @@ function quoteForm(overrides: Record<string, unknown> = {}) {
     validUntil: "2026-11-19",
     discount: "",
     notes: "",
-    items: [{ serviceId, sessions: "4", unitPrice: "150,00", discount: "" }],
+    items: [
+      {
+        kind: "service",
+        serviceId,
+        sessions: "4",
+        unitPrice: "150,00",
+        discount: "",
+      },
+    ],
     ...overrides,
   });
 }

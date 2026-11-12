@@ -7,15 +7,17 @@ import {
   auditLogs,
   installments,
   patients,
+  products,
   quoteItems,
   quotes,
   saleItems,
   sales,
   services,
 } from "@/db/schema";
+import { MODULE_OFF_ERROR } from "@/modules/clinics/modules";
 import { ANONYMIZED_NAME } from "@/modules/patients/patients";
 
-import type { ApproveValues, QuoteFormValues } from "./fields";
+import type { ApproveValues, QuoteFormValues, QuoteItemKind } from "./fields";
 import { quoteTotals, sessionAmounts, splitAmount } from "./money";
 import { monthlyDueDates } from "./recurrence";
 
@@ -50,8 +52,12 @@ export type QuoteDetail = QuoteListItem & {
   saleId: string | null;
   items: {
     id: string;
-    serviceId: string;
+    kind: QuoteItemKind;
+    serviceId: string | null;
+    productId: string | null;
+    // The service or product name, copied when the item was saved.
     serviceName: string;
+    // Sessions of a service, or the quantity of a product.
     sessions: number;
     unitPriceCents: number;
     discountCents: number;
@@ -69,6 +75,11 @@ const QUOTE_NUMBER_LOCK = 7_204_514;
 const NOT_FOUND = "Orçamento não encontrado.";
 const PATIENT_MISSING = "Escolha um paciente cadastrado.";
 const SERVICE_MISSING = "Um dos serviços não existe mais.";
+const PRODUCT_INACTIVE = "Este produto não está mais ativo.";
+
+// Whether the clinic can put products in a quote: the action passes it from
+// the session (products and finance modules on). Off unless said otherwise.
+export type QuoteOptions = { productsOn?: boolean };
 
 const fail = (formError: string): QuoteResult => ({ ok: false, formError });
 
@@ -89,25 +100,81 @@ async function checkPatient(tx: Tx, clinicId: string, patientId: string) {
   return Boolean(patient && !patient.anonymizedAt);
 }
 
-// Service names are copied into the items, like appointments do.
-async function readServiceNames(
+type Item = QuoteFormValues["items"][number];
+
+// Service and product names are copied into the items, like appointments
+// do. A product must be of the clinic and active. Returns the name of each
+// item, in order, or the error that refuses the quote.
+async function readItemNames(
   tx: Tx,
   clinicId: string,
-  serviceIds: string[],
-): Promise<Map<string, string> | null> {
-  const unique = [...new Set(serviceIds)];
-  const rows = await tx
-    .select({
-      id: services.id,
-      name: services.name,
-      isFlexible: services.isFlexible,
-    })
-    .from(services)
-    .where(and(eq(services.clinicId, clinicId), inArray(services.id, unique)));
-  if (rows.length !== unique.length || rows.some((row) => row.isFlexible)) {
-    return null;
+  items: Item[],
+  options: QuoteOptions,
+): Promise<{ names: string[] } | { error: string }> {
+  const serviceIds = [
+    ...new Set(
+      items.flatMap((item) =>
+        item.kind === "service" ? [item.serviceId] : [],
+      ),
+    ),
+  ];
+  const productIds = [
+    ...new Set(
+      items.flatMap((item) =>
+        item.kind === "product" ? [item.productId] : [],
+      ),
+    ),
+  ];
+  if (productIds.length > 0 && !options.productsOn) {
+    return { error: MODULE_OFF_ERROR };
   }
-  return new Map(rows.map((row) => [row.id, row.name]));
+  const serviceRows =
+    serviceIds.length === 0
+      ? []
+      : await tx
+          .select({
+            id: services.id,
+            name: services.name,
+            isFlexible: services.isFlexible,
+          })
+          .from(services)
+          .where(
+            and(
+              eq(services.clinicId, clinicId),
+              inArray(services.id, serviceIds),
+            ),
+          );
+  if (
+    serviceRows.length !== serviceIds.length ||
+    serviceRows.some((row) => row.isFlexible)
+  ) {
+    return { error: SERVICE_MISSING };
+  }
+  const productRows =
+    productIds.length === 0
+      ? []
+      : await tx
+          .select({ id: products.id, name: products.name })
+          .from(products)
+          .where(
+            and(
+              eq(products.clinicId, clinicId),
+              eq(products.isActive, true),
+              inArray(products.id, productIds),
+            ),
+          );
+  if (productRows.length !== productIds.length) {
+    return { error: PRODUCT_INACTIVE };
+  }
+  const serviceNames = new Map(serviceRows.map((row) => [row.id, row.name]));
+  const productNames = new Map(productRows.map((row) => [row.id, row.name]));
+  return {
+    names: items.map((item) =>
+      item.kind === "service"
+        ? serviceNames.get(item.serviceId)!
+        : productNames.get(item.productId)!,
+    ),
+  };
 }
 
 async function writeItems(
@@ -115,14 +182,15 @@ async function writeItems(
   clinicId: string,
   quoteId: string,
   values: QuoteFormValues,
-  names: Map<string, string>,
+  names: string[],
 ) {
   await tx.insert(quoteItems).values(
     values.items.map((item, index) => ({
       clinicId,
       quoteId,
-      serviceId: item.serviceId,
-      serviceName: names.get(item.serviceId)!,
+      serviceId: item.kind === "service" ? item.serviceId : null,
+      productId: item.kind === "product" ? item.productId : null,
+      serviceName: names[index]!,
       sessions: item.sessions,
       unitPriceCents: item.unitPrice,
       discountCents: item.discount,
@@ -135,18 +203,16 @@ export async function createQuote(
   clinicId: string,
   values: QuoteFormValues,
   actorUserId: string,
+  options: QuoteOptions = {},
 ): Promise<QuoteResult> {
   try {
     return await inClinic(clinicId, async (tx): Promise<QuoteResult> => {
       if (!(await checkPatient(tx, clinicId, values.patientId))) {
         return { ok: false, fieldErrors: { patientId: PATIENT_MISSING } };
       }
-      const names = await readServiceNames(
-        tx,
-        clinicId,
-        values.items.map((item) => item.serviceId),
-      );
-      if (!names) return fail(SERVICE_MISSING);
+      const read = await readItemNames(tx, clinicId, values.items, options);
+      if ("error" in read) return fail(read.error);
+      const { names } = read;
 
       await tx.execute(
         sql`select pg_advisory_xact_lock(${QUOTE_NUMBER_LOCK}, hashtext(${clinicId}))`,
@@ -198,6 +264,7 @@ export async function updateQuote(
   id: string,
   values: QuoteFormValues,
   actorUserId: string,
+  options: QuoteOptions = {},
 ): Promise<QuoteResult> {
   if (!UUID_PATTERN.test(id)) return fail(NOT_FOUND);
   try {
@@ -212,12 +279,9 @@ export async function updateQuote(
       if (!(await checkPatient(tx, clinicId, values.patientId))) {
         return { ok: false, fieldErrors: { patientId: PATIENT_MISSING } };
       }
-      const names = await readServiceNames(
-        tx,
-        clinicId,
-        values.items.map((item) => item.serviceId),
-      );
-      if (!names) return fail(SERVICE_MISSING);
+      const read = await readItemNames(tx, clinicId, values.items, options);
+      if ("error" in read) return fail(read.error);
+      const { names } = read;
 
       await tx
         .update(quotes)
@@ -291,6 +355,7 @@ export async function duplicateQuote(
   id: string,
   validUntil: string,
   actorUserId: string,
+  options: QuoteOptions = {},
 ): Promise<QuoteResult> {
   const quote = await getQuote(clinicId, id, validUntil);
   if (!quote) return fail(NOT_FOUND);
@@ -301,14 +366,19 @@ export async function duplicateQuote(
       validUntil,
       discount: quote.discountCents,
       notes: quote.notes,
-      items: quote.items.map((item) => ({
-        serviceId: item.serviceId,
-        sessions: item.sessions,
-        unitPrice: item.unitPriceCents,
-        discount: item.discountCents,
-      })),
+      items: quote.items.map((item) => {
+        const priced = {
+          sessions: item.sessions,
+          unitPrice: item.unitPriceCents,
+          discount: item.discountCents,
+        };
+        return item.productId
+          ? { kind: "product" as const, productId: item.productId, ...priced }
+          : { kind: "service" as const, serviceId: item.serviceId!, ...priced };
+      }),
     },
     actorUserId,
+    options,
   );
 }
 
@@ -364,6 +434,7 @@ export async function approveQuote(
             clinicId,
             saleId,
             serviceId: item.serviceId,
+            productId: item.productId,
             serviceName: item.serviceName,
             sessions: item.sessions,
             totalCents: totals.items[index]!.netCents,
@@ -373,7 +444,7 @@ export async function approveQuote(
         .returning({ id: saleItems.id, sortOrder: saleItems.sortOrder });
       itemRows.sort((a, b) => a.sortOrder - b.sortOrder);
 
-      const parts = planInstallments(plan, totals, items, itemRows);
+      const parts = planInstallments(plan, totals, items, itemRows, today);
       if ("error" in parts) return { ok: false, fieldErrors: parts.error };
       if (parts.rows.length > 0) {
         await tx.insert(installments).values(
@@ -420,23 +491,29 @@ type PlannedInstallment = {
 };
 
 // The installments of a new sale. Zero-value parts (a free session) are
-// left out, since an installment is always more than zero.
+// left out, since an installment is always more than zero. "Por sessão": an
+// undated installment per session of a service, and one per product item,
+// due on the day of the sale (a product has no session to wait for).
 function planInstallments(
   plan: ApproveValues,
   totals: ReturnType<typeof quoteTotals>,
-  items: { sessions: number }[],
+  items: { sessions: number; productId: string | null }[],
   itemRows: { id: string }[],
+  today: string,
 ): { rows: PlannedInstallment[] } | { error: Record<string, string> } {
   if (plan.plan === "per_session") {
-    const rows = items.flatMap((item, index) =>
-      sessionAmounts(totals.items[index]!.netCents, item.sessions).map(
-        (amountCents) => ({
-          saleItemId: itemRows[index]!.id,
-          amountCents,
-          dueDate: null,
-        }),
-      ),
-    );
+    const rows = items.flatMap((item, index): PlannedInstallment[] => {
+      const saleItemId = itemRows[index]!.id;
+      const net = totals.items[index]!.netCents;
+      if (item.productId) {
+        return [{ saleItemId, amountCents: net, dueDate: today }];
+      }
+      return sessionAmounts(net, item.sessions).map((amountCents) => ({
+        saleItemId,
+        amountCents,
+        dueDate: null,
+      }));
+    });
     return { rows: rows.filter((row) => row.amountCents > 0) };
   }
   if (totals.totalCents === 0) return { rows: [] };
@@ -580,7 +657,9 @@ export async function getQuote(
     saleId: row.saleId,
     items: items.map((item, index) => ({
       id: item.id,
+      kind: item.productId ? "product" : "service",
       serviceId: item.serviceId,
+      productId: item.productId,
       serviceName: item.serviceName,
       sessions: item.sessions,
       unitPriceCents: item.unitPriceCents,

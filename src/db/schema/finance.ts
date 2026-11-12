@@ -17,7 +17,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { users } from "./auth";
-import { appointments, clinics, patients, services } from "./clinic";
+import { appointments, clinics, patients, products, services } from "./clinic";
 import { createdAt, updatedAt } from "./columns";
 
 // Financial module (docs/financeiro.md). Money is always integer cents (BRL).
@@ -136,7 +136,9 @@ export const quoteItems = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     clinicId: clinicId(),
     quoteId: uuid("quote_id").notNull(),
-    serviceId: uuid("service_id").notNull(),
+    // Exactly one of service and product (quote_items_kind_check).
+    serviceId: uuid("service_id"),
+    productId: uuid("product_id"),
     serviceName: text("service_name").notNull(),
     sessions: integer("sessions").notNull(),
     unitPriceCents: integer("unit_price_cents").notNull(),
@@ -154,7 +156,16 @@ export const quoteItems = pgTable(
       columns: [t.clinicId, t.serviceId],
       foreignColumns: [services.clinicId, services.id],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "quote_items_product_fk",
+      columns: [t.clinicId, t.productId],
+      foreignColumns: [products.clinicId, products.id],
+    }).onDelete("restrict"),
     index("quote_items_quote_idx").on(t.quoteId),
+    check(
+      "quote_items_kind_check",
+      sql`num_nonnulls(${t.serviceId}, ${t.productId}) = 1`,
+    ),
     check("quote_items_sessions_check", sql`${t.sessions} between 1 and 200`),
     check("quote_items_price_check", sql`${t.unitPriceCents} >= 0`),
     check(
@@ -210,7 +221,9 @@ export const saleItems = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     clinicId: clinicId(),
     saleId: uuid("sale_id").notNull(),
-    serviceId: uuid("service_id").notNull(),
+    // Exactly one of service and product (sale_items_kind_check).
+    serviceId: uuid("service_id"),
+    productId: uuid("product_id"),
     serviceName: text("service_name").notNull(),
     sessions: integer("sessions").notNull(),
     // Item total after every discount; the sum of the items is the sale total.
@@ -228,7 +241,16 @@ export const saleItems = pgTable(
       columns: [t.clinicId, t.serviceId],
       foreignColumns: [services.clinicId, services.id],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "sale_items_product_fk",
+      columns: [t.clinicId, t.productId],
+      foreignColumns: [products.clinicId, products.id],
+    }).onDelete("restrict"),
     unique("sale_items_clinic_id_id_unique").on(t.clinicId, t.id),
+    check(
+      "sale_items_kind_check",
+      sql`num_nonnulls(${t.serviceId}, ${t.productId}) = 1`,
+    ),
     index("sale_items_sale_idx").on(t.saleId),
     check("sale_items_sessions_check", sql`${t.sessions} between 0 and 200`),
     check("sale_items_total_check", sql`${t.totalCents} >= 0`),

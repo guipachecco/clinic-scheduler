@@ -133,7 +133,7 @@ test.describe("minha página", () => {
   });
 
   test("owner starts products with examples and edits one", async () => {
-    await page.goto("/admin/pagina/produtos");
+    await page.goto("/admin/produtos");
     await page.getByRole("button", { name: "Começar com exemplos" }).click();
     for (const name of [
       "Protetor solar FPS 50",
@@ -143,14 +143,11 @@ test.describe("minha página", () => {
       await expect(page.getByText(name, { exact: true })).toBeVisible();
     }
 
-    const row = page.getByRole("listitem").filter({
-      has: page.getByText("Hidratante facial", { exact: true }),
-    });
-    await row.getByText("Editar", { exact: true }).click();
-    await row.getByLabel("Preço").fill("59,90");
-    await row.getByRole("button", { name: "Salvar produto" }).click();
-    await expect(row.getByText("R$ 59,90")).toBeVisible();
-    await page.reload();
+    await page.getByRole("link", { name: "Hidratante facial" }).click();
+    await expect(page).toHaveURL(/\/admin\/produtos\/[0-9a-f-]+$/);
+    await page.getByLabel("Preço").fill("59,90");
+    await page.getByRole("button", { name: "Salvar alterações" }).click();
+    await expect(page).toHaveURL(/\/admin\/produtos$/);
     await expect(
       page.getByRole("listitem").filter({ hasText: "Hidratante facial" }),
     ).toContainText("R$ 59,90");

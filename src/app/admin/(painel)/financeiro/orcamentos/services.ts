@@ -1,8 +1,9 @@
 import "server-only";
 
+import { listActiveProducts } from "@/modules/products/products";
 import { listCatalog } from "@/modules/services/services";
 
-import type { QuoteServiceOption } from "./quote-form";
+import type { QuoteProductOption, QuoteServiceOption } from "./quote-form";
 
 // Services a quote can offer: active, in active categories, and not the
 // flexible "Avaliação / encaixe" (it has no fixed description to sell).
@@ -22,4 +23,13 @@ export async function quoteServiceOptions(
           priceCents: service.priceCents,
         })),
     );
+}
+
+// Products a quote can offer: the active ones, and only while the clinic has
+// the products module on (the server refuses a product item otherwise).
+export async function quoteProductOptions(
+  clinicId: string,
+  productsOn: boolean,
+): Promise<QuoteProductOption[]> {
+  return productsOn ? listActiveProducts(clinicId) : [];
 }

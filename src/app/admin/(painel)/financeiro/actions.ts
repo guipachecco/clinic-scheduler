@@ -79,6 +79,11 @@ async function financeSession(): Promise<PanelContext | null> {
 
 const MODULE_OFF: ActionResult = { ok: false, formError: MODULE_OFF_ERROR };
 
+// Products in a quote need the products module too (finance is already on).
+const quoteOptions = (ctx: PanelContext) => ({
+  productsOn: moduleActive(ctx, "products"),
+});
+
 async function run(work: () => Promise<ActionResult>): Promise<ActionResult> {
   try {
     return await work();
@@ -103,8 +108,8 @@ export async function saveQuoteAction(
   }
   return run(() =>
     id === null
-      ? createQuote(clinicId, parsed.data, user.id)
-      : updateQuote(clinicId, id, parsed.data, user.id),
+      ? createQuote(clinicId, parsed.data, user.id, quoteOptions(session))
+      : updateQuote(clinicId, id, parsed.data, user.id, quoteOptions(session)),
   );
 }
 
@@ -134,7 +139,9 @@ export async function duplicateQuoteAction(id: string): Promise<ActionResult> {
     .setZone(CLINIC_TIME_ZONE)
     .plus({ days: 15 })
     .toFormat("yyyy-MM-dd");
-  return run(() => duplicateQuote(clinicId, id, validUntil, user.id));
+  return run(() =>
+    duplicateQuote(clinicId, id, validUntil, user.id, quoteOptions(session)),
+  );
 }
 
 export async function approveQuoteAction(

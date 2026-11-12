@@ -7,20 +7,12 @@ import {
   requireAdmin,
   type PanelContext,
 } from "@/modules/auth/session";
+import { clinicPageSchema, loyaltySchema } from "@/modules/clinic-page/fields";
 import {
-  clinicPageSchema,
-  loyaltySchema,
-  productSchema,
-} from "@/modules/clinic-page/fields";
-import {
-  addExampleProducts,
-  createProduct,
-  deleteProduct,
   redeemLoyalty,
   setReviewHidden,
   updateClinicPage,
   updateLoyalty,
-  updateProduct,
 } from "@/modules/clinic-page/panel";
 import { MODULE_OFF_ERROR, type ClinicModule } from "@/modules/clinics/modules";
 
@@ -88,69 +80,6 @@ export async function saveLoyaltyAction(
     await updateLoyalty(session.clinicId, parsed.data);
   } catch {
     return failure(GENERIC_ERROR);
-  }
-  return { ok: true };
-}
-
-export async function createProductAction(
-  input: z.input<typeof productSchema>,
-): Promise<{ ok: true } | ActionFailure> {
-  const session = await moduleSession("products");
-  if (!session) return failure(MODULE_OFF_ERROR);
-  const parsed = productSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, fieldErrors: collectErrors(parsed.error) };
-  }
-  try {
-    await createProduct(session.clinicId, parsed.data);
-  } catch {
-    return failure(GENERIC_ERROR);
-  }
-  return { ok: true };
-}
-
-export async function updateProductAction(
-  id: string,
-  input: z.input<typeof productSchema>,
-): Promise<{ ok: true } | ActionFailure> {
-  const session = await moduleSession("products");
-  if (!session) return failure(MODULE_OFF_ERROR);
-  const parsed = productSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, fieldErrors: collectErrors(parsed.error) };
-  }
-  try {
-    const found = await updateProduct(session.clinicId, id, parsed.data);
-    if (!found) return failure("Produto não encontrado.");
-  } catch {
-    return failure(GENERIC_ERROR);
-  }
-  return { ok: true };
-}
-
-export async function deleteProductAction(
-  id: string,
-): Promise<{ ok: true } | ActionFailure> {
-  const session = await moduleSession("products");
-  if (!session) return failure(MODULE_OFF_ERROR);
-  try {
-    const found = await deleteProduct(session.clinicId, id);
-    if (!found) return failure("Produto não encontrado.");
-  } catch {
-    return failure("Não foi possível excluir. Tente novamente.");
-  }
-  return { ok: true };
-}
-
-export async function addExampleProductsAction(): Promise<
-  { ok: true } | ActionFailure
-> {
-  const session = await moduleSession("products");
-  if (!session) return failure(MODULE_OFF_ERROR);
-  try {
-    await addExampleProducts(session.clinicId);
-  } catch {
-    return failure("Não foi possível adicionar os exemplos. Tente novamente.");
   }
   return { ok: true };
 }

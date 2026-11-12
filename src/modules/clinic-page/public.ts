@@ -216,7 +216,11 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
           })
           .from(products)
           .where(
-            and(eq(products.clinicId, clinicId), eq(products.isActive, true)),
+            and(
+              eq(products.clinicId, clinicId),
+              eq(products.isActive, true),
+              eq(products.showOnPage, true),
+            ),
           )
           .orderBy(
             asc(products.sortOrder),

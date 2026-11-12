@@ -68,6 +68,13 @@ export default async function SalePage({
   const duration = (serviceId: string) =>
     catalogServices.find((s) => s.id === serviceId)?.durationMinutes ?? 60;
   const active = sale.cancelledAt === null;
+  // Products are never scheduled nor revised: only services have sessions.
+  const serviceItems = sale.items.flatMap((item) =>
+    item.kind === "service" && item.serviceId
+      ? [{ ...item, serviceId: item.serviceId }]
+      : [],
+  );
+  const hasProducts = serviceItems.length < sale.items.length;
   const openInstallments = sale.installments.filter(
     (i) => i.state !== "cancelled" && i.paidCents === 0,
   ).length;
@@ -127,7 +134,7 @@ export default async function SalePage({
 
       <section aria-labelledby="sessoes" className="grid gap-3">
         <h2 id="sessoes" className="font-heading text-lg font-bold">
-          Serviços e sessões
+          {hasProducts ? "Itens da venda" : "Serviços e sessões"}
         </h2>
         <ul className="grid gap-3">
           {sale.items.map((item) => (
@@ -139,10 +146,16 @@ export default async function SalePage({
                 <p className="font-medium">{item.serviceName}</p>
                 <p className="tabular-nums">{money(item.totalCents)}</p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                {item.sessions} contratadas · {item.used} agendadas ou feitas ·{" "}
-                {item.done} feitas · {item.remaining} a agendar
-              </p>
+              {item.kind === "product" ? (
+                <p className="text-sm text-muted-foreground">
+                  Quantidade {item.sessions}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {item.sessions} contratadas · {item.used} agendadas ou feitas
+                  · {item.done} feitas · {item.remaining} a agendar
+                </p>
+              )}
               {item.appointments.length > 0 ? (
                 <ul className="grid gap-1 text-sm">
                   {item.appointments.map((a) => (
@@ -162,7 +175,7 @@ export default async function SalePage({
             </li>
           ))}
         </ul>
-        {active ? (
+        {active && serviceItems.length > 0 ? (
           <details className="rounded-2xl border bg-card p-4">
             <summary className="cursor-pointer font-medium">
               Agendar sessões
@@ -170,7 +183,7 @@ export default async function SalePage({
             <div className="mt-4">
               <ScheduleForm
                 today={today}
-                items={sale.items
+                items={serviceItems
                   .filter((item) => item.remaining > 0)
                   .map((item) => ({
                     id: item.id,
@@ -324,7 +337,7 @@ export default async function SalePage({
               saleId={sale.id}
               perSession={sale.paymentPlan === "per_session"}
               openInstallments={openInstallments}
-              items={sale.items.map((item) => ({
+              items={serviceItems.map((item) => ({
                 id: item.id,
                 serviceName: item.serviceName,
                 sessionPriceCents:
@@ -361,8 +374,15 @@ export default async function SalePage({
                 <p className="text-muted-foreground">
                   Total: {money(r.before.totalCents)} →{" "}
                   {money(r.after.totalCents)} · sessões:{" "}
-                  {r.before.items.reduce((s, i) => s + i.sessions, 0)} →{" "}
-                  {r.after.items.reduce((s, i) => s + i.sessions, 0)}
+                  {r.before.items.reduce(
+                    (s, i) => (i.productId ? s : s + i.sessions),
+                    0,
+                  )}{" "}
+                  →{" "}
+                  {r.after.items.reduce(
+                    (s, i) => (i.productId ? s : s + i.sessions),
+                    0,
+                  )}
                 </p>
               </li>
             ))}

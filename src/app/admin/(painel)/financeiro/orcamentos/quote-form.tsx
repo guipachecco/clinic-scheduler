@@ -10,7 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import type { QuoteFormInput } from "@/modules/finance/fields";
+import {
+  QUOTE_ITEM_KIND_LABELS,
+  type QuoteFormInput,
+  type QuoteItemKind,
+} from "@/modules/finance/fields";
 import { quoteTotals } from "@/modules/finance/money";
 import type { PatientListItem } from "@/modules/patients/patients";
 import { formatCents, parsePriceToCents } from "@/modules/services/fields";
@@ -25,7 +29,26 @@ export type QuoteServiceOption = {
   priceCents: number | null;
 };
 
-type Item = QuoteFormInput["items"][number] & { key: number };
+// Active products, offered only while the clinic has the products module.
+export type QuoteProductOption = {
+  id: string;
+  name: string;
+  priceCents: number | null;
+};
+
+type InputItem = QuoteFormInput["items"][number];
+
+// One line of the form. It keeps both ids so switching the kind back and
+// forth is harmless; only the one of its kind is sent.
+type Item = {
+  key: number;
+  kind: QuoteItemKind;
+  serviceId: string;
+  productId: string;
+  sessions: string;
+  unitPrice: string;
+  discount: string;
+};
 
 const centsToText = (cents: number | null) =>
   cents === null ? "" : formatCents(cents).replace("R$ ", "");
@@ -34,13 +57,36 @@ const SAVE_ERROR = "Não foi possível salvar. Tente novamente.";
 
 let nextKey = 1;
 
+const toItem = (item: InputItem): Item => ({
+  key: nextKey++,
+  kind: item.kind,
+  serviceId: item.kind === "service" ? item.serviceId : "",
+  productId: item.kind === "product" ? item.productId : "",
+  sessions: item.sessions,
+  unitPrice: item.unitPrice,
+  discount: item.discount,
+});
+
+const toInput = (item: Item): InputItem => {
+  const priced = {
+    sessions: item.sessions,
+    unitPrice: item.unitPrice,
+    discount: item.discount,
+  };
+  return item.kind === "product"
+    ? { kind: "product", productId: item.productId, ...priced }
+    : { kind: "service", serviceId: item.serviceId, ...priced };
+};
+
 export function QuoteForm({
   services,
+  products = [],
   quoteId,
   initialPatient,
   defaults,
 }: {
   services: QuoteServiceOption[];
+  products?: QuoteProductOption[];
   quoteId: string | null;
   initialPatient: { id: string; name: string } | null;
   defaults: Omit<QuoteFormInput, "patientId">;
@@ -49,9 +95,7 @@ export function QuoteForm({
   const [patient, setPatient] = useState(initialPatient);
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<PatientListItem[] | null>(null);
-  const [items, setItems] = useState<Item[]>(
-    defaults.items.map((item) => ({ ...item, key: nextKey++ })),
-  );
+  const [items, setItems] = useState<Item[]>(() => defaults.items.map(toItem));
   const [discount, setDiscount] = useState(defaults.discount);
   const [validUntil, setValidUntil] = useState(defaults.validUntil);
   const [notes, setNotes] = useState(defaults.notes);
@@ -61,6 +105,11 @@ export function QuoteForm({
 
   const servicePrice = (id: string) =>
     services.find((service) => service.id === id)?.priceCents ?? null;
+  const productPrice = (id: string) =>
+    products.find((product) => product.id === id)?.priceCents ?? null;
+  // "Serviço" or "Produto" per item, only when there are products to offer.
+  const showKinds =
+    products.length > 0 || items.some((item) => item.kind === "product");
 
   function updateItem(key: number, change: Partial<Item>) {
     setItems((current) =>
@@ -108,12 +157,7 @@ export function QuoteForm({
         validUntil,
         discount,
         notes,
-        items: items.map(({ serviceId, sessions, unitPrice, discount }) => ({
-          serviceId,
-          sessions,
-          unitPrice,
-          discount,
-        })),
+        items: items.map(toInput),
       });
     } catch {
       setSaving(false);
@@ -216,47 +260,104 @@ export function QuoteForm({
 
       <fieldset className="grid gap-4">
         <legend className="mb-2 font-heading text-lg font-bold">
-          Serviços
+          {showKinds ? "Serviços e produtos" : "Serviços"}
         </legend>
         {items.map((item, index) => {
           const prefix = `item-${item.key}`;
           const err = (field: string) => errors[`items.${index}.${field}`];
           const line = totals?.items[index];
+          const product = item.kind === "product";
           return (
             <div
               key={item.key}
               className="grid gap-3 rounded-2xl border bg-card p-4 md:grid-cols-12"
             >
-              <div className="grid gap-2 md:col-span-5">
-                <Label htmlFor={`${prefix}-servico`}>Serviço</Label>
-                <NativeSelect
-                  id={`${prefix}-servico`}
-                  value={item.serviceId}
-                  aria-invalid={Boolean(err("serviceId"))}
-                  onChange={(event) => {
-                    const price = servicePrice(event.target.value);
-                    updateItem(item.key, {
-                      serviceId: event.target.value,
-                      ...(price !== null
-                        ? { unitPrice: centsToText(price) }
-                        : {}),
-                    });
-                  }}
+              {showKinds ? (
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor={`${prefix}-tipo`}>Tipo</Label>
+                  <NativeSelect
+                    id={`${prefix}-tipo`}
+                    value={item.kind}
+                    onChange={(event) =>
+                      updateItem(item.key, {
+                        kind: event.target.value as QuoteItemKind,
+                        unitPrice: "",
+                      })
+                    }
+                  >
+                    {(["service", "product"] as const).map((kind) => (
+                      <option key={kind} value={kind}>
+                        {QUOTE_ITEM_KIND_LABELS[kind]}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+              ) : null}
+              {product ? (
+                <div className="grid gap-2 md:col-span-3">
+                  <Label htmlFor={`${prefix}-produto`}>Produto</Label>
+                  <NativeSelect
+                    id={`${prefix}-produto`}
+                    value={item.productId}
+                    aria-invalid={Boolean(err("productId"))}
+                    onChange={(event) => {
+                      const price = productPrice(event.target.value);
+                      updateItem(item.key, {
+                        productId: event.target.value,
+                        ...(price !== null
+                          ? { unitPrice: centsToText(price) }
+                          : {}),
+                      });
+                    }}
+                  >
+                    <option value="">Escolha…</option>
+                    {products.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  <FieldError
+                    id={`${prefix}-produto-erro`}
+                    message={err("productId")}
+                  />
+                </div>
+              ) : (
+                <div
+                  className={`grid gap-2 ${showKinds ? "md:col-span-3" : "md:col-span-5"}`}
                 >
-                  <option value="">Escolha…</option>
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.categoryName} · {service.name}
-                    </option>
-                  ))}
-                </NativeSelect>
-                <FieldError
-                  id={`${prefix}-servico-erro`}
-                  message={err("serviceId")}
-                />
-              </div>
+                  <Label htmlFor={`${prefix}-servico`}>Serviço</Label>
+                  <NativeSelect
+                    id={`${prefix}-servico`}
+                    value={item.serviceId}
+                    aria-invalid={Boolean(err("serviceId"))}
+                    onChange={(event) => {
+                      const price = servicePrice(event.target.value);
+                      updateItem(item.key, {
+                        serviceId: event.target.value,
+                        ...(price !== null
+                          ? { unitPrice: centsToText(price) }
+                          : {}),
+                      });
+                    }}
+                  >
+                    <option value="">Escolha…</option>
+                    {services.map((service) => (
+                      <option key={service.id} value={service.id}>
+                        {service.categoryName} · {service.name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  <FieldError
+                    id={`${prefix}-servico-erro`}
+                    message={err("serviceId")}
+                  />
+                </div>
+              )}
               <div className="grid gap-2 md:col-span-2">
-                <Label htmlFor={`${prefix}-sessoes`}>Sessões</Label>
+                <Label htmlFor={`${prefix}-sessoes`}>
+                  {product ? "Quantidade" : "Sessões"}
+                </Label>
                 <Input
                   id={`${prefix}-sessoes`}
                   inputMode="numeric"
@@ -272,7 +373,9 @@ export function QuoteForm({
                 />
               </div>
               <div className="grid gap-2 md:col-span-2">
-                <Label htmlFor={`${prefix}-preco`}>Preço por sessão</Label>
+                <Label htmlFor={`${prefix}-preco`}>
+                  {product ? "Preço unitário" : "Preço por sessão"}
+                </Label>
                 <Input
                   id={`${prefix}-preco`}
                   inputMode="decimal"
@@ -314,7 +417,7 @@ export function QuoteForm({
                       current.filter((i) => i.key !== item.key),
                     )
                   }
-                  aria-label={`Remover o serviço ${index + 1}`}
+                  aria-label={`Remover o ${product ? "produto" : "serviço"} ${index + 1}`}
                 >
                   Remover
                 </Button>
@@ -337,7 +440,9 @@ export function QuoteForm({
               ...current,
               {
                 key: nextKey++,
+                kind: services.length > 0 ? "service" : "product",
                 serviceId: "",
+                productId: "",
                 sessions: "1",
                 unitPrice: "",
                 discount: "",
@@ -345,7 +450,7 @@ export function QuoteForm({
             ])
           }
         >
-          Adicionar serviço
+          {showKinds ? "Adicionar item" : "Adicionar serviço"}
         </Button>
       </fieldset>
 

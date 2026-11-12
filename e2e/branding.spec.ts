@@ -78,6 +78,8 @@ test.describe("branding", () => {
         [slugs],
       );
       for (const table of [
+        "products",
+        "product_categories",
         "services",
         "service_categories",
         "payment_methods",

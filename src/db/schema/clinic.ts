@@ -584,8 +584,36 @@ export const clinicPhotos = pgTable(
   ],
 );
 
-// Products the clinic sells, listed on its public page. Clients see only the
-// active ones (policy products_client, migration 0017).
+// Categories of the clinic's products. Every clinic has "Outros" (migration
+// 0028 for the existing ones, createClinic for new ones).
+export const productCategories = pgTable(
+  "product_categories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("product_categories_clinic_id_id_unique").on(t.clinicId, t.id),
+    unique("product_categories_clinic_name_unique").on(t.clinicId, t.name),
+    check(
+      "product_categories_name_check",
+      sql`char_length(${t.name}) between 1 and 40`,
+    ),
+  ],
+);
+
+export const PRODUCT_OTHER_CATEGORY_NAME = "Outros";
+
+// Products the clinic sells. "Ativo" means it can be used (quotes); "Mostrar
+// na página" means it is listed on the public page. Clients see only the
+// products that are both (policy products_client, migration 0028).
 export const products = pgTable(
   "products",
   {
@@ -593,15 +621,23 @@ export const products = pgTable(
     clinicId: uuid("clinic_id")
       .notNull()
       .references(() => clinics.id, { onDelete: "restrict" }),
+    categoryId: uuid("category_id").notNull(),
     name: text("name").notNull(),
     priceCents: integer("price_cents"),
     description: text("description"),
     isActive: boolean("is_active").notNull().default(true),
+    showOnPage: boolean("show_on_page").notNull().default(true),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (t) => [
+    foreignKey({
+      name: "products_category_fk",
+      columns: [t.clinicId, t.categoryId],
+      foreignColumns: [productCategories.clinicId, productCategories.id],
+    }).onDelete("restrict"),
+    unique("products_clinic_id_id_unique").on(t.clinicId, t.id),
     index("products_clinic_id_idx").on(t.clinicId),
     check("products_name_check", sql`char_length(${t.name}) between 1 and 80`),
     check(

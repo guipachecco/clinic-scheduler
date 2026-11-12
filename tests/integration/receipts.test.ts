@@ -266,7 +266,15 @@ describe("receipts", () => {
         validUntil: "2026-11-19",
         discount: "",
         notes: "",
-        items: [{ serviceId, sessions: "2", unitPrice: "35,00", discount: "" }],
+        items: [
+          {
+            kind: "service",
+            serviceId,
+            sessions: "2",
+            unitPrice: "35,00",
+            discount: "",
+          },
+        ],
       }),
       actorId,
     );
