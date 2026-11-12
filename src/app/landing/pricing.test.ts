@@ -47,7 +47,9 @@ describe("pricingFor", () => {
     ]);
   });
   test("audiences name a way of working, not a profession", () => {
-    const text = JSON.stringify(pricingFor(new Date("2026-11-12"))).toLowerCase();
+    const text = JSON.stringify(
+      pricingFor(new Date("2026-11-12")),
+    ).toLowerCase();
     for (const word of ["manicure", "clínica", "massoterap", "acupunt"]) {
       expect(text).not.toContain(word);
     }

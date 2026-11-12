@@ -27,9 +27,9 @@ Nenhuma cliente paga ainda. Há 2 profissionais que só agendam e 1 clínica int
 
 ## Os planos
 
-| Plano        | Para quem (adesivo no cartão) | O que inclui                                                                  | Até 31/12/2026 | A partir de 01/01/2027 |
-| ------------ | ----------------------------- | ----------------------------------------------------------------------------- | -------------- | ---------------------- |
-| **Agenda**   | "Atende por horário"          | Agenda e fichas das clientes, link de agendamento, página com avaliações e fidelidade | R$ 29,90/mês   | R$ 49,90/mês           |
+| Plano        | Para quem (adesivo no cartão) | O que inclui                                                                                       | Até 31/12/2026 | A partir de 01/01/2027 |
+| ------------ | ----------------------------- | -------------------------------------------------------------------------------------------------- | -------------- | ---------------------- |
+| **Agenda**   | "Atende por horário"          | Agenda e fichas das clientes, link de agendamento, página com avaliações e fidelidade              | R$ 29,90/mês   | R$ 49,90/mês           |
 | **Completo** | "Vende pacote ou parcela"     | Tudo do Agenda, mais orçamento, pacotes e parcelas, caixa e valores a receber, anamnese e produtos | R$ 99,00/mês   | R$ 149,90/mês          |
 
 - Os dois planos têm **1 mês de teste grátis**.

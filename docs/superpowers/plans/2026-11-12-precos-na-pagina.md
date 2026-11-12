@@ -35,11 +35,13 @@
 ### Task 1: Preços e links dos planos
 
 **Files:**
+
 - Create: `src/app/landing/pricing.ts`
 - Create: `src/app/landing/pricing.test.ts`
 - Modify: `src/app/landing/quote-link.ts`
 
 **Interfaces:**
+
 - Produces:
   - `whatsappUrl(message: string): string`, em `quote-link.ts`. `QUOTE_URL` passa a ser `whatsappUrl("Oi! Vi o site da Zemana e quero um orçamento para minha clínica.")`, com o mesmo valor de hoje.
   - `type PlanId = "agenda" | "completo"`
@@ -77,7 +79,9 @@ describe("pricingFor", () => {
     );
   });
   test("audiences name a way of working, not a profession", () => {
-    const text = JSON.stringify(pricingFor(new Date("2026-11-12"))).toLowerCase();
+    const text = JSON.stringify(
+      pricingFor(new Date("2026-11-12")),
+    ).toLowerCase();
     for (const word of ["manicure", "clínica", "massoterap", "acupunt"]) {
       expect(text).not.toContain(word);
     }
@@ -113,6 +117,7 @@ git commit -m "feat(landing): preços dos planos e virada de 2027"
 ### Task 2: Fotos do sistema com dados inventados
 
 **Files:**
+
 - Create: `public/landing/por-dentro/agenda-desktop.webp`, `agenda-celular.webp`, `orcamento-desktop.webp`, `pagina-desktop.webp`, `pagina-celular.webp`, `inicio-celular.webp`
 
 Esta task é manual: não tem teste, e o resultado são as imagens.
@@ -134,18 +139,22 @@ git commit -m "feat(landing): fotos do sistema com dados de exemplo"
 ### Task 3: Seção "Sem letra miúda." (preços)
 
 **Files:**
+
 - Create: `src/app/landing/pricing-section.tsx`
 - Modify: `src/app/page.tsx` (entre `<Features />` e `<FinalCta />`)
 - Test: `e2e/landing.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `pricingFor`, `ShownPlan` (Task 1); `Sticker`, `TornEdge`, `displayClass` (`./ui`); `RiseIn` (`./motion`).
 - Produces: `PricingSection(): JSX.Element`, uma seção com `aria-labelledby="landing-pricing"`, fundo `#b7e7fc`, cada cartão com `data-testid="plan-card"`.
 
 - [ ] **Step 1: Write the failing e2e tests** em `e2e/landing.spec.ts`
 
 ```ts
-test("pricing shows both plans with launch price and plan WhatsApp", async ({ page }) => {
+test("pricing shows both plans with launch price and plan WhatsApp", async ({
+  page,
+}) => {
   await page.goto("/");
   const section = page.getByRole("region", { name: "Sem letra miúda." });
   await expect(section.getByTestId("plan-card")).toHaveCount(2);
@@ -193,12 +202,14 @@ git commit -m "feat(landing): seção de preços com Agenda e Completo"
 ### Task 4: Seção "Olha só como fica." (fotos em abas)
 
 **Files:**
+
 - Create: `src/app/landing/inside-section.tsx` (servidor)
 - Create: `src/app/landing/inside-tabs.tsx` (`"use client"`)
 - Modify: `src/app/page.tsx` (antes de `<PricingSection />`)
 - Test: `e2e/landing.spec.ts`
 
 **Interfaces:**
+
 - Consumes: as imagens da Task 2; `Sticker`, `displayClass`, `TornEdge`.
 - Produces: `InsideSection(): JSX.Element`, uma seção com `aria-labelledby="landing-inside"` e fundo `#ffd3f0`. `InsideTabs({ tabs }: { tabs: InsideTab[] })`, com `type InsideTab = { id: string; label: string; caption: string; desktop?: { src: string; alt: string }; phone?: { src: string; alt: string } }`.
 
@@ -211,13 +222,20 @@ test("inside tabs switch the screenshot", async ({ page }) => {
   await page.goto("/");
   const section = page.getByRole("region", { name: "Olha só como fica." });
   const tabs = section.getByRole("tab");
-  await expect(tabs).toHaveText(["Agenda", "Orçamento", "Sua página", "No celular"]);
+  await expect(tabs).toHaveText([
+    "Agenda",
+    "Orçamento",
+    "Sua página",
+    "No celular",
+  ]);
   await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
   await tabs.first().focus();
   await page.keyboard.press("ArrowRight");
   await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
   await expect(section.getByRole("tabpanel")).toBeVisible();
-  await expect(section.getByRole("tabpanel").getByRole("img").first()).toHaveAttribute("alt", /.+/);
+  await expect(
+    section.getByRole("tabpanel").getByRole("img").first(),
+  ).toHaveAttribute("alt", /.+/);
 });
 ```
 
@@ -246,6 +264,7 @@ git commit -m "feat(landing): galeria do sistema em abas"
 ### Task 5: Textos que diziam "sem preço"
 
 **Files:**
+
 - Modify: `src/app/page.tsx` (`DESCRIPTION`)
 - Modify: `src/app/landing/features.tsx` (comentário do topo: tirar "no prices")
 - Modify: `public/llms.txt` (seção "Como contratar")
