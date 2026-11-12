@@ -5,6 +5,7 @@
 **Goal:** O root escolhe, na criação e depois, quais módulos cada clínica tem (Produtos, Financeiro, Agendamento online, Fidelidade, Anamnese, Avaliações), e também muda o tipo de negócio dela. Um módulo desligado some do painel e da página pública.
 
 **Architecture:**
+
 - A coluna `clinics.modules text[]` guarda os módulos ligados. Só `app_platform` escreve nela.
 - As três chaves que já existiam (agendamento online, fidelidade e modelo de anamnese) passam a ter duas colunas cada: a escolha da dona ou do root, renomeada para `*_choice`, e uma coluna **gerada** com o nome antigo, que vale `escolha AND módulo ligado`. Assim, todas as funções `SECURITY DEFINER`, as consultas e as regras que já liam o nome antigo passam a obedecer ao módulo sem precisar de mudança. Os corpos das funções são texto plpgsql/sql e resolvem as colunas pelo nome em tempo de execução.
 - Produtos, Financeiro e Avaliações são bloqueados no código, num único helper (`hasModule`), em quatro lugares: o menu, as páginas (`notFound()`), as Server Actions e a página pública.
@@ -42,10 +43,12 @@
 ### Task 1: Catálogo de módulos
 
 **Files:**
+
 - Create: `src/modules/clinics/modules.ts`
 - Test: `src/modules/clinics/modules.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `CLINIC_MODULES: readonly ["products","finance","online_booking","loyalty","anamnesis","reviews"]`
   - `type ClinicModule = (typeof CLINIC_MODULES)[number]`
@@ -68,18 +71,21 @@
 ### Task 2: Migração 0027 e schema
 
 **Files:**
+
 - Modify: `src/db/schema/clinic.ts`, nas colunas de `clinics` em torno das linhas 182-211 e na check `clinics_loyalty_check`.
 - Create: `drizzle/0027_clinic_modules.sql` e o snapshot e o journal em `drizzle/meta/`, gerados.
 - Modify: as fixtures e os testes que inserem as três colunas antigas (`grep -rn "online_booking_enabled\|loyalty_enabled\|anamnesis_template" tests e2e scripts`).
 - Test: `tests/integration/clinic-modules-db.test.ts`
 
 **Interfaces:**
+
 - Produces, no schema Drizzle:
   - `clinics.modules` (`text("modules").array().notNull()` com o default dos seis).
   - `clinics.onlineBookingChoice`, `clinics.loyaltyChoice` e `clinics.anamnesisTemplateChoice`: as colunas graváveis.
   - `clinics.onlineBookingEnabled`, `clinics.loyaltyEnabled` e `clinics.anamnesisTemplate`: as colunas geradas, só de leitura (`.generatedAlwaysAs(sql\`...\`)`).
 
 **SQL da migração, em ordem:**
+
 1. `ALTER TABLE clinics ADD COLUMN modules text[] NOT NULL DEFAULT '{products,finance,online_booking,loyalty,anamnesis,reviews}'`, mais `CHECK (modules <@ ARRAY[...seis...]::text[])` com o nome `clinics_modules_check`.
 2. Renomear `online_booking_enabled` → `online_booking_choice`, `loyalty_enabled` → `loyalty_choice` e `anamnesis_template` → `anamnesis_template_choice`. A check `clinics_loyalty_check` segue o rename por OID. Confira com `\d clinics` que ela agora cita `loyalty_choice`.
 3. Adicionar as colunas geradas `STORED`:
@@ -107,10 +113,12 @@
 ### Task 3: Dados das clínicas (criar, editar, sessão)
 
 **Files:**
+
 - Modify: `src/modules/clinics/clinics.ts`, `src/modules/clinics/fields.ts`, `src/modules/clinic-page/panel.ts` (as leituras do formulário de "Minha página" e da fidelidade: linhas 50-51 e 299)
 - Test: `tests/integration/clinic-modules.test.ts` e `src/modules/clinics/fields.test.ts` (criar se não existir)
 
 **Interfaces:**
+
 - Consumes: `modulesSchema` e `ClinicModule` (Task 1); as colunas da Task 2.
 - Produces:
   - `ClinicSummary` ganha `modules: ClinicModule[]`.
@@ -133,6 +141,7 @@
 ### Task 4: Telas do root
 
 **Files:**
+
 - Modify: `src/app/admin/(root)/clinicas/clinic-form.tsx`, `actions.ts` e `page.tsx` (botão "Editar" por clínica, `href /admin/clinicas/${id}`)
 - Create:
   - `src/app/admin/(root)/clinicas/[id]/page.tsx`
@@ -140,10 +149,12 @@
   - `src/app/admin/(root)/clinicas/[id]/clinic-edit-form.tsx`
 
 **Interfaces:**
+
 - Consumes: `createClinic`, `updateClinic`, `getClinicForEdit`, `clinicEditSchema` (Task 3); `BUSINESS_TYPES` e `BUSINESS_TYPE_LABELS` de `@/modules/business-type/vocabulary`.
 - Produces: `updateClinicAction(id: string, input: ClinicEditInput): Promise<ClinicSaveResult>`, que chama `requireRoot()` e valida `id` com `z.uuid()`.
 
 **Requisitos:**
+
 - Na criação, os seis checkboxes vêm marcados, e o tipo vem com "Clínica".
 - O tipo de negócio é um `<select>` com o rótulo "Tipo de negócio".
 - A edição mostra o endereço só como texto ("Endereço: /karol-pacheco, não muda aqui").
@@ -158,6 +169,7 @@
 ### Task 5: O módulo desligado some do painel e da página pública
 
 **Files:**
+
 - Modify: `src/modules/auth/session.ts`. Adicionar `requireModule(key: ClinicModule): Promise<PanelContext>` (chama `requireAdmin()`; se `!hasModule(ctx.clinic, key)`, `notFound()`) e `moduleActive(ctx: PanelContext, key: ClinicModule): boolean`.
 - Modify: `src/app/admin/(painel)/layout.tsx`. Financeiro só entra em `navItems` com `finance`.
 - Create: `src/app/admin/(painel)/financeiro/layout.tsx`, que chama `await requireModule("finance")` e renderiza `children`.
@@ -197,6 +209,7 @@ Agendamento online, fidelidade e anamnese não precisam de código aqui, porque 
 ### Task 6: e2e
 
 **Files:**
+
 - Modify: `e2e/clinics.spec.ts`, na sequência serial que já cria "Studio Fictício de Unhas".
 
 - [ ] **Step 1: Escrever os testes**

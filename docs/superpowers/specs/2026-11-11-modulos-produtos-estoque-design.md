@@ -34,11 +34,11 @@ Quem escolhe o que cada clínica tem é o **Guilherme, como root**. A baixa de e
 
 ## Abordagens consideradas (escolhidas pelo Guilherme)
 
-| Tema | Escolhida | Descartadas |
-|---|---|---|
-| Onde guardar os módulos | **Uma coluna `clinics.modules text[]`** com check dos nomes válidos, como em `amenities` | Uma coluna booleana por módulo (cresce a cada módulo); tabela `clinic_modules` (mais RLS, sem ganho) |
-| Estoque | **`products.stock_quantity` + tabela de movimentos**, gravados na mesma transação; `check (stock_quantity >= 0)` trava o negativo, mesmo com duas baixas ao mesmo tempo | Só o histórico, somado na leitura (mais lento, trava contra negativo mais difícil) |
-| Produto no orçamento e na venda | **A mesma lista de itens aceita serviço ou produto** (exatamente um), mantendo a ordem e os totais | Listas separadas (telas e contas duplicadas) |
+| Tema                            | Escolhida                                                                                                                                                               | Descartadas                                                                                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Onde guardar os módulos         | **Uma coluna `clinics.modules text[]`** com check dos nomes válidos, como em `amenities`                                                                                | Uma coluna booleana por módulo (cresce a cada módulo); tabela `clinic_modules` (mais RLS, sem ganho) |
+| Estoque                         | **`products.stock_quantity` + tabela de movimentos**, gravados na mesma transação; `check (stock_quantity >= 0)` trava o negativo, mesmo com duas baixas ao mesmo tempo | Só o histórico, somado na leitura (mais lento, trava contra negativo mais difícil)                   |
+| Produto no orçamento e na venda | **A mesma lista de itens aceita serviço ou produto** (exatamente um), mantendo a ordem e os totais                                                                      | Listas separadas (telas e contas duplicadas)                                                         |
 
 ## Entrega em três PRs, nesta ordem
 
@@ -48,14 +48,14 @@ Cada PR depende do anterior.
 
 **Módulos** (nomes no banco → rótulo na tela):
 
-| Chave | Rótulo | O que some quando desligado |
-|---|---|---|
-| `products` | Produtos | Menu Produtos, aba Produtos da página pública, produto no orçamento, "Produtos usados" no atendimento, bloco de produtos na venda |
-| `finance` | Financeiro | Menu Financeiro (caixa, entradas, despesas, a receber, orçamentos, vendas, Mercado Pago), o bloco de pagamento no detalhe do atendimento e o resumo financeiro na ficha da pessoa |
-| `online_booking` | Agendamento online | Marcação pela página (`/[slug]/marcar`) e a chave correspondente em "Minha página" |
-| `loyalty` | Fidelidade | Cartão na página e na área da cliente, resgates no painel e a configuração em "Minha página" |
-| `anamnesis` | Anamnese | Aba de anamnese da ficha |
-| `reviews` | Avaliações | Pedir e escrever avaliação (`/[slug]/avaliar`), avaliações na página e a tela "Avaliações" do painel |
+| Chave            | Rótulo             | O que some quando desligado                                                                                                                                                       |
+| ---------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `products`       | Produtos           | Menu Produtos, aba Produtos da página pública, produto no orçamento, "Produtos usados" no atendimento, bloco de produtos na venda                                                 |
+| `finance`        | Financeiro         | Menu Financeiro (caixa, entradas, despesas, a receber, orçamentos, vendas, Mercado Pago), o bloco de pagamento no detalhe do atendimento e o resumo financeiro na ficha da pessoa |
+| `online_booking` | Agendamento online | Marcação pela página (`/[slug]/marcar`) e a chave correspondente em "Minha página"                                                                                                |
+| `loyalty`        | Fidelidade         | Cartão na página e na área da cliente, resgates no painel e a configuração em "Minha página"                                                                                      |
+| `anamnesis`      | Anamnese           | Aba de anamnese da ficha                                                                                                                                                          |
+| `reviews`        | Avaliações         | Pedir e escrever avaliação (`/[slug]/avaliar`), avaliações na página e a tela "Avaliações" do painel                                                                              |
 
 Sempre ligadas, fora da lista: Agenda, Clientes/Pacientes, Serviços, Expediente e Minha página.
 
