@@ -4,7 +4,7 @@ import { RiseIn } from "./motion";
 import { displayClass, Sticker, TornEdge } from "./ui";
 
 // Only what the system already does: no reminders, no app-store app, no
-// online payments, no prices.
+// online payments.
 const FEATURES = [
   {
     title: "Agendamento pelo link",

@@ -13,11 +13,16 @@ Zemana (zemana.com.br) é um sistema brasileiro de agendamento e gestão para cl
 
 ## Como contratar
 
-O orçamento é feito pelo WhatsApp, a partir do botão "Quero um orçamento" na página principal.
+Há dois planos, os dois com o 1º mês grátis e sem fidelidade:
+
+- Agenda: agenda e fichas das clientes, link de agendamento e página com avaliações e fidelidade. R$ 49,90 por mês a partir de 2027.
+- Completo: tudo do Agenda, mais orçamento, pacotes e parcelas, caixa e valores a receber, anamnese e produtos. R$ 149,90 por mês a partir de 2027.
+
+Há preço de lançamento até 31/12/2026; os preços atuais estão na página principal. A contratação é pelo WhatsApp, a partir dos botões dos planos na página principal.
 
 ## Páginas
 
-- [Página principal](https://zemana.com.br/): o que a Zemana faz e como pedir um orçamento
+- [Página principal](https://zemana.com.br/): o que a Zemana faz, os planos e preços e como contratar
 - [Clínicas](https://zemana.com.br/clinicas): lista das clínicas que usam a Zemana, para a cliente encontrar a sua e marcar horário
 - [Política de privacidade](https://zemana.com.br/privacidade)
 - [Termos de uso](https://zemana.com.br/termos)
