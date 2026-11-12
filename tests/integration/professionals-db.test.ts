@@ -16,7 +16,7 @@ import {
 
 import { CLINIC, otherClinic } from "../helpers/clinic";
 
-// Migration 0031: professionals, one agenda per professional, the triggers
+// Migration 0032: professionals, one agenda per professional, the triggers
 // that keep every clinic and every appointment with a professional, and the
 // busy intervals of one professional. Every record here is fictitious.
 
@@ -24,7 +24,7 @@ type NewAppointment = typeof appointments.$inferInsert;
 
 const MINUTE = 60_000;
 
-let first: string; // the professional migration 0031 gave CLINIC
+let first: string; // the professional migration 0032 gave CLINIC
 let clinicB: string;
 let patientId: string;
 let serviceId: string;

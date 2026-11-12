@@ -51,7 +51,7 @@ export async function productCategory(clinicId: string) {
   return row!.id;
 }
 
-// The clinic's default professional (migration 0031): the first active one by
+// The clinic's default professional (migration 0032): the first active one by
 // order. Every clinic has one from the moment it exists.
 export async function defaultProfessional(clinicId: string = CLINIC) {
   const [row] = await db

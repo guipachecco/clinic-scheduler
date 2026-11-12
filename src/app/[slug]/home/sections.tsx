@@ -10,6 +10,7 @@ import { AMENITY_ICONS, Icon, type IconName } from "../icons";
 import {
   clinicName,
   instagramUrl,
+  mapsEmbedUrl,
   mapsLink,
   priceLabel,
   whatsappUrl,
@@ -19,6 +20,7 @@ import { bookingButtonClass } from "./booking-button";
 import { CopyPhone } from "./copy-phone";
 import { WEEKDAY_NAMES } from "./open-status";
 import { PhotoGallery } from "./photo-gallery";
+import { durationLabel, groupByCategory } from "./service-groups";
 
 function Section({
   title,
@@ -149,6 +151,17 @@ export function Location({ page }: { page: ClinicPage }) {
   if (!page.address && !href) return null;
   return (
     <Section title="Localização">
+      {page.address ? (
+        // Loaded only when it scrolls near the screen. The address goes to
+        // Google Maps as the search; nothing else about the visitor does.
+        <iframe
+          title={`Mapa: ${page.address}`}
+          src={mapsEmbedUrl(page.address)}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className="h-44 w-full rounded-xl border bg-muted"
+        />
+      ) : null}
       <div className="flex items-center justify-between gap-3">
         <p className="min-w-0 text-sm">{page.address ?? "Ver no mapa"}</p>
         {href ? (
@@ -297,13 +310,16 @@ export function Contacts({ page }: { page: ClinicPage }) {
 
 // ---- Tab contents ----
 
-// Shown only when the clinic has services (the home page drops the tab). A
-// plain list, one line per service: name and duration on the left, the price
-// on the right. With online booking on, the whole line opens the booking with
-// that service chosen.
+// Shown only when the clinic has services (the home page drops the tab). One
+// line per service: name, description and duration on the left, the price on
+// the right, under the category's name when the clinic has more than one.
+// With online booking on, the whole line opens the booking with that service
+// chosen.
 export function ServicesTab({ page }: { page: ClinicPage }) {
+  const groups = groupByCategory(page.services);
+  const withHeadings = groups.length > 1;
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-5">
       {!page.onlineBookingEnabled ? (
         <p className="text-sm text-muted-foreground">
           {page.whatsappPhone
@@ -311,50 +327,135 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
             : "Para marcar um horário, fale com a clínica pelos contatos abaixo."}
         </p>
       ) : null}
-      <ul className="divide-y border-b">
-        {page.services.map((service) => {
-          const price = priceLabel(service.priceDisplay, service.priceCents);
-          const body = (
-            <>
-              <span className="min-w-0 flex-1">
-                <span className="block font-heading text-base leading-snug font-bold">
-                  {service.name}
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  {service.durationMinutes} min
-                </span>
+      {groups.map((group) =>
+        withHeadings ? (
+          <section
+            key={group.id}
+            aria-labelledby={`categoria-${group.id}`}
+            className="grid gap-1"
+          >
+            <h3
+              id={`categoria-${group.id}`}
+              className="text-xs font-bold tracking-widest text-primary-text uppercase"
+            >
+              {group.name}
+            </h3>
+            <ServiceList page={page} services={group.services} />
+          </section>
+        ) : (
+          <ServiceList key={group.id} page={page} services={group.services} />
+        ),
+      )}
+    </div>
+  );
+}
+
+function ServiceList({
+  page,
+  services,
+}: {
+  page: ClinicPage;
+  services: ClinicPage["services"];
+}) {
+  return (
+    <ul className="divide-y border-b">
+      {services.map((service) => {
+        const price = priceLabel(service.priceDisplay, service.priceCents);
+        const body = (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block font-heading text-base leading-snug font-bold">
+                {service.name}
               </span>
-              {price ? (
-                <span className="shrink-0 text-right font-heading text-base font-extrabold">
-                  {price}
+              {service.description ? (
+                <span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">
+                  {service.description}
                 </span>
               ) : null}
-            </>
-          );
-          return (
-            <li key={service.id}>
-              {page.onlineBookingEnabled ? (
-                <Link
-                  href={`/${page.slug}/marcar?servico=${service.id}` as Route}
-                  aria-label={`Agendar ${service.name}${price ? `, ${price}` : ""}`}
-                  className="flex min-h-16 items-center gap-3 py-3 outline-none hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                >
-                  {body}
-                  <Icon
-                    name="chevronRight"
-                    className="size-5 shrink-0 text-primary-text"
-                  />
-                </Link>
-              ) : (
-                <div className="flex min-h-16 items-center gap-3 py-3">
-                  {body}
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+              <span className="mt-0.5 block text-sm text-muted-foreground">
+                {durationLabel(service.durationMinutes)}
+              </span>
+            </span>
+            {price ? (
+              <span className="shrink-0 text-right font-heading text-base font-extrabold">
+                {price}
+              </span>
+            ) : null}
+          </>
+        );
+        return (
+          <li key={service.id}>
+            {page.onlineBookingEnabled ? (
+              <Link
+                href={`/${page.slug}/marcar?servico=${service.id}` as Route}
+                aria-label={`Agendar ${service.name}${price ? `, ${price}` : ""}`}
+                className="flex min-h-16 items-center gap-3 py-3 outline-none hover:bg-accent/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                {body}
+                <Icon
+                  name="chevronRight"
+                  className="size-5 shrink-0 text-primary-text"
+                />
+              </Link>
+            ) : (
+              <div className="flex min-h-16 items-center gap-3 py-3">
+                {body}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// The end of the page: the clinic's name, the Zemana's legal pages and a
+// quiet invitation for other businesses to have a page like this one.
+export function ClinicFooter({
+  page,
+  year,
+}: {
+  page: ClinicPage;
+  year: number;
+}) {
+  const name = clinicName(page);
+  const linkClass =
+    "underline-offset-4 hover:text-foreground hover:underline focus-visible:rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
+  return (
+    <footer className="mt-2 grid gap-4 border-t pt-6 text-sm text-muted-foreground">
+      <div>
+        <p className="font-heading text-base font-extrabold text-foreground">
+          {name}
+        </p>
+        {page.areaLabel ? <p>{page.areaLabel}</p> : null}
+      </div>
+      <nav aria-label="Rodapé">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1">
+          <li>
+            <Link href="/termos" className={linkClass}>
+              Termos de uso
+            </Link>
+          </li>
+          <li>
+            <Link href="/privacidade" className={linkClass}>
+              Privacidade
+            </Link>
+          </li>
+        </ul>
+      </nav>
+      <p>
+        Tem um negócio?{" "}
+        <Link
+          href="/"
+          className={`font-semibold text-primary-text ${linkClass}`}
+        >
+          Crie sua agenda online na Zemana
+        </Link>
+      </p>
+      <p className="text-xs">
+        © {year} {name}. Agenda online por Zemana.
+      </p>
+    </footer>
   );
 }
 
@@ -387,8 +488,12 @@ export function BookingBar({ page }: { page: ClinicPage }) {
     <>
       {/* Keeps the last section clear of the fixed bar. */}
       <div aria-hidden="true" className="h-16" />
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10">
-        <div className="mx-auto w-full max-w-md px-4 pb-3">{action}</div>
+      {/* From lg the navigation is in the header: the bar sits at the
+          bottom of the screen. */}
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 lg:bottom-0">
+        <div className="mx-auto w-full max-w-md px-4 pb-3 lg:pb-6">
+          {action}
+        </div>
       </div>
     </>
   );

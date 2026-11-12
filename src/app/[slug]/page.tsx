@@ -18,6 +18,7 @@ import {
   AboutTab,
   Amenities,
   BookingBar,
+  ClinicFooter,
   Contacts,
   hasAbout,
   Hours,
@@ -214,6 +215,10 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
       <Hours page={page} today={today} />
       <PaymentMethods methods={page.paymentMethods} />
       <Contacts page={page} />
+      <ClinicFooter
+        page={page}
+        year={DateTime.fromJSDate(now, { zone: page.timezone }).year}
+      />
       <BookingBar page={page} />
       <JsonLd data={clinicJsonLd(page)} />
     </>

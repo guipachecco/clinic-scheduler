@@ -236,7 +236,7 @@ async function readHours(tx: Tx, clinicId: string): Promise<DayHours[]> {
 }
 
 // Online bookings go to the clinic's default professional until clients can
-// choose (migration 0031). Null when the clinic has no active one.
+// choose (migration 0032). Null when the clinic has no active one.
 async function readProfessional(
   tx: Tx,
   clinicId: string,

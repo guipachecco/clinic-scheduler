@@ -15,7 +15,7 @@ import type { ProfessionalFormInput, ProfessionalFormValues } from "./fields";
 
 // The clinic's team, as app_panel inside the clinic (inClinic). Every clinic
 // has at least one active professional; the first active one by order is the
-// default, who gets the online bookings for now (migration 0031). Names go
+// default, who gets the online bookings for now (migration 0032). Names go
 // neither to audit_logs nor into error messages.
 
 export type Professional = {
@@ -51,7 +51,7 @@ function unexpected(error: unknown): Error {
   return new Error("Não foi possível salvar a equipe.", { cause: error });
 }
 
-// Same order as default_professional (migration 0031).
+// Same order as default_professional (migration 0032).
 const teamOrder = [
   asc(professionals.sortOrder),
   asc(professionals.createdAt),

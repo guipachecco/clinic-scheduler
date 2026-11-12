@@ -319,7 +319,7 @@ export const clinics = pgTable(
 );
 
 // The people who see patients at a clinic, each with her own agenda
-// (migration 0031). Every clinic has at least one: the database creates it
+// (migration 0032). Every clinic has at least one: the database creates it
 // with the clinic. The first active one by sort_order is the default: online
 // bookings go to her until clients can choose. She has no panel login of her
 // own (yet). Deactivated, never deleted: the panel has no delete. They go
@@ -764,7 +764,7 @@ export const CANCELLATION_REASONS = [
 // occupied_from/occupied_until include the preparation and cleanup buffers.
 // The appointments_no_overlap exclusion constraint (custom migration) rejects
 // two active appointments of the same professional whose occupied ranges
-// overlap (per clinic until migration 0031).
+// overlap (per clinic until migration 0032).
 export const appointments = pgTable(
   "appointments",
   {
@@ -773,7 +773,7 @@ export const appointments = pgTable(
       .notNull()
       .references(() => clinics.id, { onDelete: "restrict" }),
     patientId: uuid("patient_id").notNull(),
-    // Whose agenda it is in (migration 0031). An insert that leaves it out
+    // Whose agenda it is in (migration 0032). An insert that leaves it out
     // sends DEFAULT (null), and the appointments_default_professional trigger
     // fills in the clinic's default professional. The app always names her.
     professionalId: uuid("professional_id")

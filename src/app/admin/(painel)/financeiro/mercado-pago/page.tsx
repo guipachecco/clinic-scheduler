@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { requireModule } from "@/modules/auth/session";
@@ -6,6 +7,7 @@ import {
   getConnection,
   mercadoPagoConfig,
 } from "@/modules/mercado-pago/accounts";
+import { MERCADO_PAGO_VISIBLE } from "@/modules/mercado-pago/visible";
 import { formatLocal } from "@/modules/schedule/time";
 
 import { FinanceTabs, PageTitle } from "../ui";
@@ -54,6 +56,7 @@ export default async function MercadoPagoPage({
   searchParams: Promise<{ conexao?: string }>;
 }) {
   const { clinicId, isRoot } = await requireModule("finance");
+  if (!MERCADO_PAGO_VISIBLE) notFound();
   const { conexao } = await searchParams;
   const config = mercadoPagoConfig();
   const connection = config ? await getConnection(clinicId) : null;
