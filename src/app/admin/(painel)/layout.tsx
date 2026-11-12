@@ -37,6 +37,15 @@ export default async function PanelLayout({
       icon: "person",
     },
     { href: "/admin/servicos", label: "Serviços", icon: "services" },
+    ...(moduleActive(session, "products")
+      ? [
+          {
+            href: "/admin/produtos",
+            label: "Produtos",
+            icon: "box",
+          } as const,
+        ]
+      : []),
     { href: "/admin/expediente", label: "Expediente", icon: "clock" },
     // Optional module: off, it leaves the menu (the routes answer 404).
     ...(moduleActive(session, "finance")

@@ -117,11 +117,6 @@ async function otherCategoryId(tx: Tx, clinicId: string): Promise<string> {
   return row!.id;
 }
 
-// For callers that have no category to offer (the old products screen).
-export async function getOtherCategoryId(clinicId: string): Promise<string> {
-  return inClinic(clinicId, (tx) => otherCategoryId(tx, clinicId));
-}
-
 async function categoryExists(tx: Tx, clinicId: string, id: string) {
   const [row] = await tx
     .select({ id: productCategories.id })
@@ -249,7 +244,7 @@ export async function getProduct(
 export async function deleteProduct(
   clinicId: string,
   id: string,
-  actorUserId?: string,
+  actorUserId: string,
 ): Promise<DeleteProductResult> {
   if (!UUID_PATTERN.test(id)) return { ok: false, reason: "not_found" };
   try {
@@ -286,7 +281,7 @@ export async function deleteProduct(
         await tx.insert(auditLogs).values({
           clinicId,
           actorType: "admin",
-          actorUserId: actorUserId ?? null,
+          actorUserId,
           action: "product.deleted",
           entityType: "product",
           entityId: id,

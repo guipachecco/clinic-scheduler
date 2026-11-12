@@ -34,7 +34,7 @@ export default async function ClinicPageSettingsPage() {
           <div className="flex flex-wrap gap-2">
             {productsOn ? (
               <Button asChild variant="outline">
-                <Link href={"/admin/pagina/produtos" as Route}>Produtos</Link>
+                <Link href={"/admin/produtos" as Route}>Produtos</Link>
               </Button>
             ) : null}
             {reviewsOn ? (

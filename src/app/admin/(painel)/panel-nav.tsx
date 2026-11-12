@@ -11,6 +11,7 @@ export type NavIcon =
   | "calendar"
   | "person"
   | "services"
+  | "box"
   | "clock"
   | "money"
   | "page"
@@ -46,6 +47,12 @@ const ICON_PATHS: Record<NavIcon, React.ReactNode> = {
       <circle cx="17" cy="16" r="2.5" />
       <circle cx="12" cy="7" r="2.5" />
       <path d="M8.5 14 11 9.2M15.5 14 13 9.2" />
+    </>
+  ),
+  box: (
+    <>
+      <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z" />
+      <path d="M4 7.5 12 12l8-4.5M12 12v9" />
     </>
   ),
   clock: (
