@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import { authorizationUrl } from "@/modules/mercado-pago/api";
 import { mercadoPagoConfig } from "@/modules/mercado-pago/accounts";
+import { MERCADO_PAGO_VISIBLE } from "@/modules/mercado-pago/visible";
 
 import { OAUTH_COOKIE, oauthCookieOptions } from "../oauth-cookie";
 
@@ -19,7 +20,7 @@ export async function GET() {
   }
   const { clinicId } = session;
   const config = mercadoPagoConfig();
-  if (!config) return new Response("Not found", { status: 404 });
+  if (!config || !MERCADO_PAGO_VISIBLE) return new Response("Not found", { status: 404 });
 
   const state = randomBytes(24).toString("base64url");
   const response = NextResponse.redirect(

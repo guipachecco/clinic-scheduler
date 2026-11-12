@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Icon, type IconName } from "@/components/icon";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
+import { MERCADO_PAGO_VISIBLE } from "@/modules/mercado-pago/visible";
 import { formatCents } from "@/modules/services/fields";
 
 // Display helpers shared by the financial pages. Server-safe and client-safe.
@@ -39,7 +40,10 @@ export function FinanceTabs({
   return (
     <nav aria-label="Financeiro" className="-mx-1 overflow-x-auto">
       <ul className="flex gap-1 p-1">
-        {TABS.map((tab) => (
+        {TABS.filter(
+          (tab) =>
+            MERCADO_PAGO_VISIBLE || tab.href !== "/admin/financeiro/mercado-pago",
+        ).map((tab) => (
           <li key={tab.href} className="shrink-0">
             <Link
               href={tab.href as Route}
