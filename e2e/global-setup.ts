@@ -31,6 +31,7 @@ import {
   TEST_ADMIN_PRODUCTS,
   TEST_ADMIN_SCHEDULE,
   TEST_ADMIN_SERVICES,
+  TEST_ADMIN_STOCK,
 } from "./test-account";
 
 export default async function globalSetup() {
@@ -67,6 +68,7 @@ export default async function globalSetup() {
     await createAdmin(TEST_ADMIN_PATIENTS);
     await createAdmin(TEST_ADMIN_SERVICES);
     await createAdmin(TEST_ADMIN_PRODUCTS);
+    await createAdmin(TEST_ADMIN_STOCK);
     await createAdmin(TEST_ADMIN_SCHEDULE);
     await createAdmin(TEST_ADMIN_AGENDA);
     await createAdmin(TEST_ADMIN_FINANCE);

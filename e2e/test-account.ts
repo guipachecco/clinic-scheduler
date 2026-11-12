@@ -166,3 +166,12 @@ export const TEST_ADMIN_PRODUCTS = {
   name: "Administradora de Produtos",
   password: "senha-de-teste-produtos-bem-longa",
 };
+
+// Owner used by the stock suite (e2e/stock.spec.ts).
+export const TEST_ADMIN_STOCK = {
+  role: "admin" as const,
+  clinicSlug: "grais",
+  email: "estoque@example.test",
+  name: "Administradora de Estoque",
+  password: "senha-de-teste-estoque-bem-longa",
+};
