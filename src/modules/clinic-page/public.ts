@@ -4,7 +4,13 @@ import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 
 import { asClient, clientDb, type Tx } from "@/db/client";
 import { findPgError } from "@/db/errors";
-import { appointments, clinics, products, services } from "@/db/schema";
+import {
+  appointments,
+  clinics,
+  products,
+  serviceCategories,
+  services,
+} from "@/db/schema";
 import type { ClinicTheme } from "@/db/schema/clinic";
 import type { BookingContext } from "@/modules/booking/booking";
 import type { BusinessType } from "@/modules/business-type/vocabulary";
@@ -53,6 +59,8 @@ export type ClinicPage = PublicClinic & {
     durationMinutes: number;
     priceCents: number | null;
     priceDisplay: "fixed" | "starting_at" | "on_request" | "hidden";
+    // The service's category, so the page can group the list under it.
+    category: { id: string; name: string };
   }[];
   products: {
     id: string;
@@ -190,17 +198,33 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
         durationMinutes: services.durationMinutes,
         priceCents: services.priceCents,
         priceDisplay: services.priceDisplay,
+        categoryId: serviceCategories.id,
+        categoryName: serviceCategories.name,
       })
       .from(services)
+      .innerJoin(
+        serviceCategories,
+        and(
+          eq(serviceCategories.clinicId, services.clinicId),
+          eq(serviceCategories.id, services.categoryId),
+        ),
+      )
       .where(
         and(
           eq(services.clinicId, clinicId),
           eq(services.isActive, true),
           eq(services.onlineBookingEnabled, true),
           eq(services.isFlexible, false),
+          eq(serviceCategories.isActive, true),
         ),
       )
-      .orderBy(asc(services.sortOrder), asc(services.name), asc(services.id));
+      .orderBy(
+        asc(serviceCategories.sortOrder),
+        asc(serviceCategories.name),
+        asc(services.sortOrder),
+        asc(services.name),
+        asc(services.id),
+      );
 
     const productsOn = hasModule(clinic, "products");
     const reviewsOn = hasModule(clinic, "reviews");
@@ -297,9 +321,10 @@ export async function getClinicPage(slug: string): Promise<ClinicPage | null> {
         height: Number(row.height),
       })),
       hours,
-      services: serviceRows.map((row) => ({
+      services: serviceRows.map(({ categoryId, categoryName, ...row }) => ({
         ...row,
         priceCents: row.priceDisplay === "hidden" ? null : row.priceCents,
+        category: { id: categoryId, name: categoryName },
       })),
       products: productRows,
       reviews: reviewRows.map((row) => ({
