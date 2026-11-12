@@ -46,6 +46,14 @@ export function mapsLink(
   return null;
 }
 
+// The small map of the Localização section: Google Maps' embed of the
+// address, which needs no key. The CSP allows only this origin in frames
+// (src/lib/csp.ts).
+export const MAPS_EMBED_ORIGIN = "https://www.google.com";
+export function mapsEmbedUrl(address: string): string {
+  return `${MAPS_EMBED_ORIGIN}/maps?q=${encodeURIComponent(address)}&z=16&output=embed`;
+}
+
 function ContactLink({
   href,
   icon,

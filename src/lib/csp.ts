@@ -23,6 +23,8 @@ export function buildContentSecurityPolicy({
     "img-src": ["'self'", "blob:", "data:"],
     "font-src": ["'self'"],
     "connect-src": ["'self'"],
+    // Only the small map of the clinic page (Google Maps' embed).
+    "frame-src": ["https://www.google.com"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
