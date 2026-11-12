@@ -22,6 +22,28 @@ export async function clearRateLimits() {
   }
 }
 
+// Turns the account's 2FA off again in the throwaway e2e database, as the
+// root's "reset 2FA" does. A suite's beforeAll runs again when Playwright
+// retries it (CI) or repeats it (--repeat-each), and by then the account
+// already has 2FA, so the login would ask for a code instead.
+async function resetTwoFactor(email: string) {
+  const client = new Client({ connectionString: E2E_DATABASE_URL });
+  await client.connect();
+  try {
+    await client.query(
+      `DELETE FROM two_factors
+       WHERE user_id = (SELECT id FROM users WHERE email = $1)`,
+      [email],
+    );
+    await client.query(
+      "UPDATE users SET two_factor_enabled = false WHERE email = $1",
+      [email],
+    );
+  } finally {
+    await client.end();
+  }
+}
+
 // Signs in with a fresh account, sets up its 2FA and lands in the panel.
 // Used by suites that need a logged-in admin without relying on other specs.
 // `landing` is where the panel opens: root without a chosen clinic goes to
@@ -32,6 +54,7 @@ export async function signInWithFreshTwoFactor(
   landing: RegExp = /\/admin$/,
 ) {
   await clearRateLimits();
+  await resetTwoFactor(account.email);
   await page.goto("/admin/entrar");
   await page.getByLabel("E-mail").fill(account.email);
   await page.getByLabel("Senha").fill(account.password);
