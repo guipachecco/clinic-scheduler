@@ -204,6 +204,13 @@
       "when": 1794442261162,
       "tag": "0028_products_like_services",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1794477880805,
+      "tag": "0029_stock",
+      "breakpoints": true
     }
   ]
 }
