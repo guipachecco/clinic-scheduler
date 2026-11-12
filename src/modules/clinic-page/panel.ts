@@ -8,6 +8,8 @@ import {
   clinics,
   loyaltyRedemptions,
   patients,
+  PRODUCT_OTHER_CATEGORY_NAME,
+  productCategories,
   products,
   reviews,
 } from "@/db/schema";
@@ -122,6 +124,22 @@ export async function listProducts(clinicId: string): Promise<PanelProduct[]> {
   );
 }
 
+// Until the panel picks a category (Task 2), new products go to "Outros".
+async function otherCategoryId(tx: Tx, clinicId: string): Promise<string> {
+  const [row] = await tx
+    .select({ id: productCategories.id })
+    .from(productCategories)
+    .where(
+      and(
+        eq(productCategories.clinicId, clinicId),
+        eq(productCategories.name, PRODUCT_OTHER_CATEGORY_NAME),
+      ),
+    )
+    .limit(1);
+  if (!row) throw new Error("A clínica não tem a categoria Outros.");
+  return row.id;
+}
+
 // New products go to the end of the list.
 async function nextSortOrder(tx: Tx, clinicId: string): Promise<number> {
   const [row] = await tx
@@ -140,6 +158,7 @@ export async function createProduct(
       .insert(products)
       .values({
         clinicId,
+        categoryId: await otherCategoryId(tx, clinicId),
         name: input.name,
         priceCents: input.price,
         description: input.description,
@@ -198,9 +217,11 @@ export async function addExampleProducts(clinicId: string): Promise<number> {
       .from(products)
       .where(eq(products.clinicId, clinicId));
     if (Number(existing?.total ?? 0) > 0) return 0;
+    const categoryId = await otherCategoryId(tx, clinicId);
     await tx.insert(products).values(
       EXAMPLE_PRODUCTS.map((product, index) => ({
         clinicId,
+        categoryId,
         name: product.name,
         priceCents: product.priceCents,
         isActive: true,

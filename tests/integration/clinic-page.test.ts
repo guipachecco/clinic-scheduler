@@ -34,7 +34,7 @@ import {
   uploadDraftImage,
 } from "@/modules/page-builder/builder";
 
-import { CLINIC, otherClinic } from "../helpers/clinic";
+import { CLINIC, otherClinic, productCategory } from "../helpers/clinic";
 
 // The clinic page module (public reads, client writes, owner panel). Every
 // record is fictitious; e-mails end in @modulo-pagina.example.test and the
@@ -193,9 +193,20 @@ beforeAll(async () => {
   await db
     .insert(paymentMethods)
     .values({ clinicId: CLINIC, name: `Pix ${TAG}` });
+  const productCategoryId = await productCategory(CLINIC);
   await db.insert(products).values([
-    { clinicId: CLINIC, name: `Ativo ${TAG}`, priceCents: 1000 },
-    { clinicId: CLINIC, name: `Inativo ${TAG}`, isActive: false },
+    {
+      clinicId: CLINIC,
+      categoryId: productCategoryId,
+      name: `Ativo ${TAG}`,
+      priceCents: 1000,
+    },
+    {
+      clinicId: CLINIC,
+      categoryId: productCategoryId,
+      name: `Inativo ${TAG}`,
+      isActive: false,
+    },
   ]);
 });
 

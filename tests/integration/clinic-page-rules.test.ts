@@ -18,7 +18,7 @@ import {
   users,
 } from "@/db/schema";
 
-import { CLINIC, otherClinic } from "../helpers/clinic";
+import { CLINIC, otherClinic, productCategory } from "../helpers/clinic";
 
 // The database rules of the clinic page (migration 0017): products, reviews,
 // loyalty and the definer functions the public page reads through. Every
@@ -475,10 +475,22 @@ describe("clinic page rules", () => {
   });
 
   it("shows clients only active products of their clinic", async () => {
+    const mine = await productCategory(CLINIC);
+    const theirs = await productCategory(clinicB);
     await db.insert(products).values([
-      { clinicId: CLINIC, name: `Creme ${TAG} A`, priceCents: 4500 },
-      { clinicId: CLINIC, name: `Óleo ${TAG} A`, isActive: false },
-      { clinicId: clinicB, name: `Creme ${TAG} B` },
+      {
+        clinicId: CLINIC,
+        categoryId: mine,
+        name: `Creme ${TAG} A`,
+        priceCents: 4500,
+      },
+      {
+        clinicId: CLINIC,
+        categoryId: mine,
+        name: `Óleo ${TAG} A`,
+        isActive: false,
+      },
+      { clinicId: clinicB, categoryId: theirs, name: `Creme ${TAG} B` },
     ]);
     const seen = await clientDb.transaction(async (tx) => {
       await tx.execute(

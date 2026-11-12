@@ -355,7 +355,7 @@ export async function getSale(
       ).length;
       return {
         id: item.id,
-        serviceId: item.serviceId,
+        serviceId: item.serviceId!,
         serviceName: item.serviceName,
         sessions: item.sessions,
         totalCents: item.totalCents,
@@ -804,7 +804,7 @@ export async function scheduleSessions(
         clinicId,
         {
           patientId: sale.patientId,
-          serviceId: item.serviceId,
+          serviceId: item.serviceId!,
           slots,
           acknowledgeWarnings: values.acknowledgeWarnings,
         },

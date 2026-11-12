@@ -580,7 +580,7 @@ export async function getQuote(
     saleId: row.saleId,
     items: items.map((item, index) => ({
       id: item.id,
-      serviceId: item.serviceId,
+      serviceId: item.serviceId!,
       serviceName: item.serviceName,
       sessions: item.sessions,
       unitPriceCents: item.unitPriceCents,

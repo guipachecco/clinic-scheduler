@@ -13,6 +13,8 @@ import {
   FLEXIBLE_SERVICE_SLUG,
   OTHER_CATEGORY_SLUG,
   paymentMethods,
+  PRODUCT_OTHER_CATEGORY_NAME,
+  productCategories,
   serviceCategories,
   services,
 } from "@/db/schema";
@@ -139,7 +141,8 @@ export async function listClinics(): Promise<ClinicSummary[]> {
 
 // Creates the clinic with what every clinic needs to start: the "Outros"
 // category and the flexible "Avaliação / encaixe" service (as migration 0005
-// did for the first clinic), plus the default payment methods and expense
+// did for the first clinic), the "Outros" product category (as migration
+// 0028 did), plus the default payment methods and expense
 // categories (as migration 0009 did).
 export async function createClinic(
   values: ClinicFormInput,
@@ -195,6 +198,11 @@ export async function createClinic(
         isActive: true,
         isFlexible: true,
         sortOrder: 0,
+      });
+      await tx.insert(productCategories).values({
+        clinicId,
+        name: PRODUCT_OTHER_CATEGORY_NAME,
+        sortOrder: 999,
       });
       await tx.insert(paymentMethods).values(
         DEFAULT_PAYMENT_METHODS.map((name, sortOrder) => ({
