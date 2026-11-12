@@ -6,11 +6,11 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-import { Icon, type IconName } from "./icons";
+import { Icon } from "./icons";
+import { clientNavItems, isActiveNavItem } from "./nav-items";
 
-type Item = { href: string; label: string; icon: IconName; exact?: boolean };
-
-// The client area's fixed bottom navigation.
+// The client area's fixed bottom navigation, on phones and tablets. From the
+// lg breakpoint the same items are links in the header (top-nav.tsx).
 export function BottomNav({
   slug,
   signedIn,
@@ -19,28 +19,15 @@ export function BottomNav({
   signedIn: boolean;
 }) {
   const pathname = usePathname();
-  const base = `/${slug}`;
-  const items: Item[] = [
-    { href: base, label: "Início", icon: "home", exact: true },
-    { href: `${base}/marcar`, label: "Agendar", icon: "calendar" },
-    { href: `${base}/meus-horarios`, label: "Meus horários", icon: "clock" },
-    {
-      href: signedIn ? `${base}/perfil` : `${base}/entrar`,
-      label: "Perfil",
-      icon: "person",
-    },
-  ];
 
   return (
     <nav
       aria-label="Navegação"
-      className="fixed inset-x-0 bottom-0 z-20 border-t bg-card pb-[env(safe-area-inset-bottom)]"
+      className="fixed inset-x-0 bottom-0 z-20 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       <ul className="mx-auto grid max-w-md grid-cols-4">
-        {items.map((item) => {
-          const active = item.exact
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {clientNavItems(slug, signedIn).map((item) => {
+          const active = isActiveNavItem(item, pathname);
           return (
             <li key={item.label}>
               <Link

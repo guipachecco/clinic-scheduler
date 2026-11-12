@@ -469,6 +469,10 @@ test.describe("client area", () => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto(`/${A.slug}`);
     const nav = page.getByRole("navigation", { name: "Navegação" });
+    // On the phone the header carries no navigation.
+    await expect(page.getByRole("banner").getByRole("navigation")).toHaveCount(
+      0,
+    );
     const links = [
       { name: "Início", href: `/${A.slug}` },
       { name: "Agendar", href: `/${A.slug}/marcar` },
@@ -482,6 +486,48 @@ test.describe("client area", () => {
       // An icon, never an emoji.
       await expect(link.locator("svg")).toHaveCount(1);
     }
+    expect(await noSidewaysScroll(page)).toBe(true);
+  });
+
+  test("wide screen moves the navigation to the header", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`/${A.slug}/marcar`);
+    // One navigation only (the bottom bar is hidden), inside the header.
+    await expect(
+      page.getByRole("navigation", { name: "Navegação" }),
+    ).toHaveCount(1);
+    const nav = page
+      .getByRole("banner")
+      .getByRole("navigation", { name: "Navegação" });
+    await expect(nav).toBeVisible();
+    for (const [name, href] of [
+      ["Início", `/${A.slug}`],
+      ["Agendar", `/${A.slug}/marcar`],
+      ["Meus horários", `/${A.slug}/meus-horarios`],
+      ["Perfil", `/${A.slug}/entrar`],
+    ] as const) {
+      await expect(nav.getByRole("link", { name })).toHaveAttribute(
+        "href",
+        href,
+      );
+    }
+    // Signed out, /marcar sends her to sign in: Perfil (/entrar) is marked.
+    await expect(nav.getByRole("link", { name: "Perfil" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await nav.getByRole("link", { name: "Início" }).click();
+    await expect(page).toHaveURL(new RegExp(`/${A.slug}$`));
+    await expect(nav.getByRole("link", { name: "Início" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    // The booking button rests at the bottom of the screen, fully in view.
+    const book = page
+      .getByRole("main")
+      .getByRole("link", { name: "Marcar horário" });
+    await expect(book).toBeInViewport({ ratio: 1 });
     expect(await noSidewaysScroll(page)).toBe(true);
   });
 
