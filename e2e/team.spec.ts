@@ -12,6 +12,8 @@ import { TEST_ADMIN_TEAM } from "./test-account";
 test.describe.configure({ mode: "serial" });
 
 const SECOND = "Bia Equipe Teste";
+// The badge of the default professional (the form's hint says it too).
+const DEFAULT_BADGE = "Recebe os agendamentos online";
 
 let context: BrowserContext;
 let page: Page;
@@ -45,9 +47,7 @@ test.describe("equipe", () => {
     await expect(
       page.getByRole("heading", { name: "Equipe", level: 1 }),
     ).toBeVisible();
-    await expect(page.getByText("Recebe os agendamentos online")).toHaveCount(
-      1,
-    );
+    await expect(page.getByText(DEFAULT_BADGE, { exact: true })).toHaveCount(1);
 
     await page.goto("/admin/agenda/novo");
     await expect(page.getByLabel("Serviço")).toBeVisible();
@@ -89,7 +89,7 @@ test.describe("equipe", () => {
     await page.goto("/admin/equipe");
     const first = page
       .getByRole("listitem")
-      .filter({ hasText: "Recebe os agendamentos online" });
+      .filter({ has: page.getByText(DEFAULT_BADGE, { exact: true }) });
     await first.getByText("Editar").click();
     await first.getByLabel("Ativa (aparece na agenda)").uncheck();
     await first.getByRole("button", { name: "Salvar" }).click();
