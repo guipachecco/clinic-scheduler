@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { requireModule } from "@/modules/auth/session";
-import { listProducts } from "@/modules/clinic-page/panel";
+import { getProduct, listProductCatalog } from "@/modules/products/products";
 import { formatCents } from "@/modules/services/fields";
 
 import { ExampleProductsButton, ProductForm } from "./product-form";
@@ -17,7 +17,15 @@ function priceInput(cents: number | null) {
 
 export default async function ProductsPage() {
   const { clinicId } = await requireModule("products");
-  const products = await listProducts(clinicId);
+  // Temporary: the new catalog screen (Task 3) replaces this list.
+  const catalog = await listProductCatalog(clinicId);
+  const products = (
+    await Promise.all(
+      catalog
+        .flatMap((category) => category.products)
+        .map((item) => getProduct(clinicId, item.id)),
+    )
+  ).filter((product) => product !== null);
 
   return (
     <div className="grid max-w-3xl gap-6">
@@ -48,7 +56,7 @@ export default async function ProductsPage() {
                   {product.priceCents === null
                     ? "Sem preço"
                     : formatCents(product.priceCents)}
-                  {product.isActive ? null : (
+                  {product.showOnPage ? null : (
                     <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">
                       Escondido
                     </span>
@@ -67,7 +75,7 @@ export default async function ProductsPage() {
                       name: product.name,
                       price: priceInput(product.priceCents),
                       description: product.description ?? "",
-                      isActive: product.isActive,
+                      isActive: product.showOnPage,
                     }}
                   />
                 </div>

@@ -34,7 +34,7 @@ import {
   uploadDraftImage,
 } from "@/modules/page-builder/builder";
 
-import { CLINIC, otherClinic, productCategory } from "../helpers/clinic";
+import { CLINIC, productCategory } from "../helpers/clinic";
 
 // The clinic page module (public reads, client writes, owner panel). Every
 // record is fictitious; e-mails end in @modulo-pagina.example.test and the
@@ -43,7 +43,6 @@ import { CLINIC, otherClinic, productCategory } from "../helpers/clinic";
 const DOMAIN = "@modulo-pagina.example.test";
 const TAG = "Modulo Pagina";
 const MINUTE = 60_000;
-const SPARE_SLUG = "clinica-modulo-pagina";
 
 let slug: string;
 let original: typeof clinics.$inferSelect;
@@ -104,11 +103,6 @@ async function cleanup() {
     await db.delete(users).where(inArray(users.id, userIds));
   }
   await db.delete(products).where(like(products.name, `%${TAG}%`));
-  const [spare] = await db
-    .select({ id: clinics.id })
-    .from(clinics)
-    .where(eq(clinics.slug, SPARE_SLUG));
-  if (spare) await db.delete(products).where(eq(products.clinicId, spare.id));
   await db.delete(paymentMethods).where(like(paymentMethods.name, `%${TAG}%`));
   await db.delete(services).where(eq(services.slug, "servico-modulo-pagina"));
   await db
@@ -207,6 +201,12 @@ beforeAll(async () => {
       name: `Inativo ${TAG}`,
       isActive: false,
     },
+    {
+      clinicId: CLINIC,
+      categoryId: productCategoryId,
+      name: `Fora da página ${TAG}`,
+      showOnPage: false,
+    },
   ]);
 });
 
@@ -257,6 +257,7 @@ describe("clinic page module", () => {
     expect(page.amenities).toEqual(["wifi", "aceita_pets"]);
     expect(page.instagramHandle).toBe("zemana.teste");
     expect(page.paymentMethods).toContain(`Pix ${TAG}`);
+    // Active, but not on the page, stays off it.
     expect(page.products.map((p) => p.name)).toEqual([`Ativo ${TAG}`]);
     expect(page.loyalty).toEqual({ visits: 2, reward: "Brinde fictício" });
     expect(page.hours).toHaveLength(7);
@@ -277,14 +278,6 @@ describe("clinic page module", () => {
     expect(page.reviewSummary).toEqual({ average: null, total: 0 });
     await panel.setReviewHidden(CLINIC, review!.id, false, actor);
     expect((await getClinicPage(slug))!.reviews).toHaveLength(1);
-  });
-
-  it("adds the example products once", async () => {
-    const throwaway = await otherClinic(SPARE_SLUG);
-    expect(await panel.addExampleProducts(throwaway)).toBe(3);
-    expect(await panel.addExampleProducts(throwaway)).toBe(0);
-    const list = await panel.listProducts(throwaway);
-    expect(list.map((p) => p.priceCents).sort()).toEqual([6990, 7990, 9500]);
   });
 
   it("redeems loyalty only with a prize", async () => {

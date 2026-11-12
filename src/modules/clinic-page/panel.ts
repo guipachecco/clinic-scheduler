@@ -8,28 +8,14 @@ import {
   clinics,
   loyaltyRedemptions,
   patients,
-  PRODUCT_OTHER_CATEGORY_NAME,
-  productCategories,
-  products,
   reviews,
 } from "@/db/schema";
 
-import type {
-  Amenity,
-  ClinicPageInput,
-  LoyaltyInput,
-  ProductInput,
-} from "./fields";
+import type { Amenity, ClinicPageInput, LoyaltyInput } from "./fields";
 
 // The owner's side of the clinic page, as app_panel inside the clinic
 // (inClinic). Inputs are already parsed by the schemas in ./fields. Actor ids
 // come from the server session, never from the browser.
-
-const EXAMPLE_PRODUCTS = [
-  { name: "Protetor solar FPS 50", priceCents: 7990 },
-  { name: "Hidratante facial", priceCents: 6990 },
-  { name: "Sérum de vitamina C", priceCents: 9500 },
-] as const;
 
 export type ClinicPageSettings = ClinicPageInput & {
   loyaltyEnabled: boolean;
@@ -96,140 +82,6 @@ export async function updateLoyalty(
       })
       .where(eq(clinics.id, clinicId)),
   );
-}
-
-export type PanelProduct = {
-  id: string;
-  name: string;
-  priceCents: number | null;
-  description: string | null;
-  isActive: boolean;
-};
-
-const productColumns = {
-  id: products.id,
-  name: products.name,
-  priceCents: products.priceCents,
-  description: products.description,
-  isActive: products.isActive,
-};
-
-export async function listProducts(clinicId: string): Promise<PanelProduct[]> {
-  return inClinic(clinicId, (tx) =>
-    tx
-      .select(productColumns)
-      .from(products)
-      .where(eq(products.clinicId, clinicId))
-      .orderBy(asc(products.sortOrder), asc(products.name), asc(products.id)),
-  );
-}
-
-// Until the panel picks a category (Task 2), new products go to "Outros".
-async function otherCategoryId(tx: Tx, clinicId: string): Promise<string> {
-  const [row] = await tx
-    .select({ id: productCategories.id })
-    .from(productCategories)
-    .where(
-      and(
-        eq(productCategories.clinicId, clinicId),
-        eq(productCategories.name, PRODUCT_OTHER_CATEGORY_NAME),
-      ),
-    )
-    .limit(1);
-  if (!row) throw new Error("A clínica não tem a categoria Outros.");
-  return row.id;
-}
-
-// New products go to the end of the list.
-async function nextSortOrder(tx: Tx, clinicId: string): Promise<number> {
-  const [row] = await tx
-    .select({ next: sql<number>`coalesce(max(${products.sortOrder}), -1) + 1` })
-    .from(products)
-    .where(eq(products.clinicId, clinicId));
-  return Number(row?.next ?? 0);
-}
-
-export async function createProduct(
-  clinicId: string,
-  input: ProductInput,
-): Promise<string> {
-  return inClinic(clinicId, async (tx) => {
-    const [row] = await tx
-      .insert(products)
-      .values({
-        clinicId,
-        categoryId: await otherCategoryId(tx, clinicId),
-        name: input.name,
-        priceCents: input.price,
-        description: input.description,
-        isActive: input.isActive,
-        sortOrder: await nextSortOrder(tx, clinicId),
-      })
-      .returning({ id: products.id });
-    return row!.id;
-  });
-}
-
-// False when the product is not in this clinic.
-export async function updateProduct(
-  clinicId: string,
-  id: string,
-  input: ProductInput,
-): Promise<boolean> {
-  return inClinic(clinicId, async (tx) => {
-    const rows = await tx
-      .update(products)
-      .set({
-        name: input.name,
-        priceCents: input.price,
-        description: input.description,
-        isActive: input.isActive,
-        updatedAt: new Date(),
-      })
-      .where(and(eq(products.clinicId, clinicId), eq(products.id, id)))
-      .returning({ id: products.id });
-    return rows.length > 0;
-  });
-}
-
-export async function deleteProduct(
-  clinicId: string,
-  id: string,
-): Promise<boolean> {
-  return inClinic(clinicId, async (tx) => {
-    const rows = await tx
-      .delete(products)
-      .where(and(eq(products.clinicId, clinicId), eq(products.id, id)))
-      .returning({ id: products.id });
-    return rows.length > 0;
-  });
-}
-
-// Fills an empty product list with three examples; returns how many it added.
-export async function addExampleProducts(clinicId: string): Promise<number> {
-  return inClinic(clinicId, async (tx) => {
-    // Two clicks at once must not both see an empty list.
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext('products'), hashtext(${clinicId}))`,
-    );
-    const [existing] = await tx
-      .select({ total: count() })
-      .from(products)
-      .where(eq(products.clinicId, clinicId));
-    if (Number(existing?.total ?? 0) > 0) return 0;
-    const categoryId = await otherCategoryId(tx, clinicId);
-    await tx.insert(products).values(
-      EXAMPLE_PRODUCTS.map((product, index) => ({
-        clinicId,
-        categoryId,
-        name: product.name,
-        priceCents: product.priceCents,
-        isActive: true,
-        sortOrder: index,
-      })),
-    );
-    return EXAMPLE_PRODUCTS.length;
-  });
 }
 
 export type PanelReview = {
