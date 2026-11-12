@@ -8,6 +8,7 @@ import { CookieNotice } from "./landing/cookie-notice/cookie-notice";
 import { Features } from "./landing/features";
 import { FinalCta } from "./landing/final-cta";
 import { Hero } from "./landing/hero";
+import { PricingSection } from "./landing/pricing-section";
 import { SiteFooter } from "./landing/site-footer";
 import { SiteHeader } from "./landing/site-header";
 import { ScrollStory } from "./landing/scroll-story";
@@ -29,6 +30,10 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
   },
 };
+
+// The launch prices end on a fixed date: regenerate hourly so the page
+// switches over without a deploy.
+export const revalidate = 3600;
 
 // Tells search engines what Zemana is (structured data, schema.org).
 const ZEMANA_JSON_LD = {
@@ -72,6 +77,7 @@ export default function HomePage() {
         <Hero />
         <ScrollStory />
         <Features />
+        <PricingSection />
         <FinalCta />
       </main>
       <SiteFooter />

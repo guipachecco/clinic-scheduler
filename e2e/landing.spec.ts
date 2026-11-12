@@ -9,6 +9,9 @@ import { TEST_ADMIN } from "./test-account";
 // The Zemana landing page at /, on a 360 px phone.
 test.use({ viewport: { width: 360, height: 800 } });
 
+// Launch prices (and their stickers) only exist until this moment.
+const LAUNCH_ENDS_AT = Date.parse("2027-01-01T03:00:00Z");
+
 const QUOTE_URL = `https://wa.me/5547991037244?text=${encodeURIComponent(
   "Oi! Vi o site da Zemana e quero um orçamento para minha clínica.",
 )}`;
@@ -118,6 +121,26 @@ test("no horizontal scroll at 360 px", async ({ page }) => {
   expect(width).toBeLessThanOrEqual(360);
 });
 
+test("pricing shows both plans with launch price and plan WhatsApp", async ({
+  page,
+}) => {
+  test.skip(Date.now() >= LAUNCH_ENDS_AT, "launch over");
+  await page.goto("/");
+  const section = page.getByRole("region", { name: "Sem letra miúda." });
+  await expect(section.getByTestId("plan-card")).toHaveCount(2);
+  await expect(section.getByText("R$ 29,90", { exact: true })).toBeVisible();
+  await expect(section.getByText("R$ 99,00", { exact: true })).toBeVisible();
+  await expect(section.getByText("R$ 149,90", { exact: true })).toBeVisible();
+  await expect(section.getByText("1º mês grátis")).toBeVisible();
+  await expect(section.getByText(/garanta esse preço/i)).toBeVisible();
+  const cta = section.getByRole("link", { name: "Quero o Completo" });
+  await expect(cta).toHaveAttribute(
+    "href",
+    `https://wa.me/5547991037244?text=${encodeURIComponent("Oi! Quero o plano Completo da Zemana.")}`,
+  );
+  await expect(cta).toHaveAttribute("target", "_blank");
+});
+
 test("features promise only what exists", async ({ page }) => {
   await page.goto("/");
   const text = (await page.locator("body").innerText()).toLowerCase();
@@ -133,6 +156,7 @@ test("features promise only what exists", async ({ page }) => {
 test("reduced motion shows the page static and readable", async ({
   browser,
 }) => {
+  test.skip(Date.now() >= LAUNCH_ENDS_AT, "launch over");
   const context = await browser.newContext({
     reducedMotion: "reduce",
     viewport: { width: 360, height: 800 },
@@ -147,6 +171,14 @@ test("reduced motion shows the page static and readable", async ({
     await card.scrollIntoViewIfNeeded();
     await expect(card).toHaveCSS("opacity", "1");
   }
+  // So are both plan cards, with the launch price.
+  const plans = page.getByTestId("plan-card");
+  await expect(plans).toHaveCount(2);
+  for (const card of await plans.all()) {
+    await card.scrollIntoViewIfNeeded();
+    await expect(card).toHaveCSS("opacity", "1");
+  }
+  await expect(page.getByText("R$ 29,90", { exact: true })).toBeVisible();
   // The ticker band becomes a short still row that fits the phone.
   const ticker = page.getByTestId("ticker-static");
   await expect(ticker).toBeVisible();
@@ -157,6 +189,7 @@ test("reduced motion shows the page static and readable", async ({
 });
 
 test("feature cards show without JavaScript", async ({ browser }) => {
+  test.skip(Date.now() >= LAUNCH_ENDS_AT, "launch over");
   const context = await browser.newContext({
     javaScriptEnabled: false,
     viewport: { width: 360, height: 800 },
@@ -178,6 +211,12 @@ test("feature cards show without JavaScript", async ({ browser }) => {
   for (const card of await cards.all()) {
     await expect(card).toHaveCSS("opacity", "1");
   }
+  const plans = page.getByTestId("plan-card");
+  await expect(plans).toHaveCount(2);
+  for (const card of await plans.all()) {
+    await expect(card).toHaveCSS("opacity", "1");
+  }
+  await expect(page.getByText("R$ 29,90", { exact: true })).toBeVisible();
   // The story renders its still scenes in the server HTML.
   for (const text of ["Ana 14h", "Problema resolvido", "Com a Zemana"]) {
     const scene = page.getByText(text, { exact: true });
