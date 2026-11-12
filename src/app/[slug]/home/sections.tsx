@@ -358,6 +358,56 @@ export function ServicesTab({ page }: { page: ClinicPage }) {
   );
 }
 
+// The end of the page: the clinic's name, the Zemana's legal pages and a
+// quiet invitation for other businesses to have a page like this one.
+export function ClinicFooter({
+  page,
+  year,
+}: {
+  page: ClinicPage;
+  year: number;
+}) {
+  const name = clinicName(page);
+  const linkClass =
+    "underline-offset-4 hover:text-foreground hover:underline focus-visible:rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none";
+  return (
+    <footer className="mt-2 grid gap-4 border-t pt-6 text-sm text-muted-foreground">
+      <div>
+        <p className="font-heading text-base font-extrabold text-foreground">
+          {name}
+        </p>
+        {page.areaLabel ? <p>{page.areaLabel}</p> : null}
+      </div>
+      <nav aria-label="Rodapé">
+        <ul className="flex flex-wrap gap-x-4 gap-y-1">
+          <li>
+            <Link href="/termos" className={linkClass}>
+              Termos de uso
+            </Link>
+          </li>
+          <li>
+            <Link href="/privacidade" className={linkClass}>
+              Privacidade
+            </Link>
+          </li>
+        </ul>
+      </nav>
+      <p>
+        Tem um negócio?{" "}
+        <Link
+          href="/"
+          className={`font-semibold text-primary-text ${linkClass}`}
+        >
+          Crie sua agenda online na Zemana
+        </Link>
+      </p>
+      <p className="text-xs">
+        © {year} {name}. Agenda online por Zemana.
+      </p>
+    </footer>
+  );
+}
+
 // The one strong action of the page, fixed above the bottom navigation:
 // "Marcar horário", or the clinic's WhatsApp when online booking is off.
 export function BookingBar({ page }: { page: ClinicPage }) {
