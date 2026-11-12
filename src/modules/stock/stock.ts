@@ -33,8 +33,9 @@ import type { EntryValues, UsageValues } from "./fields";
 // balance, in the same transaction, while the product row is locked. Values
 // never go to audit_logs or into error messages; only ids and quantities do.
 //
-// Locks are always taken in the same order (sale, then its items, then
-// products by id), so two operations never wait on each other in a cycle.
+// Locks are always taken in the same order (sale, then its appointment, then
+// its items, then products by id), so two operations never wait on each
+// other in a cycle.
 // stock_movements rows cannot be locked (app_panel has no UPDATE on them,
 // which SELECT ... FOR UPDATE needs): the product row is the lock for every
 // movement of that product, reversals included.
@@ -60,6 +61,8 @@ export type StockHistoryEntry = {
       }
     | { type: "sale"; saleId: string; saleNumber: number };
   reversed: boolean;
+  // A reversal of an entry ("Entrada desfeita"), not of a usage or handover.
+  reversesEntry: boolean;
 };
 
 export type AppointmentUsage = {
@@ -106,6 +109,7 @@ const NOTHING_TO_HAND_OVER = "Os produtos desta venda já têm baixa.";
 const MOVEMENT_NOT_FOUND = "Movimento não encontrado.";
 const REVERSAL_NOT_REVERSIBLE = "Um estorno não pode ser desfeito.";
 const ALREADY_REVERSED = "Esta baixa já foi desfeita.";
+const ENTRY_ALREADY_REVERSED = "Esta entrada já foi desfeita.";
 
 const insufficient = (n: number) =>
   `Estoque insuficiente: há ${n}. Lance uma entrada primeiro.`;
@@ -134,6 +138,12 @@ const reversedOf = () =>
   sql<boolean>`exists (
     select 1 from stock_movements r
     where r.reverses_id = "stock_movements"."id")`;
+
+// Whether a movement is the reversal of an entry.
+const reversesEntryOf = () =>
+  sql<boolean>`exists (
+    select 1 from stock_movements o
+    where o.id = "stock_movements"."reverses_id" and o.kind = 'entry')`;
 
 async function lockProducts(tx: Tx, clinicId: string, ids: string[]) {
   return tx
@@ -249,6 +259,23 @@ export async function recordUsage(
   if (!UUID_PATTERN.test(appointmentId)) return fail(APPOINTMENT_NOT_FOUND);
   try {
     return await inClinic(clinicId, async (tx): Promise<StockResult> => {
+      // With a sale item, the sale is locked before the appointment: the
+      // order cancelSale uses (sale, then its appointments).
+      let found: { saleId: string } | undefined;
+      let sale: Awaited<ReturnType<typeof lockSale>> | undefined;
+      if (values.saleItemId) {
+        [found] = await tx
+          .select({ saleId: saleItems.saleId })
+          .from(saleItems)
+          .where(
+            and(
+              eq(saleItems.id, values.saleItemId),
+              eq(saleItems.clinicId, clinicId),
+            ),
+          );
+        if (found) sale = await lockSale(tx, clinicId, found.saleId);
+      }
+
       const [appointment] = await tx
         .select({
           patientId: appointments.patientId,
@@ -268,18 +295,14 @@ export async function recordUsage(
       }
 
       if (values.saleItemId) {
-        const [found] = await tx
-          .select({ saleId: saleItems.saleId })
-          .from(saleItems)
-          .where(
-            and(
-              eq(saleItems.id, values.saleItemId),
-              eq(saleItems.clinicId, clinicId),
-            ),
-          );
         if (!found) return fail(SALE_ITEM_INVALID);
-        // Sale first, then the item: the order every sale change uses.
-        const sale = await lockSale(tx, clinicId, found.saleId);
+        // The movement sum below is fresh only because the sale was locked
+        // in an earlier, separate statement: under READ COMMITTED each
+        // statement takes a new snapshot, so this one sees every movement
+        // committed by whoever held the sale lock before us. The item's
+        // FOR UPDATE alone is not enough (a statement that waits on a row
+        // lock re-reads that row, not the subquery). Never merge the sale
+        // lock into this statement.
         const [item] = await tx
           .select({
             productId: saleItems.productId,
@@ -377,6 +400,8 @@ export async function handOverAll(
         ...new Set(open.map((item) => item.productId)),
       ]);
       const byId = new Map(locked.map((product) => [product.id, product]));
+      // isActive is not checked on purpose: a product already sold must still
+      // be deliverable after it is deactivated.
       // Checked in the order of the sale, before anything is written.
       const needed = new Map<string, number>();
       for (const item of open) {
@@ -424,6 +449,8 @@ export async function reverseMovement(
   actorUserId: string,
 ): Promise<StockResult> {
   if (!UUID_PATTERN.test(movementId)) return fail(MOVEMENT_NOT_FOUND);
+  // An entry undone is "entrada desfeita"; a usage or handover, "baixa".
+  let alreadyReversed = ALREADY_REVERSED;
   try {
     return await inClinic(clinicId, async (tx): Promise<StockResult> => {
       const [original] = await tx
@@ -437,6 +464,7 @@ export async function reverseMovement(
         );
       if (!original) return fail(MOVEMENT_NOT_FOUND);
       if (original.kind === "reversal") return fail(REVERSAL_NOT_REVERSIBLE);
+      if (original.kind === "entry") alreadyReversed = ENTRY_ALREADY_REVERSED;
 
       // The product row serializes every movement of the product: after it
       // is locked, a reversal made meanwhile is already visible.
@@ -447,7 +475,7 @@ export async function reverseMovement(
         .from(stockMovements)
         .where(eq(stockMovements.reversesId, movementId))
         .limit(1);
-      if (existing) return fail(ALREADY_REVERSED);
+      if (existing) return fail(alreadyReversed);
 
       const quantity = -original.quantity;
       if (product.stockQuantity + quantity < 0) {
@@ -478,7 +506,7 @@ export async function reverseMovement(
   } catch (error) {
     // The last guard when two reversals race past the check.
     if (isUniqueViolation(error, "stock_movements_reverses_unique")) {
-      return fail(ALREADY_REVERSED);
+      return fail(alreadyReversed);
     }
     throw unexpected(error);
   }
@@ -524,6 +552,7 @@ export async function getProductStock(
         saleId: saleItems.saleId,
         saleNumber: quotes.number,
         reversed: reversedOf(),
+        reversesEntry: reversesEntryOf(),
       })
       .from(stockMovements)
       .leftJoin(appointments, eq(stockMovements.appointmentId, appointments.id))
@@ -573,6 +602,7 @@ export async function getProductStock(
         note: row.note,
         origin,
         reversed: row.reversed,
+        reversesEntry: row.reversesEntry,
       };
     }),
   };
@@ -613,6 +643,7 @@ export async function listAppointmentUsage(
 
 // Products a person bought and has not fully received, for the sale picker
 // of the appointment. Cancelled sales never show; the oldest sale first.
+// Named as sold: sale_items.service_name holds the product name of the sale.
 export async function listOpenSaleItems(
   clinicId: string,
   patientId: string,
@@ -625,19 +656,19 @@ export async function listOpenSaleItems(
         saleId: sales.id,
         saleNumber: quotes.number,
         productId: saleItems.productId,
-        productName: products.name,
+        productName: saleItems.serviceName,
         sold: saleItems.sessions,
         movements: itemMovementsOf(),
       })
       .from(saleItems)
       .innerJoin(sales, eq(saleItems.saleId, sales.id))
       .innerJoin(quotes, eq(sales.quoteId, quotes.id))
-      .innerJoin(products, eq(saleItems.productId, products.id))
       .where(
         and(
           eq(saleItems.clinicId, clinicId),
           eq(sales.patientId, patientId),
           isNull(sales.cancelledAt),
+          isNotNull(saleItems.productId),
         ),
       )
       .orderBy(
@@ -660,7 +691,7 @@ export async function listOpenSaleItems(
 }
 
 // "Produtos da venda": for each product item, how much was sold and how much
-// already went out (outs minus their reversals).
+// already went out (outs minus their reversals), named as sold.
 export async function saleProductProgress(
   clinicId: string,
   saleId: string,
@@ -670,14 +701,17 @@ export async function saleProductProgress(
     tx
       .select({
         saleItemId: saleItems.id,
-        productName: products.name,
+        productName: saleItems.serviceName,
         sold: saleItems.sessions,
         movements: itemMovementsOf(),
       })
       .from(saleItems)
-      .innerJoin(products, eq(saleItems.productId, products.id))
       .where(
-        and(eq(saleItems.clinicId, clinicId), eq(saleItems.saleId, saleId)),
+        and(
+          eq(saleItems.clinicId, clinicId),
+          eq(saleItems.saleId, saleId),
+          isNotNull(saleItems.productId),
+        ),
       )
       .orderBy(asc(saleItems.sortOrder), asc(saleItems.id)),
   );

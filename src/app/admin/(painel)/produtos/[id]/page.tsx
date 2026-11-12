@@ -90,7 +90,9 @@ export default async function ProductPage({
               const reversal = entry.kind === "reversal";
               let label: React.ReactNode = "Entrada";
               if (reversal) {
-                label = "Baixa desfeita";
+                label = entry.reversesEntry
+                  ? "Entrada desfeita"
+                  : "Baixa desfeita";
               } else if (origin.type === "appointment") {
                 const text = `Atendimento de ${origin.patientName} em ${formatLocal(origin.startsAt, "dd/MM", zone)}`;
                 label = (

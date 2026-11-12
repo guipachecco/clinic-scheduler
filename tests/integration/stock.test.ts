@@ -147,6 +147,19 @@ async function movementSum(id: string) {
   return result.rows[0]!.total;
 }
 
+// Waits until this many sessions are blocked on a lock.
+async function lockWaiters(count: number) {
+  for (let attempt = 0; attempt < 200; attempt++) {
+    const result = await db.execute<{ waiting: number }>(
+      sql`select count(*)::int as waiting from pg_stat_activity
+          where datname = current_database() and wait_event_type = 'Lock'`,
+    );
+    if (result.rows[0]!.waiting >= count) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`Esperava ${count} sessões aguardando um lock.`);
+}
+
 const entry = (quantity: number, note?: string) =>
   entrySchema.parse({ quantity: String(quantity), note });
 
@@ -315,7 +328,9 @@ describe("stock", () => {
 
   it("usage linked to a sale cannot exceed what is left", async () => {
     await ok(recordEntry(CLINIC, productId, entry(20), actorId));
-    const sale = await newSale([{ productId, sold: 3 }]);
+    const sale = await newSale([
+      { productId, sold: 3, name: "Creme Fictício" },
+    ]);
     const [item] = sale.itemIds;
 
     expect(await listOpenSaleItems(CLINIC, patientId)).toEqual([
@@ -352,9 +367,61 @@ describe("stock", () => {
       expect.objectContaining({ quantity: 2, saleNumber: sale.number }),
     ]);
 
+    // Renamed after the sale: the sale keeps the name it was sold with.
+    await db
+      .update(products)
+      .set({ name: "Creme Renomeado" })
+      .where(eq(products.id, productId));
+    expect(await listOpenSaleItems(CLINIC, patientId)).toEqual([
+      expect.objectContaining({
+        saleItemId: item,
+        productName: "Creme Fictício",
+      }),
+    ]);
+    expect(await saleProductProgress(CLINIC, sale.saleId)).toEqual([
+      expect.objectContaining({
+        saleItemId: item,
+        productName: "Creme Fictício",
+      }),
+    ]);
+
     await ok(recordUsage(CLINIC, appointmentId, usage(1, item!), actorId));
     expect(await listOpenSaleItems(CLINIC, patientId)).toEqual([]);
     expect(await stockOf(productId)).toBe(17);
+  });
+
+  it("a usage against a sale item and Dar baixa em tudo at once never exceed what was sold", async () => {
+    await ok(recordEntry(CLINIC, productId, entry(20), actorId));
+    const sale = await newSale([{ productId, sold: 2 }]);
+    const [item] = sale.itemIds;
+
+    // Forces the race: with the product row held here, handOverAll stops
+    // after locking the sale and its items, and the usage starts only then.
+    let handOver!: ReturnType<typeof handOverAll>;
+    let used!: ReturnType<typeof recordUsage>;
+    await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select id from products where id = ${productId} for update`,
+      );
+      handOver = handOverAll(CLINIC, sale.saleId, actorId);
+      await lockWaiters(1);
+      used = recordUsage(CLINIC, appointmentId, usage(2, item!), actorId);
+      await lockWaiters(2);
+    });
+    const results = await Promise.all([used, handOver]);
+    expect(results[1]).toEqual({ ok: true });
+    expect(results[0]).toEqual({
+      ok: false,
+      formError: `Na venda nº ${sale.number} faltam só 0.`,
+    });
+    const [row] = (
+      await db.execute<{ total: number }>(
+        sql`select coalesce(sum(quantity), 0)::int as total from stock_movements where sale_item_id = ${item!}`,
+      )
+    ).rows;
+    expect(row!.total).toBe(-2);
+    expect(await stockOf(productId)).toBe(18);
+    expect(await movementSum(productId)).toBe(18);
   });
 
   it("usage refuses a sale item of another patient, another product or a cancelled sale", async () => {
@@ -550,6 +617,15 @@ describe("stock", () => {
     await ok(reverseMovement(CLINIC, entered!.id, actorId));
     expect(await stockOf(productId)).toBe(0);
     expect(await movementSum(productId)).toBe(0);
+    expect(await reverseMovement(CLINIC, entered!.id, actorId)).toEqual({
+      ok: false,
+      formError: "Esta entrada já foi desfeita.",
+    });
+    const history = (await getProductStock(CLINIC, productId))!.history;
+    expect(history[0]).toMatchObject({ kind: "reversal", reversesEntry: true });
+    expect(
+      history.filter((m) => m.kind !== "reversal").map((m) => m.reversesEntry),
+    ).toEqual([false, false, false]);
   });
 
   it("a product with stock history cannot be deleted", async () => {

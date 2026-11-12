@@ -209,10 +209,10 @@ export default async function AppointmentPage({
         </section>
       ) : handOverLink ? (
         <section
-          aria-labelledby="pagamento"
+          aria-labelledby="sessao-paga"
           className="grid gap-3 rounded-2xl border bg-card p-4"
         >
-          <h2 id="pagamento" className="font-heading text-lg font-bold">
+          <h2 id="sessao-paga" className="font-heading text-lg font-bold">
             Pagamento da sessão
           </h2>
           <p>Sessão paga.</p>

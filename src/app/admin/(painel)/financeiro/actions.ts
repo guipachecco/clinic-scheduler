@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import * as z from "zod";
 
 import {
@@ -50,7 +51,6 @@ import { DateTime } from "luxon";
 
 import { CLINIC_TIME_ZONE, todayLocal } from "@/modules/schedule/time";
 import { handOverAll } from "@/modules/stock/stock";
-import { revalidatePath } from "next/cache";
 
 // Server Actions of the financial module. Each one checks the session first,
 // takes the clinic from it, parses the raw input again, and turns unexpected
