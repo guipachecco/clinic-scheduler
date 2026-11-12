@@ -142,6 +142,53 @@ test("pricing shows both plans with launch price and plan WhatsApp", async ({
   await expect(cta).toHaveAttribute("target", "_blank");
 });
 
+test("inside tabs switch the screenshot", async ({ page }) => {
+  await page.goto("/");
+  const section = page.getByRole("region", { name: "Olha só como fica." });
+  const tabs = section.getByRole("tab");
+  await expect(tabs).toHaveText([
+    "Agenda",
+    "Orçamento",
+    "Sua página",
+    "No celular",
+  ]);
+  await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
+  await tabs.first().focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(tabs.nth(1)).toBeFocused();
+  await expect(section.getByRole("tabpanel")).toBeVisible();
+  await expect(
+    section.getByRole("tabpanel").getByRole("img").first(),
+  ).toHaveAttribute("alt", /.+/);
+  // Wraps around at both ends, and Home and End jump.
+  await page.keyboard.press("End");
+  await expect(tabs.last()).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowLeft");
+  await expect(tabs.last()).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("Home");
+  await expect(tabs.first()).toHaveAttribute("aria-selected", "true");
+});
+
+test("inside gallery shows the first tab without JavaScript", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: { width: 360, height: 800 },
+  });
+  const page = await context.newPage();
+  await page.goto("/");
+  const section = page.getByRole("region", { name: "Olha só como fica." });
+  await section.scrollIntoViewIfNeeded();
+  const panel = section.getByRole("tabpanel");
+  await expect(panel).toHaveCount(1);
+  await expect(panel.getByRole("img")).toHaveCount(2);
+  await context.close();
+});
+
 test("features promise only what exists", async ({ page }) => {
   await page.goto("/");
   const text = (await page.locator("body").innerText()).toLowerCase();

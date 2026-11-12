@@ -8,6 +8,7 @@ import { CookieNotice } from "./landing/cookie-notice/cookie-notice";
 import { Features } from "./landing/features";
 import { FinalCta } from "./landing/final-cta";
 import { Hero } from "./landing/hero";
+import { InsideSection } from "./landing/inside-section";
 import { PricingSection } from "./landing/pricing-section";
 import { SiteFooter } from "./landing/site-footer";
 import { SiteHeader } from "./landing/site-header";
@@ -77,6 +78,7 @@ export default function HomePage() {
         <Hero />
         <ScrollStory />
         <Features />
+        <InsideSection />
         <PricingSection />
         <FinalCta />
       </main>
