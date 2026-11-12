@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/db/owner";
 import {
@@ -6,6 +6,7 @@ import {
   GRAIS_CLINIC_ID,
   PRODUCT_OTHER_CATEGORY_NAME,
   productCategories,
+  professionals,
 } from "@/db/schema";
 
 // The clinic every integration test works in: the one migration 0007 creates
@@ -48,4 +49,25 @@ export async function productCategory(clinicId: string) {
       ),
     );
   return row!.id;
+}
+
+// The clinic's default professional (migration 0031): the first active one by
+// order. Every clinic has one from the moment it exists.
+export async function defaultProfessional(clinicId: string = CLINIC) {
+  const [row] = await db
+    .select({ id: professionals.id, name: professionals.name })
+    .from(professionals)
+    .where(
+      and(
+        eq(professionals.clinicId, clinicId),
+        eq(professionals.isActive, true),
+      ),
+    )
+    .orderBy(
+      asc(professionals.sortOrder),
+      asc(professionals.createdAt),
+      asc(professionals.id),
+    )
+    .limit(1);
+  return row!;
 }

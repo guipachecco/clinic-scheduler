@@ -41,7 +41,15 @@ export type ServiceOption = {
   isFlexible: boolean;
 };
 
-type Props = { services: ServiceOption[] } & (
+export type ProfessionalChoice = { id: string; name: string };
+
+// `professionals` are the choices of the selector, the default one first. The
+// selector shows only with more than one; otherwise the server picks (a new
+// appointment goes to the default professional, an edit keeps hers).
+type Props = {
+  services: ServiceOption[];
+  professionals: ProfessionalChoice[];
+} & (
   | {
       mode: "create";
       date: string;
@@ -63,6 +71,7 @@ type Field = keyof AppointmentFormInput;
 const SHOWN_FIELDS: readonly string[] = [
   "patientId",
   "serviceId",
+  "professionalId",
   "customLabel",
   "date",
   "startTime",
@@ -244,6 +253,8 @@ export function AppointmentForm(props: Props) {
       : {
           patientId: initialPatient?.id ?? "",
           serviceId: "",
+          professionalId:
+            props.professionals.length > 1 ? props.professionals[0]!.id : "",
           customLabel: "",
           date: props.date,
           startTime: props.startTime,
@@ -428,6 +439,26 @@ export function AppointmentForm(props: Props) {
             message={errors.serviceId?.message}
           />
         </div>
+
+        {props.professionals.length > 1 ? (
+          <div className="grid content-start gap-2">
+            <Label htmlFor="professionalId">Profissional</Label>
+            <NativeSelect
+              {...fieldProps("professionalId")}
+              {...register("professionalId")}
+            >
+              {props.professionals.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </NativeSelect>
+            <FieldError
+              id="professionalId-error"
+              message={errors.professionalId?.message}
+            />
+          </div>
+        ) : null}
 
         {service?.isFlexible ? (
           <div className="grid content-start gap-2">

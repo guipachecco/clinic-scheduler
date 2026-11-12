@@ -99,6 +99,12 @@ export const appointmentFormSchema = z
   .object({
     patientId: z.uuid("Escolha o paciente."),
     serviceId: z.uuid("Escolha o serviço."),
+    // Absent or empty when the form has no selector (a team of one): a new
+    // appointment goes to the default professional and an edit keeps hers.
+    professionalId: z
+      .union([z.uuid("Escolha a profissional."), z.literal("")])
+      .optional()
+      .transform((value) => value || null),
     // Required or forbidden depending on the service; the data layer checks.
     customLabel: z
       .string()
@@ -145,6 +151,7 @@ export const appointmentFormSchema = z
     return {
       patientId: value.patientId,
       serviceId: value.serviceId,
+      professionalId: value.professionalId,
       customLabel: value.customLabel,
       startsAt,
       endsAt: new Date(startsAt.getTime() + value.durationMinutes * 60_000),

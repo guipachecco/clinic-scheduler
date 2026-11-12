@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { requireAdmin } from "@/modules/auth/session";
 import { getPatient } from "@/modules/patients/patients";
+import { listActiveProfessionals } from "@/modules/professionals/professionals";
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 import { listActiveServices } from "@/modules/services/services";
 
@@ -77,9 +78,10 @@ export default async function NewAppointmentPage({
   }>;
 }) {
   const { clinicId } = await requireAdmin();
-  const [{ inicio, paciente }, services] = await Promise.all([
+  const [{ inicio, paciente }, services, professionals] = await Promise.all([
     searchParams,
     listActiveServices(clinicId),
+    listActiveProfessionals(clinicId),
   ]);
   const patient = await initialPatient(clinicId, paciente);
 
@@ -102,6 +104,7 @@ export default async function NewAppointmentPage({
         <AppointmentForm
           mode="create"
           services={services.map(toOption)}
+          professionals={professionals}
           {...startDefaults(inicio)}
           initialPatient={patient}
         />

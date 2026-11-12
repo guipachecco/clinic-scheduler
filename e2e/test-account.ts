@@ -175,3 +175,12 @@ export const TEST_ADMIN_STOCK = {
   name: "Administradora de Estoque",
   password: "senha-de-teste-estoque-bem-longa",
 };
+
+// Owner used by the team suite (e2e/team.spec.ts).
+export const TEST_ADMIN_TEAM = {
+  role: "admin" as const,
+  clinicSlug: "grais",
+  email: "equipe@example.test",
+  name: "Administradora da Equipe",
+  password: "senha-de-teste-equipe-bem-longa",
+};

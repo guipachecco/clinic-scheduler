@@ -9,6 +9,7 @@ import {
   appointments,
   auditLogs,
   patients,
+  professionals,
   serviceCategories,
   services,
 } from "@/db/schema";
@@ -52,6 +53,8 @@ export type AppointmentRecord = {
   serviceId: string;
   serviceName: string;
   isFlexible: boolean;
+  professionalId: string;
+  professionalName: string;
   customLabel: string | null;
   startsAt: Date;
   endsAt: Date;
@@ -77,6 +80,8 @@ export type CalendarEvent = {
   editable: boolean;
   // Booked by the client through the clinic link (source online).
   online: boolean;
+  professionalId: string;
+  professionalName: string;
 };
 
 export type PatientAppointmentItem = {
@@ -110,6 +115,7 @@ const ANONYMIZED = "Paciente anonimizado não pode ser agendado.";
 const PATIENT_MISSING = "Escolha um paciente cadastrado.";
 const SERVICE_MISSING = "Escolha um serviço cadastrado.";
 const SERVICE_INACTIVE = "Serviço inativo.";
+const PROFESSIONAL_MISSING = "Escolha uma profissional ativa da equipe.";
 const LABEL_REQUIRED = "Informe o rótulo deste atendimento.";
 const LABEL_FORBIDDEN = "Este serviço não usa rótulo.";
 const OVERLAP_RACE = "Este horário conflita com outro atendimento.";
@@ -224,11 +230,50 @@ function occupiedRange(startsAt: Date, endsAt: Date, service: ServiceRow) {
   };
 }
 
-// Pre-check with the same '[)' semantics as appointments_no_overlap. The
-// message shows the other appointment's own times, never its patient.
+// The professional an appointment goes to: the one asked for, when she is an
+// active professional of this clinic, or the clinic's default one when none
+// is asked for (a team of one has no selector). `keptId` is the
+// appointment's current professional, who stays allowed on edit even when
+// she is no longer active. Read under the agenda lock, which a deactivation
+// also takes.
+async function professionalFor(
+  tx: Tx,
+  clinicId: string,
+  requestedId: string | null,
+  keptId?: string,
+): Promise<{ id: string } | { fail: Fail }> {
+  const missing = { fail: fieldFail("professionalId", PROFESSIONAL_MISSING) };
+  if (requestedId === null) {
+    if (keptId) return { id: keptId };
+    const result = await tx.execute<{ id: string | null }>(
+      sql`select default_professional(${clinicId}::uuid) as id`,
+    );
+    const id = result.rows[0]?.id;
+    return id ? { id } : missing;
+  }
+  if (!UUID_PATTERN.test(requestedId)) return missing;
+  if (requestedId === keptId) return { id: keptId };
+  const [row] = await tx
+    .select({ id: professionals.id })
+    .from(professionals)
+    .where(
+      and(
+        eq(professionals.id, requestedId),
+        eq(professionals.clinicId, clinicId),
+        eq(professionals.isActive, true),
+      ),
+    )
+    .limit(1);
+  return row ?? missing;
+}
+
+// Pre-check with the same '[)' semantics as appointments_no_overlap: only
+// the same professional's appointments conflict. The message shows the
+// other appointment's own times, never its patient.
 async function overlapRefusal(
   tx: Tx,
   clinicId: string,
+  professionalId: string,
   range: { occupiedFrom: Date; occupiedUntil: Date },
   excludeId?: string,
 ): Promise<Fail | null> {
@@ -238,6 +283,7 @@ async function overlapRefusal(
     .where(
       and(
         eq(appointments.clinicId, clinicId),
+        eq(appointments.professionalId, professionalId),
         inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
         lt(appointments.occupiedFrom, range.occupiedUntil),
         gt(appointments.occupiedUntil, range.occupiedFrom),
@@ -380,8 +426,20 @@ export async function createAppointment(
       const serviceFail = serviceRefusal(service, values.customLabel);
       if (serviceFail || !service) return serviceFail!;
 
+      const professional = await professionalFor(
+        tx,
+        clinicId,
+        values.professionalId,
+      );
+      if ("fail" in professional) return professional.fail;
+
       const occupied = occupiedRange(values.startsAt, values.endsAt, service);
-      const overlap = await overlapRefusal(tx, clinicId, occupied);
+      const overlap = await overlapRefusal(
+        tx,
+        clinicId,
+        professional.id,
+        occupied,
+      );
       if (overlap) return overlap;
 
       const warned = await warningRefusal(
@@ -399,6 +457,7 @@ export async function createAppointment(
         .values({
           clinicId,
           patientId: values.patientId,
+          professionalId: professional.id,
           serviceId: service.id,
           serviceName: service.name,
           serviceDurationMinutes: service.durationMinutes,
@@ -422,6 +481,7 @@ export async function createAppointment(
         entityId: row!.id,
         changes: {
           patientId: values.patientId,
+          professionalId: professional.id,
           serviceId: service.id,
           ...period(values.startsAt, values.endsAt),
           status: "confirmed",
@@ -474,6 +534,8 @@ export async function insertSessionAppointments(
   input: {
     patientId: string;
     serviceId: string;
+    // Null or absent: the clinic's default professional.
+    professionalId?: string | null;
     slots: SessionSlot[];
     acknowledgeWarnings: boolean;
   },
@@ -491,6 +553,14 @@ export async function insertSessionAppointments(
       ok: false,
       formError: "Este serviço não pode ser agendado em pacote.",
     };
+  }
+  const professional = await professionalFor(
+    tx,
+    clinicId,
+    input.professionalId ?? null,
+  );
+  if ("fail" in professional) {
+    return { ok: false, formError: PROFESSIONAL_MISSING };
   }
 
   const ranges = input.slots.map((slot) =>
@@ -513,7 +583,7 @@ export async function insertSessionAppointments(
       });
       continue;
     }
-    const overlap = await overlapRefusal(tx, clinicId, range);
+    const overlap = await overlapRefusal(tx, clinicId, professional.id, range);
     if (overlap) {
       problems.push({ index, kind: "conflict", message: overlap.formError! });
       continue;
@@ -539,6 +609,7 @@ export async function insertSessionAppointments(
       .values({
         clinicId,
         patientId: input.patientId,
+        professionalId: professional.id,
         serviceId: service.id,
         serviceName: service.name,
         serviceDurationMinutes: service.durationMinutes,
@@ -561,6 +632,7 @@ export async function insertSessionAppointments(
       entityId: row!.id,
       changes: {
         patientId: input.patientId,
+        professionalId: professional.id,
         serviceId: service.id,
         ...period(slot.startsAt, slot.endsAt),
         status: "confirmed",
@@ -602,19 +674,39 @@ export async function updateAppointment(
       );
       if (serviceFail || !service) return serviceFail!;
 
+      const professional = await professionalFor(
+        tx,
+        clinicId,
+        values.professionalId,
+        current.professionalId,
+      );
+      if ("fail" in professional) return professional.fail;
+
       const serviceChanged = service.id !== current.serviceId;
+      const professionalChanged = professional.id !== current.professionalId;
       const labelChanged = values.customLabel !== current.customLabel;
       const timeChanged =
         values.startsAt.getTime() !== current.startsAt.getTime() ||
         values.endsAt.getTime() !== current.endsAt.getTime();
-      if (!serviceChanged && !labelChanged && !timeChanged) {
+      if (
+        !serviceChanged &&
+        !professionalChanged &&
+        !labelChanged &&
+        !timeChanged
+      ) {
         return { ok: true, id };
       }
 
       let occupied: { occupiedFrom: Date; occupiedUntil: Date } | undefined;
-      if (serviceChanged || timeChanged) {
+      if (serviceChanged || timeChanged || professionalChanged) {
         occupied = occupiedRange(values.startsAt, values.endsAt, service);
-        const overlap = await overlapRefusal(tx, clinicId, occupied, id);
+        const overlap = await overlapRefusal(
+          tx,
+          clinicId,
+          professional.id,
+          occupied,
+          id,
+        );
         if (overlap) return overlap;
       }
 
@@ -636,6 +728,7 @@ export async function updateAppointment(
         .update(appointments)
         .set({
           serviceId: service.id,
+          professionalId: professional.id,
           ...(serviceChanged
             ? {
                 serviceName: service.name,
@@ -658,7 +751,15 @@ export async function updateAppointment(
             toServiceId: service.id,
           }
         : {};
-      const labelChanges = labelChanged ? { labelChanged: true } : {};
+      const otherChanges = {
+        ...(labelChanged ? { labelChanged: true } : {}),
+        ...(professionalChanged
+          ? {
+              fromProfessionalId: current.professionalId,
+              toProfessionalId: professional.id,
+            }
+          : {}),
+      };
       await tx.insert(auditLogs).values({
         clinicId,
         actorType: "admin",
@@ -671,10 +772,10 @@ export async function updateAppointment(
               from: period(current.startsAt, current.endsAt),
               to: period(values.startsAt, values.endsAt),
               ...serviceChanges,
-              ...labelChanges,
+              ...otherChanges,
               ...(codes.length > 0 ? { warnings: codes } : {}),
             }
-          : { ...serviceChanges, ...labelChanges },
+          : { ...serviceChanges, ...otherChanges },
       });
       if (timeChanged) await syncSessionInstallment(tx, clinicId, id);
       return { ok: true, id };
@@ -713,7 +814,13 @@ export async function rescheduleAppointment(
       }
 
       const occupied = occupiedRange(input.startsAt, input.endsAt, service);
-      const overlap = await overlapRefusal(tx, clinicId, occupied, id);
+      const overlap = await overlapRefusal(
+        tx,
+        clinicId,
+        current.professionalId,
+        occupied,
+        id,
+      );
       if (overlap) return overlap;
 
       const warned = await warningRefusal(
@@ -838,6 +945,12 @@ function displayName(patient: {
   return patient.name.trim().split(/\s+/)[0] ?? patient.name;
 }
 
+// The appointment's professional; the composite key keeps it in the clinic.
+const professionalJoin = and(
+  eq(professionals.clinicId, appointments.clinicId),
+  eq(professionals.id, appointments.professionalId),
+);
+
 export async function getAppointment(
   clinicId: string,
   id: string,
@@ -854,6 +967,8 @@ export async function getAppointment(
         serviceId: appointments.serviceId,
         serviceName: appointments.serviceName,
         isFlexible: services.isFlexible,
+        professionalId: appointments.professionalId,
+        professionalName: professionals.name,
         customLabel: appointments.customLabel,
         startsAt: appointments.startsAt,
         endsAt: appointments.endsAt,
@@ -865,6 +980,7 @@ export async function getAppointment(
       .from(appointments)
       .innerJoin(patients, eq(appointments.patientId, patients.id))
       .innerJoin(services, eq(appointments.serviceId, services.id))
+      .innerJoin(professionals, professionalJoin)
       .where(and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)))
       .limit(1),
   );
@@ -879,6 +995,8 @@ export async function getAppointment(
     serviceId: row.serviceId,
     serviceName: row.serviceName,
     isFlexible: row.isFlexible,
+    professionalId: row.professionalId,
+    professionalName: row.professionalName,
     customLabel: row.customLabel,
     startsAt: row.startsAt,
     endsAt: row.endsAt,
@@ -907,6 +1025,8 @@ const calendarColumns = {
   name: patients.name,
   nickname: patients.nickname,
   anonymizedAt: patients.anonymizedAt,
+  professionalId: appointments.professionalId,
+  professionalName: professionals.name,
 };
 
 function toCalendarEvent(row: {
@@ -920,6 +1040,8 @@ function toCalendarEvent(row: {
   name: string;
   nickname: string | null;
   anonymizedAt: Date | null;
+  professionalId: string;
+  professionalName: string;
 }): CalendarEvent {
   const patientLabel = displayName(row);
   const serviceLabel = row.customLabel ?? row.serviceName;
@@ -934,6 +1056,8 @@ function toCalendarEvent(row: {
     status: row.status,
     editable: !row.anonymizedAt && isEditableStatus(row.status),
     online,
+    professionalId: row.professionalId,
+    professionalName: row.professionalName,
   };
 }
 
@@ -951,6 +1075,7 @@ export async function listAppointmentsInRange(
       .select(calendarColumns)
       .from(appointments)
       .innerJoin(patients, eq(appointments.patientId, patients.id))
+      .innerJoin(professionals, professionalJoin)
       .where(
         and(
           eq(appointments.clinicId, clinicId),
@@ -990,6 +1115,7 @@ export async function listRequestedFrom(
       .from(appointments)
       .innerJoin(patients, eq(appointments.patientId, patients.id))
       .innerJoin(services, eq(appointments.serviceId, services.id))
+      .innerJoin(professionals, professionalJoin)
       .where(pendingFrom(clinicId, now))
       .orderBy(asc(appointments.startsAt), asc(appointments.id)),
   );

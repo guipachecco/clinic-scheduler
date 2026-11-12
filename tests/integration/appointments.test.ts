@@ -28,7 +28,7 @@ import {
   type AppointmentFormValues,
 } from "@/modules/appointments/fields";
 
-import { CLINIC } from "../helpers/clinic";
+import { CLINIC, defaultProfessional } from "../helpers/clinic";
 
 // Every record here is fictitious and exists only during the test.
 
@@ -915,6 +915,7 @@ describe("getAppointment", () => {
       customLabel: LABEL,
       durationMinutes: "45",
     });
+    const professional = await defaultProfessional();
     expect(await getAppointment(CLINIC, id, NOW)).toEqual({
       id,
       patientId,
@@ -922,6 +923,8 @@ describe("getAppointment", () => {
       serviceId: flexibleServiceId,
       serviceName: "Encaixe fictício",
       isFlexible: true,
+      professionalId: professional.id,
+      professionalName: professional.name,
       customLabel: LABEL,
       startsAt: new Date("2026-11-10T13:00:00Z"),
       endsAt: new Date("2026-11-10T13:45:00Z"),
@@ -983,6 +986,7 @@ describe("listAppointmentsInRange", () => {
       ...range,
       includeCancelled: false,
     });
+    const professional = await defaultProfessional();
     expect(events).toEqual([
       {
         id: nick,
@@ -994,6 +998,8 @@ describe("listAppointmentsInRange", () => {
         status: "confirmed",
         editable: true,
         online: false,
+        professionalId: professional.id,
+        professionalName: professional.name,
       },
       {
         id: plain,
@@ -1005,6 +1011,8 @@ describe("listAppointmentsInRange", () => {
         status: "confirmed",
         editable: true,
         online: true,
+        professionalId: professional.id,
+        professionalName: professional.name,
       },
     ]);
 

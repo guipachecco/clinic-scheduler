@@ -318,6 +318,48 @@ export const clinics = pgTable(
   ],
 );
 
+// The people who see patients at a clinic, each with her own agenda
+// (migration 0031). Every clinic has at least one: the database creates it
+// with the clinic. The first active one by sort_order is the default: online
+// bookings go to her until clients can choose. She has no panel login of her
+// own (yet). Deactivated, never deleted: the panel has no delete. They go
+// with their clinic (cascade), which appointments still prevent.
+export const professionals = pgTable(
+  "professionals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    registration: text("registration"),
+    isActive: boolean("is_active").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    unique("professionals_clinic_id_id_unique").on(t.clinicId, t.id),
+    index("professionals_clinic_order_idx").on(
+      t.clinicId,
+      t.sortOrder,
+      t.createdAt,
+    ),
+    check(
+      "professionals_name_check",
+      sql`char_length(${t.name}) between 1 and 60`,
+    ),
+    check(
+      "professionals_registration_check",
+      sql`${t.registration} is null or char_length(${t.registration}) between 1 and 40`,
+    ),
+    check(
+      "professionals_sort_order_check",
+      sql`${t.sortOrder} between 0 and 999`,
+    ),
+  ],
+);
+
 export const serviceCategories = pgTable(
   "service_categories",
   {
@@ -721,7 +763,8 @@ export const CANCELLATION_REASONS = [
 
 // occupied_from/occupied_until include the preparation and cleanup buffers.
 // The appointments_no_overlap exclusion constraint (custom migration) rejects
-// two active appointments of the same clinic whose occupied ranges overlap.
+// two active appointments of the same professional whose occupied ranges
+// overlap (per clinic until migration 0031).
 export const appointments = pgTable(
   "appointments",
   {
@@ -730,6 +773,12 @@ export const appointments = pgTable(
       .notNull()
       .references(() => clinics.id, { onDelete: "restrict" }),
     patientId: uuid("patient_id").notNull(),
+    // Whose agenda it is in (migration 0031). An insert that leaves it out
+    // sends DEFAULT (null), and the appointments_default_professional trigger
+    // fills in the clinic's default professional. The app always names her.
+    professionalId: uuid("professional_id")
+      .notNull()
+      .$defaultFn(() => sql`default`),
     serviceId: uuid("service_id").notNull(),
     serviceName: text("service_name").notNull(),
     serviceDurationMinutes: integer("service_duration_minutes").notNull(),
@@ -759,6 +808,12 @@ export const appointments = pgTable(
       columns: [t.clinicId, t.patientId],
       foreignColumns: [patients.clinicId, patients.id],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "appointments_professional_fk",
+      columns: [t.clinicId, t.professionalId],
+      foreignColumns: [professionals.clinicId, professionals.id],
+    }).onDelete("restrict"),
+    index("appointments_professional_idx").on(t.professionalId, t.startsAt),
     foreignKey({
       name: "appointments_service_fk",
       columns: [t.clinicId, t.serviceId],

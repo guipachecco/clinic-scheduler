@@ -218,6 +218,13 @@
       "when": 1794497243130,
       "tag": "0030_client_my_clinics_order",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794499760622,
+      "tag": "0031_professionals",
+      "breakpoints": true
     }
   ]
 }
