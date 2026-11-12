@@ -3,6 +3,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { env } from "@/lib/env";
+import { redactText } from "@/lib/logger";
 
 import { parseSender } from "./sender";
 
@@ -49,12 +50,38 @@ async function sendWithMailerSend(apiKey: string, message: EmailMessage) {
       text: message.text,
     }),
   });
-  // Only the status: the response may echo the recipient.
   if (!response.ok) {
+    const reason = await refusalReason(response);
     throw new Error(
-      `Falha ao enviar o e-mail (MailerSend ${response.status}).`,
+      `Falha ao enviar o e-mail (MailerSend ${response.status})` +
+        (reason ? `: ${reason}` : "."),
     );
   }
+}
+
+// MailerSend's own words for a refusal (plan limits, unverified domain...),
+// so the log says why. Addresses are taken out: the errors may echo the
+// recipient. Empty when the body is not MailerSend's JSON.
+async function refusalReason(response: Response): Promise<string> {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return "";
+  }
+  if (!body || typeof body !== "object") return "";
+  const { message, errors } = body as { message?: unknown; errors?: unknown };
+  const parts: string[] = [];
+  if (typeof message === "string") parts.push(message);
+  if (errors && typeof errors === "object") {
+    for (const [field, list] of Object.entries(errors)) {
+      const texts = (Array.isArray(list) ? list : [list]).filter(
+        (item): item is string => typeof item === "string",
+      );
+      if (texts.length) parts.push(`${field}: ${texts.join(" ")}`);
+    }
+  }
+  return redactText(parts.join(" | ")).slice(0, 500);
 }
 
 async function writeToOutbox(message: EmailMessage) {

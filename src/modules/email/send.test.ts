@@ -81,23 +81,44 @@ describe("sendEmail", () => {
     expect(await readOutbox(outbox)).toEqual([]);
   });
 
-  it("fails with only the status when MailerSend refuses", async () => {
+  async function refusal(body: string) {
     vi.stubEnv("MAILERSEND_API_KEY", "mlsn.chave_ficticia");
     vi.stubEnv("EMAIL_FROM", "nao-responda@example.com");
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        async () =>
-          new Response(JSON.stringify({ message: "cliente@example.test" }), {
-            status: 422,
-          }),
-      ),
+      vi.fn(async () => new Response(body, { status: 422 })),
     );
     vi.resetModules();
     const { sendEmail } = await import("./send");
+    return sendEmail(message).then(
+      () => {
+        throw new Error("sendEmail should have failed");
+      },
+      (error: Error) => error.message,
+    );
+  }
 
-    const failure = sendEmail(message);
-    await expect(failure).rejects.toThrowError(
+  it("fails with MailerSend's reason, without the recipient", async () => {
+    const text = await refusal(
+      JSON.stringify({
+        message:
+          "Trial accounts can only send emails to the administrator's email. (and 1 more error)",
+        errors: {
+          "to.0.email": [
+            "cliente@example.test is not an administrator. #MS42225",
+          ],
+        },
+      }),
+    );
+    expect(text).toContain("Falha ao enviar o e-mail (MailerSend 422)");
+    expect(text).toContain("Trial accounts can only send emails");
+    expect(text).toContain("to.0.email");
+    expect(text).toContain("#MS42225");
+    expect(text).not.toContain("cliente@example.test");
+  });
+
+  it("fails with only the status when the refusal is not JSON", async () => {
+    expect(await refusal("<html>erro</html>")).toBe(
       "Falha ao enviar o e-mail (MailerSend 422).",
     );
   });
