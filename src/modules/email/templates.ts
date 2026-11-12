@@ -56,8 +56,9 @@ ${paragraphs}
 }
 
 function greeting(userName: string) {
-  const firstName = userName.trim().split(/\s+/)[0];
-  return firstName ? `Olá, ${firstName}!` : "Olá!";
+  // The full name as typed at signup, spaces tidied.
+  const name = userName.trim().replace(/\s+/g, " ");
+  return name ? `Olá, ${name}!` : "Olá!";
 }
 
 export function verificationEmail(input: TemplateInput): EmailContent {
