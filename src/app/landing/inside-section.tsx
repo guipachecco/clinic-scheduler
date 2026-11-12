@@ -34,7 +34,7 @@ const TABS: InsideTab[] = [
     caption: "Sua página, do seu jeito",
     desktop: {
       src: `${BASE}/pagina-desktop.webp`,
-      alt: "Página da clínica no computador, com os serviços, o botão de agendar e as avaliações",
+      alt: "Página da clínica no computador, com os serviços, e o botão de agendar",
     },
     phone: {
       src: `${BASE}/pagina-celular.webp`,

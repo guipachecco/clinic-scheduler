@@ -26,7 +26,8 @@ const LOOK: Record<
 };
 
 // The plans and their prices. The launch price shows until the switch-over
-// date; the page revalidates hourly so the change needs no deploy.
+// date. The switch relies on "/" being rendered per request (connection() in
+// the root layout); caching "/" would break it.
 export function PricingSection() {
   const { launch, plans } = pricingFor(new Date());
 
@@ -86,12 +87,18 @@ export function PricingSection() {
                     </p>
                     <div className="mt-4 min-h-6 text-base font-semibold opacity-70">
                       {plan.regularPrice ? (
-                        <s>
-                          <span>{plan.regularPrice}</span>/mês
-                        </s>
+                        <>
+                          <span className="sr-only">De </span>
+                          <s>
+                            <span>{plan.regularPrice}</span>/mês
+                          </s>
+                        </>
                       ) : null}
                     </div>
                     <p className="font-heading leading-[0.9] font-extrabold">
+                      {plan.regularPrice ? (
+                        <span className="sr-only">por </span>
+                      ) : null}
                       <span className="text-[clamp(3rem,15vw,4.75rem)] [font-stretch:75%]">
                         {plan.price}
                       </span>

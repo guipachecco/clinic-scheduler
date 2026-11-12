@@ -22,7 +22,7 @@ Há preço de lançamento até 31/12/2026; os preços atuais estão na página p
 
 ## Páginas
 
-- [Página principal](https://zemana.com.br/): o que a Zemana faz e como pedir um orçamento
+- [Página principal](https://zemana.com.br/): o que a Zemana faz, os planos e preços e como contratar
 - [Clínicas](https://zemana.com.br/clinicas): lista das clínicas que usam a Zemana, para a cliente encontrar a sua e marcar horário
 - [Política de privacidade](https://zemana.com.br/privacidade)
 - [Termos de uso](https://zemana.com.br/termos)

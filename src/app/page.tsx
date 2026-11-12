@@ -41,10 +41,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// The launch prices end on a fixed date: regenerate hourly so the page
-// switches over without a deploy.
-export const revalidate = 3600;
-
 // Tells search engines what Zemana is (structured data, schema.org).
 function zemanaJsonLd(description: string) {
   return {

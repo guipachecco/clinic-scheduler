@@ -113,7 +113,11 @@ export function InsideTabs({ tabs }: { tabs: InsideTab[] }) {
                   src={tab.desktop.src}
                   alt={tab.desktop.alt}
                   {...DESKTOP_SIZE}
-                  sizes="(min-width: 1152px) 720px, (min-width: 768px) 55vw, 100vw"
+                  sizes={
+                    tab.phone
+                      ? "(min-width: 1152px) 860px, (min-width: 768px) calc(100vw - 280px), 100vw"
+                      : "(min-width: 1152px) 1104px, 100vw"
+                  }
                   className="block h-auto w-full"
                 />
               </div>
