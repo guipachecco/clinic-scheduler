@@ -387,8 +387,12 @@ export function BookingBar({ page }: { page: ClinicPage }) {
     <>
       {/* Keeps the last section clear of the fixed bar. */}
       <div aria-hidden="true" className="h-16" />
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10">
-        <div className="mx-auto w-full max-w-md px-4 pb-3">{action}</div>
+      {/* From lg the navigation is in the header: the bar sits at the
+          bottom of the screen. */}
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 lg:bottom-0">
+        <div className="mx-auto w-full max-w-md px-4 pb-3 lg:pb-6">
+          {action}
+        </div>
       </div>
     </>
   );

@@ -15,6 +15,7 @@ import "../page-fonts";
 
 import { BottomNav } from "./bottom-nav";
 import { PageTheme } from "./page-theme";
+import { TopNav } from "./top-nav";
 import { clinicName } from "./ui";
 
 export async function generateMetadata({
@@ -35,7 +36,8 @@ export async function generateMetadata({
 
 // The clinic link (/<slug>) that the owner shares: a compact header with the
 // clinic's logo (the Zemana mark without one) and name, one column made for a
-// 360 px phone and a bottom navigation. Unknown, deactivated and reserved
+// 360 px phone and a bottom navigation; from the lg breakpoint the header
+// widens and carries the navigation instead. Unknown, deactivated and reserved
 // names are not found (src/modules/clients/session.ts). The look the owner
 // published (color, buttons, heading font) applies only inside the
 // clinic-page container.
@@ -57,7 +59,7 @@ export default async function ClientLayout({
     <div className="clinic-page flex flex-1 flex-col bg-background">
       <PageTheme theme={look.theme} scopeClass="clinic-page" />
       <header className="border-b bg-card">
-        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-3">
+        <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 px-4 py-3 lg:max-w-5xl lg:gap-6 lg:px-8">
           <Link
             href={`/${clinic.slug}`}
             className="flex min-w-0 items-center gap-2.5"
@@ -77,14 +79,18 @@ export default async function ClientLayout({
               {clinicName(clinic)}
             </span>
           </Link>
-          <ThemeToggle
-            initialTheme={theme}
-            className="border-border text-foreground hover:bg-accent focus-visible:ring-ring focus-visible:ring-offset-background"
-          />
+          <div className="flex shrink-0 items-center gap-4">
+            <TopNav slug={clinic.slug} signedIn={user !== null} />
+            <ThemeToggle
+              initialTheme={theme}
+              className="border-border text-foreground hover:bg-accent focus-visible:ring-ring focus-visible:ring-offset-background"
+            />
+          </div>
         </div>
       </header>
-      {/* Bottom padding keeps the content clear of the fixed navigation. */}
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pt-6 pb-28">
+      {/* Bottom padding keeps the content clear of the fixed navigation
+          (less from lg, where the navigation is in the header). */}
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pt-6 pb-28 lg:pb-12">
         {children}
       </main>
       <BottomNav slug={clinic.slug} signedIn={user !== null} />
