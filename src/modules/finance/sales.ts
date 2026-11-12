@@ -68,8 +68,13 @@ export type SaleDetail = {
   createdAt: Date;
   items: {
     id: string;
-    serviceId: string;
+    // A product is never scheduled: it has no sessions and nothing remains.
+    kind: "service" | "product";
+    serviceId: string | null;
+    productId: string | null;
+    // The service or product name, copied when the quote was saved.
     serviceName: string;
+    // Sessions of a service, or the quantity of a product.
     sessions: number;
     totalCents: number;
     // Sessions that use up the package: requested, confirmed or completed.
@@ -137,6 +142,7 @@ const UUID_PATTERN =
 
 const SALE_NOT_FOUND = "Venda não encontrada.";
 const SALE_CANCELLED = "Esta venda foi cancelada.";
+const PRODUCT_NO_SESSIONS = "Produto não tem sessões.";
 
 type Executor = Pick<Tx, "select">;
 
@@ -353,15 +359,18 @@ export async function getSale(
       const used = mine.filter((s) =>
         (counting as string[]).includes(s.status),
       ).length;
+      const product = item.productId !== null;
       return {
         id: item.id,
-        serviceId: item.serviceId!,
+        kind: product ? ("product" as const) : ("service" as const),
+        serviceId: item.serviceId,
+        productId: item.productId,
         serviceName: item.serviceName,
         sessions: item.sessions,
         totalCents: item.totalCents,
         used,
         done: mine.filter((s) => s.status === "completed").length,
-        remaining: Math.max(0, item.sessions - used),
+        remaining: product ? 0 : Math.max(0, item.sessions - used),
         appointments: mine.map((s) => ({
           id: s.id,
           startsAt: s.startsAt,
@@ -764,6 +773,8 @@ export async function scheduleSessions(
         )
         .limit(1);
       if (!item) return fail("Item da venda não encontrado.");
+      if (item.serviceId === null) return fail(PRODUCT_NO_SESSIONS);
+      const serviceId = item.serviceId;
       const sale = await lockSale(tx, clinicId, item.saleId);
       if (!sale) return fail(SALE_NOT_FOUND);
       if (sale.cancelledAt) return fail(SALE_CANCELLED);
@@ -804,7 +815,7 @@ export async function scheduleSessions(
         clinicId,
         {
           patientId: sale.patientId,
-          serviceId: item.serviceId!,
+          serviceId,
           slots,
           acknowledgeWarnings: values.acknowledgeWarnings,
         },
@@ -944,6 +955,7 @@ export async function reviseSale(
       if (values.action === "add_sessions") {
         const item = await itemOf(values.saleItemId);
         if (!item) return fail("Item da venda não encontrado.");
+        if (item.productId !== null) return fail(PRODUCT_NO_SESSIONS);
         const added = values.sessions * values.sessionPriceCents;
         await tx
           .update(saleItems)
@@ -1010,6 +1022,7 @@ export async function reviseSale(
       if (values.action === "remove_sessions") {
         const item = await itemOf(values.saleItemId);
         if (!item) return fail("Item da venda não encontrado.");
+        if (item.productId !== null) return fail(PRODUCT_NO_SESSIONS);
         const [used] = await tx
           .select({ count: sql<number>`count(*)::int` })
           .from(saleSessions)

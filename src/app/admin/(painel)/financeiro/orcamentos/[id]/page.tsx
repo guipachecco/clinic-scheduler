@@ -15,14 +15,20 @@ import { QuoteActions } from "./quote-actions";
 // No patient data in the title: it would reach the browser history.
 export const metadata: Metadata = { title: "Orçamento" };
 
-// The message the owner sends; service names and values only.
+// The message the owner sends; service and product names and values only.
+// Sessions of a service, or the quantity of a product.
+const amountOf = (item: QuoteDetail["items"][number]) =>
+  item.kind === "product"
+    ? `Quantidade ${item.sessions}`
+    : `${item.sessions} ${item.sessions === 1 ? "sessão" : "sessões"}`;
+
 function quoteMessage(clinicName: string, quote: QuoteDetail) {
   const lines = [
     `${clinicName}: orçamento nº ${quote.number}`,
     "",
     ...quote.items.map(
       (item) =>
-        `• ${item.serviceName}: ${item.sessions} ${item.sessions === 1 ? "sessão" : "sessões"} — ${money(item.grossCents)}`,
+        `• ${item.serviceName}: ${amountOf(item)} — ${money(item.grossCents)}`,
     ),
   ];
   if (quote.discountCents > 0)
@@ -50,6 +56,7 @@ export default async function QuotePage({
   const whatsappUrl = phone
     ? `https://wa.me/${phone}?text=${encodeURIComponent(quoteMessage(clinic.name, quote))}`
     : null;
+  const hasProducts = quote.items.some((item) => item.kind === "product");
 
   return (
     <div className="grid max-w-4xl gap-6">
@@ -87,17 +94,19 @@ export default async function QuotePage({
 
       <div className="overflow-x-auto rounded-2xl border bg-card">
         <table className="w-full min-w-[32rem] text-sm">
-          <caption className="sr-only">Serviços do orçamento</caption>
+          <caption className="sr-only">
+            {hasProducts ? "Itens do orçamento" : "Serviços do orçamento"}
+          </caption>
           <thead className="text-left text-muted-foreground">
             <tr>
               <th scope="col" className="p-3 font-medium">
-                Serviço
+                {hasProducts ? "Item" : "Serviço"}
               </th>
               <th scope="col" className="p-3 font-medium">
-                Sessões
+                {hasProducts ? "Sessões ou quantidade" : "Sessões"}
               </th>
               <th scope="col" className="p-3 font-medium">
-                Por sessão
+                {hasProducts ? "Valor unitário" : "Por sessão"}
               </th>
               <th scope="col" className="p-3 font-medium">
                 Desconto
@@ -111,7 +120,11 @@ export default async function QuotePage({
             {quote.items.map((item) => (
               <tr key={item.id} className="border-t">
                 <td className="p-3">{item.serviceName}</td>
-                <td className="p-3 tabular-nums">{item.sessions}</td>
+                <td className="p-3 tabular-nums">
+                  {item.kind === "product"
+                    ? `Quantidade ${item.sessions}`
+                    : item.sessions}
+                </td>
                 <td className="p-3 tabular-nums">
                   {money(item.unitPriceCents)}
                 </td>

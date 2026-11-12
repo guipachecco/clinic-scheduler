@@ -90,12 +90,30 @@ const optionalText = (max: number) =>
     .max(max, `Use no máximo ${max} caracteres.`)
     .transform((value) => (value === "" ? null : value));
 
-export const quoteItemSchema = z.object({
-  serviceId: z.uuid({ error: "Escolha o serviço." }),
-  sessions: intField(1, MAX_SESSIONS, "a quantidade de sessões"),
-  unitPrice: moneyField({ allowZero: true }),
-  discount: optionalMoney,
-});
+export const QUOTE_ITEM_KIND_LABELS = {
+  service: "Serviço",
+  product: "Produto",
+} as const;
+export type QuoteItemKind = keyof typeof QUOTE_ITEM_KIND_LABELS;
+
+// An item is a service (sold in sessions) or a product (sold by quantity,
+// kept in `sessions` too).
+export const quoteItemSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("service"),
+    serviceId: z.uuid({ error: "Escolha o serviço." }),
+    sessions: intField(1, MAX_SESSIONS, "a quantidade de sessões"),
+    unitPrice: moneyField({ allowZero: true }),
+    discount: optionalMoney,
+  }),
+  z.object({
+    kind: z.literal("product"),
+    productId: z.uuid({ error: "Escolha o produto." }),
+    sessions: intField(1, MAX_SESSIONS, "a quantidade"),
+    unitPrice: moneyField({ allowZero: true }),
+    discount: optionalMoney,
+  }),
+]);
 
 export const quoteFormSchema = z
   .object({
@@ -105,7 +123,7 @@ export const quoteFormSchema = z
     notes: optionalText(500),
     items: z
       .array(quoteItemSchema)
-      .min(1, "Adicione pelo menos um serviço.")
+      .min(1, "Adicione pelo menos um item.")
       .max(30),
   })
   .superRefine((data, ctx) => {

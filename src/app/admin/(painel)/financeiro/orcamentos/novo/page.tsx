@@ -1,14 +1,14 @@
 import { DateTime } from "luxon";
 import type { Metadata } from "next";
 
-import { requireModule } from "@/modules/auth/session";
+import { moduleActive, requireModule } from "@/modules/auth/session";
 import { DEFAULT_QUOTE_VALIDITY_DAYS } from "@/modules/finance/fields";
 import { getPatient } from "@/modules/patients/patients";
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 
 import { FinanceTabs, PageTitle } from "../../ui";
 import { QuoteForm } from "../quote-form";
-import { quoteServiceOptions } from "../services";
+import { quoteProductOptions, quoteServiceOptions } from "../services";
 
 export const metadata: Metadata = { title: "Novo orçamento" };
 
@@ -18,10 +18,12 @@ export default async function NewQuotePage({
 }: {
   searchParams: Promise<{ paciente?: string }>;
 }) {
-  const { clinicId } = await requireModule("finance");
+  const ctx = await requireModule("finance");
+  const { clinicId } = ctx;
   const { paciente } = await searchParams;
-  const [services, patient] = await Promise.all([
+  const [services, products, patient] = await Promise.all([
     quoteServiceOptions(clinicId),
+    quoteProductOptions(clinicId, moduleActive(ctx, "products")),
     typeof paciente === "string" ? getPatient(clinicId, paciente) : null,
   ]);
   const validUntil = DateTime.now()
@@ -33,13 +35,14 @@ export default async function NewQuotePage({
     <div className="grid max-w-4xl gap-6">
       <PageTitle title="Novo orçamento" />
       <FinanceTabs current="/admin/financeiro/orcamentos" />
-      {services.length === 0 ? (
+      {services.length === 0 && products.length === 0 ? (
         <p className="rounded-lg border bg-card p-4 text-sm">
           Cadastre ao menos um serviço ativo para fazer orçamentos.
         </p>
       ) : (
         <QuoteForm
           services={services}
+          products={products}
           quoteId={null}
           initialPatient={
             patient && !patient.anonymizedAt
@@ -51,7 +54,21 @@ export default async function NewQuotePage({
             discount: "",
             notes: "",
             items: [
-              { serviceId: "", sessions: "1", unitPrice: "", discount: "" },
+              services.length > 0
+                ? {
+                    kind: "service",
+                    serviceId: "",
+                    sessions: "1",
+                    unitPrice: "",
+                    discount: "",
+                  }
+                : {
+                    kind: "product",
+                    productId: "",
+                    sessions: "1",
+                    unitPrice: "",
+                    discount: "",
+                  },
             ],
           }}
         />

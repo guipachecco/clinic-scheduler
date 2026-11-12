@@ -114,7 +114,15 @@ async function saleWithInstallments(count = 2) {
       validUntil: "2026-11-30",
       discount: "",
       notes: "",
-      items: [{ serviceId, sessions: "2", unitPrice: "150,00", discount: "" }],
+      items: [
+        {
+          kind: "service",
+          serviceId,
+          sessions: "2",
+          unitPrice: "150,00",
+          discount: "",
+        },
+      ],
     }),
     actorId,
   );
