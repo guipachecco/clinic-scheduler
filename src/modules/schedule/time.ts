@@ -34,7 +34,7 @@ export function localDayRange(
 
 export function formatLocal(
   date: Date,
-  pattern: "dd/MM HH:mm" | "dd/MM/yyyy" | "HH:mm",
+  pattern: "dd/MM HH:mm" | "dd/MM/yyyy" | "dd/MM" | "HH:mm",
   zone: string = CLINIC_TIME_ZONE,
 ): string {
   return DateTime.fromJSDate(date, { zone }).toFormat(pattern);

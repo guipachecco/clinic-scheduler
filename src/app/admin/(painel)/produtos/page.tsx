@@ -120,6 +120,9 @@ export default async function ProductsPage() {
                   >
                     {product.name}
                   </Link>
+                  <p className="text-sm text-muted-foreground">
+                    Estoque: {product.stockQuantity}
+                  </p>
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <span
                       className={cn(
