@@ -40,14 +40,13 @@ const PLANS: {
   {
     id: "agenda",
     name: "Agenda",
-    audience: "Pra quem atende com hora marcada",
+    audience: "Atende por horário",
     description:
       "Pra quem quer as clientes marcando sozinhas e a semana organizada.",
     includes: [
-      "Página própria pra clientes marcarem",
-      "Agenda da semana e do mês",
-      "Cadastro das clientes",
-      "Lembretes automáticos",
+      "Agenda e fichas das clientes",
+      "Seu link de agendamento",
+      "Página com avaliações e fidelidade",
     ],
     launchCents: 2990,
     regularCents: 4990,
@@ -55,14 +54,14 @@ const PLANS: {
   {
     id: "completo",
     name: "Completo",
-    audience: "Pra quem vende pacote de sessões e parcela",
+    audience: "Vende pacote ou parcela",
     description:
       "Pra quem também faz orçamento, vende pacote de sessões ou parcela.",
     includes: [
       "Tudo do Agenda",
-      "Orçamentos",
-      "Pacotes de sessões",
-      "Pagamentos e parcelas",
+      "Orçamento, pacotes e parcelas",
+      "Caixa e valores a receber",
+      "Anamnese e produtos",
     ],
     launchCents: 9900,
     regularCents: 14990,

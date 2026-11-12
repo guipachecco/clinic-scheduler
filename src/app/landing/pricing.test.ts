@@ -26,6 +26,26 @@ describe("pricingFor", () => {
       "https://wa.me/5547991037244?text=Oi! Quero o plano Completo da Zemana.",
     );
   });
+  test("audience and includes copy is pinned", () => {
+    const [agenda, completo] = pricingFor(new Date("2026-11-12")).plans;
+    expect([agenda!.audience, agenda!.includes]).toEqual([
+      "Atende por horário",
+      [
+        "Agenda e fichas das clientes",
+        "Seu link de agendamento",
+        "Página com avaliações e fidelidade",
+      ],
+    ]);
+    expect([completo!.audience, completo!.includes]).toEqual([
+      "Vende pacote ou parcela",
+      [
+        "Tudo do Agenda",
+        "Orçamento, pacotes e parcelas",
+        "Caixa e valores a receber",
+        "Anamnese e produtos",
+      ],
+    ]);
+  });
   test("audiences name a way of working, not a profession", () => {
     const text = JSON.stringify(pricingFor(new Date("2026-11-12"))).toLowerCase();
     for (const word of ["manicure", "clínica", "massoterap", "acupunt"]) {
