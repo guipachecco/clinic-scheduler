@@ -305,6 +305,10 @@ test("metadata names Zemana and shares the generated image", async ({
   await expect(page).toHaveTitle(
     "Zemana — agenda online para profissionais de beleza e saúde",
   );
+  await expect(page.locator("meta[name=description]")).toHaveAttribute(
+    "content",
+    /Planos a partir de R\$ \d+,\d{2} por mês, com o 1º mês grátis/,
+  );
   const ogImage = await page
     .locator('meta[property="og:image"]')
     .first()

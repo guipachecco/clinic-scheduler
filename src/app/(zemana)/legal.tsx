@@ -5,7 +5,7 @@ import { AuthShell, authLinkClass } from "./auth-shell";
 // Shared frame of the privacy policy and the terms of use: same shell as the
 // sign-in pages, readable on a 360 px phone.
 
-export const LEGAL_UPDATED_AT = "8 de novembro de 2026";
+export const LEGAL_UPDATED_AT = "12 de novembro de 2026";
 
 // The channel for privacy requests and questions about the terms.
 export const LEGAL_CONTACT_URL = "https://wa.me/5547991037244";

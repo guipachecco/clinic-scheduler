@@ -67,8 +67,8 @@ export default function TermsPage() {
             produtos) deve ser verdadeiro e seu, ou usado com autorização.
           </li>
           <li>
-            Os valores e as condições do plano são combinados diretamente com a
-            Zemana.
+            Os preços dos planos estão na página principal da Zemana. A cobrança
+            e as demais condições são combinadas diretamente com a Zemana.
           </li>
         </ul>
       </LegalSection>
