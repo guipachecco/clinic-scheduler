@@ -242,22 +242,34 @@ test.describe("agenda", () => {
 
   test("the month and day views load without an error", async () => {
     // A range outside the one already loaded asks the server again (a Server
-    // Action POST); its answer must be a success.
-    const expectLoad = async (action: () => Promise<void>) => {
+    // Action POST). Its body is not read here: the browser may drop it before
+    // the test gets to it. The page itself shows whether the load worked.
+    const expectLoad = async (action: () => Promise<void>, month: DateTime) => {
       const loaded = page.waitForResponse(
         (response) =>
           response.request().method() === "POST" &&
           new URL(response.url()).pathname === "/admin/agenda",
       );
       await action();
-      const body = await (await loaded).text();
-      expect(body).toContain('"ok":true');
+      expect((await loaded).ok()).toBe(true);
+      // The 15th never shows as a spill-over day of the month before.
+      const middle = month.set({ day: 15 }).toISODate();
+      await expect(
+        calendar().locator(
+          `.fc-daygrid-day[data-date="${middle}"]:not(.fc-day-other)`,
+        ),
+      ).toBeVisible();
+      await expect(page.getByText("Não foi possível carregar")).toHaveCount(0);
     };
+    const thisMonth = DateTime.now()
+      .setZone("America/Sao_Paulo")
+      .startOf("month");
     const month = views().getByRole("button", { name: "Mês", exact: true });
-    await expectLoad(() => month.click());
+    await expectLoad(() => month.click(), thisMonth);
     await expect(month).toHaveAttribute("aria-pressed", "true");
-    await expectLoad(() =>
-      page.getByRole("button", { name: "Próximo mês" }).click(),
+    await expectLoad(
+      () => page.getByRole("button", { name: "Próximo mês" }).click(),
+      thisMonth.plus({ months: 1 }),
     );
 
     const day = views().getByRole("button", { name: "Dia", exact: true });

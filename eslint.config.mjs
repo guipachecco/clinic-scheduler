@@ -26,6 +26,18 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // ImageResponse (next/og) renders only a plain <img>. The Next plugin
+  // already skips these files on Linux, but its path check fails on Windows
+  // backslashes, so the rule is turned off here for both.
+  {
+    files: [
+      "src/app/**/opengraph-image.tsx",
+      "src/app/**/twitter-image.tsx",
+      "src/app/**/icon.tsx",
+      "src/app/**/apple-icon.tsx",
+    ],
+    rules: { "@next/next/no-img-element": "off" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
