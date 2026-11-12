@@ -42,7 +42,8 @@ export function FinanceTabs({
       <ul className="flex gap-1 p-1">
         {TABS.filter(
           (tab) =>
-            MERCADO_PAGO_VISIBLE || tab.href !== "/admin/financeiro/mercado-pago",
+            MERCADO_PAGO_VISIBLE ||
+            tab.href !== "/admin/financeiro/mercado-pago",
         ).map((tab) => (
           <li key={tab.href} className="shrink-0">
             <Link

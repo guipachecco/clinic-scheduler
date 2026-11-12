@@ -20,7 +20,8 @@ export async function GET() {
   }
   const { clinicId } = session;
   const config = mercadoPagoConfig();
-  if (!config || !MERCADO_PAGO_VISIBLE) return new Response("Not found", { status: 404 });
+  if (!config || !MERCADO_PAGO_VISIBLE)
+    return new Response("Not found", { status: 404 });
 
   const state = randomBytes(24).toString("base64url");
   const response = NextResponse.redirect(
