@@ -148,6 +148,8 @@ describe("listMyClinics", () => {
       rating: null,
       loyalty: null,
       nextAppointment: null,
+      address: null,
+      lastVisitAt: null,
     });
     expect(list[1]!.areaLabel).toBeNull();
   });
@@ -193,6 +195,7 @@ describe("listMyClinics", () => {
         loyaltyVisits: 3,
         loyaltyReward: "Brinde",
         whatsappPhone: "+5547999990000",
+        address: "  Rua das Flores, 120 — Joinville  ",
       })
       .where(eq(clinics.id, clinicId));
     const [category] = await db
@@ -277,6 +280,11 @@ describe("listMyClinics", () => {
     });
     expect(card.rating).toEqual({ average: 4.5, total: 2 });
     expect(card.whatsappPhone).toBe("+5547999990000");
+    expect(card.address).toBe("Rua das Flores, 120 — Joinville");
+    // The last completed visit, not the later confirmed or cancelled ones.
+    expect(
+      Math.round((card.lastVisitAt!.getTime() - Date.now()) / 3_600_000),
+    ).toBe(-24);
 
     // With the reviews module off the rating disappears; it comes back with it.
     const [{ modules: allModules }] = await db

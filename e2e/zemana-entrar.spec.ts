@@ -27,10 +27,42 @@ const people = {
   client: { name: "Cliente Zemana", email: `cliente${DOMAIN}` },
   empty: { name: "Cliente Sem Clinica", email: `sem-clinica${DOMAIN}` },
   neighbour: { name: "Outra Cliente", email: `outra${DOMAIN}` },
+  // Client of the four "many" clinics, for the search and the order.
+  many: { name: "Cliente Muitas", email: `muitas${DOMAIN}` },
   panel: { name: "Dona do Painel Zemana", email: `painel${DOMAIN}` },
   // Panel owner without 2FA yet, for the signed-in redirect test.
   owner: { name: "Dona Logada Zemana", email: `dona-logada${DOMAIN}` },
 };
+
+const MANY: {
+  slug: string;
+  name: string;
+  address: string | null;
+  appointment?: { days: number; status: "confirmed" | "completed" };
+}[] = [
+  {
+    slug: `${PREFIX}bela-joinville`,
+    name: "Zemana Entrar Studio Bela",
+    address: "Rua das Flores, 10 — Joinville",
+  },
+  {
+    slug: `${PREFIX}bela-blumenau`,
+    name: "Zemana Entrar Studio Bela",
+    address: "Av. Brasil, 20 — Blumenau",
+    appointment: { days: 3, status: "confirmed" },
+  },
+  {
+    slug: `${PREFIX}c`,
+    name: "Zemana Entrar Clínica C",
+    address: null,
+    appointment: { days: -10, status: "completed" },
+  },
+  {
+    slug: `${PREFIX}d`,
+    name: "Zemana Entrar Clínica D",
+    address: null,
+  },
+];
 
 // Signs up during the tests (not seeded).
 const newcomer = { name: "Nova Cliente Zemana", email: `nova${DOMAIN}` };
@@ -46,11 +78,18 @@ async function withDb<T>(run: (db: Client) => Promise<T>) {
 }
 
 async function cleanUp(db: Client) {
-  await db.query(
-    `DELETE FROM audit_logs WHERE clinic_id IN
-       (SELECT id FROM clinics WHERE slug LIKE $1)`,
-    [`${PREFIX}%`],
-  );
+  for (const table of [
+    "audit_logs",
+    "appointments",
+    "services",
+    "service_categories",
+  ]) {
+    await db.query(
+      `DELETE FROM ${table} WHERE clinic_id IN
+         (SELECT id FROM clinics WHERE slug LIKE $1)`,
+      [`${PREFIX}%`],
+    );
+  }
   await db.query(
     `DELETE FROM patients WHERE clinic_id IN
        (SELECT id FROM clinics WHERE slug LIKE $1)`,
@@ -131,6 +170,60 @@ test.beforeAll(async () => {
         [clinicId, userId],
       );
     }
+
+    // Four clinics of "many": two with the same name in different cities,
+    // one with a future appointment and one with a past visit.
+    for (const clinic of MANY) {
+      const {
+        rows: [row],
+      } = await db.query<{ id: string }>(
+        `INSERT INTO clinics (slug, name, address) VALUES ($1, $2, $3)
+         RETURNING id`,
+        [clinic.slug, clinic.name, clinic.address],
+      );
+      const {
+        rows: [patient],
+      } = await db.query<{ id: string }>(
+        `INSERT INTO patients (clinic_id, user_id, name, name_normalized, phone)
+         VALUES ($1, $2, 'Ficha Muitas', 'ficha muitas', '+5511987658801')
+         RETURNING id`,
+        [row!.id, userIds.many],
+      );
+      if (clinic.appointment === undefined) continue;
+      const {
+        rows: [category],
+      } = await db.query<{ id: string }>(
+        `INSERT INTO service_categories (clinic_id, name, slug)
+         VALUES ($1, 'Categoria', 'categoria-muitas') RETURNING id`,
+        [row!.id],
+      );
+      const {
+        rows: [service],
+      } = await db.query<{ id: string }>(
+        `INSERT INTO services (clinic_id, category_id, name, slug,
+           duration_minutes)
+         VALUES ($1, $2, 'Limpeza', 'limpeza-muitas', 60) RETURNING id`,
+        [row!.id, category!.id],
+      );
+      const startsAt = new Date(
+        Date.now() + clinic.appointment.days * 86_400_000,
+      );
+      const endsAt = new Date(startsAt.getTime() + 3_600_000);
+      await db.query(
+        `INSERT INTO appointments (clinic_id, patient_id, service_id,
+           service_name, service_duration_minutes, starts_at, ends_at,
+           occupied_from, occupied_until, status, source)
+         VALUES ($1, $2, $3, 'Limpeza', 60, $4, $5, $4, $5, $6, 'admin')`,
+        [
+          row!.id,
+          patient!.id,
+          service!.id,
+          startsAt,
+          endsAt,
+          clinic.appointment.status,
+        ],
+      );
+    }
   });
 });
 
@@ -155,6 +248,8 @@ test("client signs in at /entrar and sees only her clinics", async ({
   await expect(
     page.getByRole("link", { name: "Meus horários" }).first(),
   ).toHaveAttribute("href", `/${SLUGS.a}/meus-horarios`);
+  // Two clinics: no search.
+  await expect(page.getByRole("searchbox")).toHaveCount(0);
 
   // Already signed in: /entrar goes back to the list.
   await page.goto("/entrar");
@@ -162,6 +257,54 @@ test("client signs in at /entrar and sees only her clinics", async ({
 
   await page.getByRole("button", { name: "Sair" }).click();
   await expect(page).toHaveURL(/\/entrar$/);
+});
+
+test("client with many clinics finds hers by order, address and search", async ({
+  page,
+}) => {
+  // One sign-in more in this file: keep the later ones under the limit.
+  await clearRateLimits();
+  await signInAt(page, people.many.email, PASSWORD);
+  await expect(page).toHaveURL(/\/minhas-clinicas$/);
+  const cards = page.getByRole("main").getByRole("list").getByRole("listitem");
+
+  // Next appointment first, then the last visit, then by name.
+  const bookHrefs = MANY.map((clinic) => `/${clinic.slug}/marcar`);
+  await expect(cards).toHaveCount(4);
+  const order = await cards
+    .getByRole("link", { name: "Agendar" })
+    .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+  expect(order).toEqual([
+    bookHrefs[1],
+    bookHrefs[2],
+    bookHrefs[3],
+    bookHrefs[0],
+  ]);
+  // The two clinics with the same name show their addresses.
+  await expect(cards.nth(0)).toContainText("Av. Brasil, 20 — Blumenau");
+  await expect(cards.nth(3)).toContainText("Rua das Flores, 10 — Joinville");
+
+  const search = page.getByRole("searchbox", { name: "Buscar clínica" });
+  await search.fill("joinville");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText("Zemana Entrar Studio Bela");
+  await expect(cards.first()).toContainText("Joinville");
+
+  await search.fill("STUDIO bela");
+  await expect(cards).toHaveCount(2);
+
+  await search.fill("clinica d");
+  await expect(cards).toHaveCount(1);
+  await expect(cards.first()).toContainText("Zemana Entrar Clínica D");
+
+  await search.fill("podologia");
+  await expect(cards).toHaveCount(0);
+  await expect(
+    page.getByText("Nenhuma clínica encontrada para “podologia”."),
+  ).toBeVisible();
+
+  await search.fill("");
+  await expect(cards).toHaveCount(4);
 });
 
 test("client without clinics sees the empty message", async ({ page }) => {

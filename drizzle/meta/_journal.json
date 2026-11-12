@@ -211,6 +211,13 @@
       "when": 1794477880805,
       "tag": "0029_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794497243130,
+      "tag": "0030_client_my_clinics_order",
+      "breakpoints": true
     }
   ]
 }
