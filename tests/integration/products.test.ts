@@ -369,6 +369,18 @@ describe("example products", () => {
       .where(inArray(productCategories.clinicId, [throwaway]));
     expect(rows).toEqual([{ name: PRODUCT_OTHER_CATEGORY_NAME }]);
   });
+
+  it("lists Outros for a clinic without product categories", async () => {
+    const throwaway = await otherClinic(SLUG_OLD);
+    await db.delete(products).where(eq(products.clinicId, throwaway));
+    await db
+      .delete(productCategories)
+      .where(eq(productCategories.clinicId, throwaway));
+    const catalog = await listProductCatalog(throwaway);
+    expect(catalog.map((c) => c.name)).toEqual([PRODUCT_OTHER_CATEGORY_NAME]);
+    // Listing again does not make a second one.
+    expect(await listProductCatalog(throwaway)).toHaveLength(1);
+  });
 });
 
 describe("clinic page", () => {

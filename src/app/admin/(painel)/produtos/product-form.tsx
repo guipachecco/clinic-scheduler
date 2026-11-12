@@ -80,7 +80,15 @@ function Checkbox({
 }
 
 export function ProductForm(props: Props) {
-  const defaults = props.mode === "edit" ? props.defaults : EMPTY;
+  // With a single category to choose from, it is already chosen.
+  const defaults =
+    props.mode === "edit"
+      ? props.defaults
+      : {
+          ...EMPTY,
+          categoryId:
+            props.categories.length === 1 ? props.categories[0]!.id : "",
+        };
   const [formError, setFormError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();

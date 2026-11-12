@@ -28,9 +28,10 @@ export default async function EditQuotePage({
   if (!quote) notFound();
   if (quote.status !== "draft")
     redirect(`/admin/financeiro/orcamentos/${id}` as Route);
+  const productsOn = moduleActive(ctx, "products");
   const [services, active] = await Promise.all([
     quoteServiceOptions(clinicId),
-    quoteProductOptions(clinicId, moduleActive(ctx, "products")),
+    quoteProductOptions(clinicId, productsOn),
   ]);
   // A product deactivated since the draft was saved still shows by name;
   // saving the quote again with it is refused.
@@ -41,7 +42,9 @@ export default async function EditQuotePage({
         ? [
             {
               id: item.productId,
-              name: `${item.serviceName} (inativo)`,
+              name: `${item.serviceName} ${
+                productsOn ? "(inativo)" : "(módulo Produtos desligado)"
+              }`,
               priceCents: null,
             },
           ]

@@ -422,6 +422,9 @@ export async function listProductCatalog(
 ): Promise<ProductCatalogCategory[]> {
   // One transaction runs one query at a time: each is awaited in turn.
   const [categories, rows] = await inClinic(clinicId, async (tx) => {
+    // A clinic created by older code has no "Outros" yet: make it, so the
+    // new-product form never offers an empty select.
+    await otherCategoryId(tx, clinicId);
     const categoryRows = await tx
       .select()
       .from(productCategories)

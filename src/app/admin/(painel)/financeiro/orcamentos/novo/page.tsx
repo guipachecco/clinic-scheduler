@@ -21,9 +21,10 @@ export default async function NewQuotePage({
   const ctx = await requireModule("finance");
   const { clinicId } = ctx;
   const { paciente } = await searchParams;
+  const productsOn = moduleActive(ctx, "products");
   const [services, products, patient] = await Promise.all([
     quoteServiceOptions(clinicId),
-    quoteProductOptions(clinicId, moduleActive(ctx, "products")),
+    quoteProductOptions(clinicId, productsOn),
     typeof paciente === "string" ? getPatient(clinicId, paciente) : null,
   ]);
   const validUntil = DateTime.now()
@@ -37,7 +38,9 @@ export default async function NewQuotePage({
       <FinanceTabs current="/admin/financeiro/orcamentos" />
       {services.length === 0 && products.length === 0 ? (
         <p className="rounded-lg border bg-card p-4 text-sm">
-          Cadastre ao menos um serviço ativo para fazer orçamentos.
+          {productsOn
+            ? "Cadastre ao menos um serviço ou produto ativo para fazer orçamentos."
+            : "Cadastre ao menos um serviço ativo para fazer orçamentos."}
         </p>
       ) : (
         <QuoteForm

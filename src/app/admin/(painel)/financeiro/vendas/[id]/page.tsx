@@ -374,8 +374,15 @@ export default async function SalePage({
                 <p className="text-muted-foreground">
                   Total: {money(r.before.totalCents)} →{" "}
                   {money(r.after.totalCents)} · sessões:{" "}
-                  {r.before.items.reduce((s, i) => s + i.sessions, 0)} →{" "}
-                  {r.after.items.reduce((s, i) => s + i.sessions, 0)}
+                  {r.before.items.reduce(
+                    (s, i) => (i.productId ? s : s + i.sessions),
+                    0,
+                  )}{" "}
+                  →{" "}
+                  {r.after.items.reduce(
+                    (s, i) => (i.productId ? s : s + i.sessions),
+                    0,
+                  )}
                 </p>
               </li>
             ))}

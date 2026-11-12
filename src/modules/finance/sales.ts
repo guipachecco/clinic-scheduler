@@ -128,7 +128,14 @@ export type SaleListItem = {
 
 type Snapshot = {
   totalCents: number;
-  items: { serviceName: string; sessions: number; totalCents: number }[];
+  // `productId` is set on product items, whose `sessions` is a quantity;
+  // revisions saved before it existed lack it.
+  items: {
+    serviceName: string;
+    sessions: number;
+    totalCents: number;
+    productId?: string | null;
+  }[];
   installments: {
     number: number;
     amountCents: number;
@@ -183,6 +190,7 @@ async function snapshot(executor: Executor, saleId: string): Promise<Snapshot> {
       serviceName: saleItems.serviceName,
       sessions: saleItems.sessions,
       totalCents: saleItems.totalCents,
+      productId: saleItems.productId,
     })
     .from(saleItems)
     .where(eq(saleItems.saleId, saleId))

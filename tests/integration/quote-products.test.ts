@@ -415,4 +415,32 @@ describe("products in a quote", () => {
       .where(eq(saleItems.id, product.id));
     expect(item!.sessions).toBe(2);
   });
+
+  it("revision snapshots mark product items", async () => {
+    const quoteId = await created([serviceItem("2"), productItem()]);
+    const saleId = await approve(quoteId, { plan: "per_session" });
+    const service = (await sale(saleId)).items[0]!;
+    const revised = await reviseSale(
+      CLINIC,
+      saleId,
+      reviseSchema.parse({
+        reason: "Teste",
+        action: "add_sessions",
+        saleItemId: service.id,
+        sessions: "1",
+        sessionPrice: "150,00",
+      }),
+      actorId,
+      TODAY,
+      NOW,
+    );
+    expect(revised.ok).toBe(true);
+    const [revision] = (await sale(saleId)).revisions;
+    for (const side of [revision!.before, revision!.after]) {
+      expect(side.items.map((i) => Boolean(i.productId))).toEqual([
+        false,
+        true,
+      ]);
+    }
+  });
 });
