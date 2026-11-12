@@ -70,7 +70,7 @@ async function pgErrorCode(promise: Promise<unknown>) {
 async function setOnlineBooking(clinicId: string, enabled: boolean) {
   await db
     .update(clinics)
-    .set({ onlineBookingEnabled: enabled })
+    .set({ onlineBookingChoice: enabled })
     .where(eq(clinics.id, clinicId));
 }
 
@@ -154,7 +154,7 @@ async function cleanup() {
 beforeAll(async () => {
   await cleanup();
   const [grais] = await db
-    .select({ online: clinics.onlineBookingEnabled })
+    .select({ online: clinics.onlineBookingChoice })
     .from(clinics)
     .where(eq(clinics.id, CLINIC));
   onlineBefore = grais!.online;
@@ -623,6 +623,7 @@ describe("client access", () => {
         "maxActiveAppointmentsPerPhone",
         "maxAdvanceDays",
         "minAdvanceMinutes",
+        "modules",
         "name",
         "onlineBookingEnabled",
         "slotStepMinutes",

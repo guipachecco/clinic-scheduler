@@ -2,16 +2,22 @@ import { randomBytes } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { requireAdmin } from "@/modules/auth/session";
+import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import { authorizationUrl } from "@/modules/mercado-pago/api";
 import { mercadoPagoConfig } from "@/modules/mercado-pago/accounts";
 
 import { OAUTH_COOKIE, oauthCookieOptions } from "../oauth-cookie";
 
 // "Conectar Mercado Pago": sends the owner to Mercado Pago to authorize the
-// Zemana. The state ties the answer to this browser and this clinic.
+// Zemana. The state ties the answer to this browser and this clinic. Closed
+// while the clinic has the finance module off; the webhook and the OAuth
+// return stay open, so payments already under way are not lost.
 export async function GET() {
-  const { clinicId } = await requireAdmin();
+  const session = await requireAdmin();
+  if (!moduleActive(session, "finance")) {
+    return new Response("Not found", { status: 404 });
+  }
+  const { clinicId } = session;
   const config = mercadoPagoConfig();
   if (!config) return new Response("Not found", { status: 404 });
 

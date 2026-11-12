@@ -4,12 +4,13 @@ import { logger } from "@/lib/logger";
 import { requireClient } from "@/modules/clients/session";
 import { reviewSchema } from "@/modules/clinic-page/fields";
 import { createReview } from "@/modules/clinic-page/public";
+import { hasModule, MODULE_OFF_ERROR } from "@/modules/clinics/modules";
 
 export type ReviewResult =
   | { ok: true }
   | {
       ok: false;
-      reason: "invalid" | "not_allowed" | "failed";
+      reason: "invalid" | "not_allowed" | "failed" | "module_off";
       message: string;
     };
 
@@ -20,7 +21,10 @@ export async function submitReview(
   slug: string,
   input: unknown,
 ): Promise<ReviewResult> {
-  const { ctx } = await requireClient(slug, `/${slug}/avaliar`);
+  const { ctx, clinic } = await requireClient(slug, `/${slug}/avaliar`);
+  if (!hasModule(clinic, "reviews")) {
+    return { ok: false, reason: "module_off", message: MODULE_OFF_ERROR };
+  }
   const parsed = reviewSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -32,6 +36,9 @@ export async function submitReview(
   try {
     const result = await createReview(ctx, parsed.data);
     if (result.ok) return result;
+    if (result.reason === "module_off") {
+      return { ok: false, reason: "module_off", message: MODULE_OFF_ERROR };
+    }
     return result.reason === "not_allowed"
       ? {
           ok: false,

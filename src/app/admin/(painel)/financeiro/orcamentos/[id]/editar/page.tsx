@@ -1,7 +1,7 @@
 import type { Metadata, Route } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { getQuote } from "@/modules/finance/quotes";
 import { todayLocal } from "@/modules/schedule/time";
 import { formatCents } from "@/modules/services/fields";
@@ -21,7 +21,7 @@ export default async function EditQuotePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const { id } = await params;
   const quote = await getQuote(clinicId, id, todayLocal());
   if (!quote) notFound();

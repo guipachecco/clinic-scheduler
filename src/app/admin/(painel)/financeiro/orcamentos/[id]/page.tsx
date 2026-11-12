@@ -2,7 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { QUOTE_STATUS_LABELS } from "@/modules/finance/fields";
 import { getQuote, type QuoteDetail } from "@/modules/finance/quotes";
 import { getPatient } from "@/modules/patients/patients";
@@ -40,7 +40,7 @@ export default async function QuotePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { clinicId, clinic } = await requireAdmin();
+  const { clinicId, clinic } = await requireModule("finance");
   const { id } = await params;
   const today = todayLocal();
   const quote = await getQuote(clinicId, id, today);

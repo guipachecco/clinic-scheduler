@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Route } from "next";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { requireRoot } from "@/modules/auth/session";
@@ -44,6 +45,11 @@ export default async function ClinicsPage() {
                 <input type="hidden" name="clinicId" value={clinic.id} />
                 <Button type="submit">Abrir painel</Button>
               </form>
+              <Button asChild variant="outline">
+                <Link href={`/admin/clinicas/${clinic.id}` as Route}>
+                  Editar
+                </Link>
+              </Button>
               <form action={toggleClinicAction}>
                 <input type="hidden" name="clinicId" value={clinic.id} />
                 <input

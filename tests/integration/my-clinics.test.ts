@@ -189,7 +189,7 @@ describe("listMyClinics", () => {
     await db
       .update(clinics)
       .set({
-        loyaltyEnabled: true,
+        loyaltyChoice: true,
         loyaltyVisits: 3,
         loyaltyReward: "Brinde",
         whatsappPhone: "+5547999990000",
@@ -278,6 +278,27 @@ describe("listMyClinics", () => {
     expect(card.rating).toEqual({ average: 4.5, total: 2 });
     expect(card.whatsappPhone).toBe("+5547999990000");
 
+    // With the reviews module off the rating disappears; it comes back with it.
+    const [{ modules: allModules }] = await db
+      .select({ modules: clinics.modules })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId));
+    await db
+      .update(clinics)
+      .set({ modules: allModules.filter((m) => m !== "reviews") })
+      .where(eq(clinics.id, clinicId));
+    const hidden = (await listMyClinics(userU)).find(
+      (c) => c.slug === slugs.a,
+    )!;
+    expect(hidden.rating).toBeNull();
+    await db
+      .update(clinics)
+      .set({ modules: allModules })
+      .where(eq(clinics.id, clinicId));
+    expect(
+      (await listMyClinics(userU)).find((c) => c.slug === slugs.a)!.rating,
+    ).toEqual({ average: 4.5, total: 2 });
+
     // The other client sees her own appointment, not this one's.
     const other = (await listMyClinics(userV)).find((c) => c.slug === slugs.a)!;
     expect(
@@ -311,11 +332,11 @@ describe("listPublicClinics", () => {
     // off.
     await db
       .update(clinics)
-      .set({ onlineBookingEnabled: true })
+      .set({ onlineBookingChoice: true })
       .where(inArray(clinics.slug, [slugs.a, slugs.b, slugs.e]));
     await db
       .update(clinics)
-      .set({ onlineBookingEnabled: false })
+      .set({ onlineBookingChoice: false })
       .where(eq(clinics.id, c!.id));
     const list = await listPublicClinics();
     const found = list.map((clinic) => clinic.slug);

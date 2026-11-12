@@ -9,9 +9,12 @@ import {
   createClinic,
   getClinic,
   setClinicActive,
+  updateClinic,
 } from "@/modules/clinics/clinics";
 import {
+  clinicEditSchema,
   clinicFormSchema,
+  type ClinicEditInput,
   type ClinicFormInput,
 } from "@/modules/clinics/fields";
 
@@ -24,7 +27,9 @@ export type ClinicSaveResult =
   | { ok: true; id: string }
   | {
       ok: false;
-      fieldErrors: Partial<Record<keyof ClinicFormInput, string>>;
+      fieldErrors: Partial<
+        Record<keyof ClinicFormInput | keyof ClinicEditInput, string>
+      >;
       formError?: string;
     };
 
@@ -45,6 +50,30 @@ export async function createClinicAction(
   }
   try {
     return await createClinic(parsed.data, session.user.id);
+  } catch {
+    return { ok: false, fieldErrors: {}, formError: GENERIC_ERROR };
+  }
+}
+
+export async function updateClinicAction(
+  id: string,
+  input: ClinicEditInput,
+): Promise<ClinicSaveResult> {
+  const session = await requireRoot();
+  if (!idSchema.safeParse(id).success) {
+    return { ok: false, fieldErrors: {}, formError: GENERIC_ERROR };
+  }
+  const parsed = clinicEditSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Partial<Record<keyof ClinicEditInput, string>> = {};
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[0] as keyof ClinicEditInput | undefined;
+      if (key && !(key in fieldErrors)) fieldErrors[key] = issue.message;
+    }
+    return { ok: false, fieldErrors };
+  }
+  try {
+    return await updateClinic(id, parsed.data, session.user.id);
   } catch {
     return { ok: false, fieldErrors: {}, formError: GENERIC_ERROR };
   }

@@ -29,7 +29,15 @@ export type PageFormDefaults = {
   onlineBookingEnabled: boolean;
 };
 
-export function PageForm({ defaults }: { defaults: PageFormDefaults }) {
+// showOnlineBooking is false while the clinic has the online booking module
+// off: the switch is hidden, and saving keeps the owner's stored choice.
+export function PageForm({
+  defaults,
+  showOnlineBooking,
+}: {
+  defaults: PageFormDefaults;
+  showOnlineBooking: boolean;
+}) {
   const router = useRouter();
   const [values, setValues] = useState(defaults);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -155,17 +163,19 @@ export function PageForm({ defaults }: { defaults: PageFormDefaults }) {
         </div>
       </fieldset>
 
-      <label className="flex min-h-11 items-center gap-3 rounded-lg border bg-card px-3 text-sm font-medium">
-        <input
-          type="checkbox"
-          className="size-5 accent-primary"
-          checked={values.onlineBookingEnabled}
-          onChange={(event) =>
-            set("onlineBookingEnabled", event.target.checked)
-          }
-        />
-        Aceitar agendamentos online
-      </label>
+      {showOnlineBooking ? (
+        <label className="flex min-h-11 items-center gap-3 rounded-lg border bg-card px-3 text-sm font-medium">
+          <input
+            type="checkbox"
+            className="size-5 accent-primary"
+            checked={values.onlineBookingEnabled}
+            onChange={(event) =>
+              set("onlineBookingEnabled", event.target.checked)
+            }
+          />
+          Aceitar agendamentos online
+        </label>
+      ) : null}
 
       <FormError message={formError} />
       <p role="status" className="text-sm font-medium text-primary">

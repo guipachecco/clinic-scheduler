@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { AMENITY_LABELS } from "@/modules/clinic-page/fields";
 import type { ClinicPage } from "@/modules/clinic-page/public";
+import { hasModule } from "@/modules/clinics/modules";
 
 import { AMENITY_ICONS, Icon, type IconName } from "../icons";
 import {
@@ -87,6 +88,8 @@ export function Reviews({
   canReview: boolean;
 }) {
   const { reviews, reviewSummary } = page;
+  // The reviews module off hides the section, "Avaliar" button included.
+  if (!hasModule(page, "reviews")) return null;
   if (reviews.length === 0 && !canReview) return null;
   const date = new Intl.DateTimeFormat("pt-BR", {
     timeZone: page.timezone,

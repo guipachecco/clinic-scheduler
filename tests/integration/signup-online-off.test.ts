@@ -41,7 +41,7 @@ beforeAll(async () => {
   clinicId = await otherClinic(SLUG);
   await db
     .update(clinics)
-    .set({ onlineBookingEnabled: false, isActive: true })
+    .set({ onlineBookingChoice: false, isActive: true })
     .where(eq(clinics.id, clinicId));
 });
 

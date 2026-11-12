@@ -335,7 +335,7 @@ describe("anamnesis module", () => {
     const id = await create();
     await db
       .update(clinics)
-      .set({ anamnesisTemplate: "integrativa-ads-v1" })
+      .set({ anamnesisTemplateChoice: "integrativa-ads-v1" })
       .where(eq(clinics.id, other));
     try {
       expect(await getAnamnesis(other, patientId, id)).toBeNull();
@@ -346,7 +346,7 @@ describe("anamnesis module", () => {
     } finally {
       await db
         .update(clinics)
-        .set({ anamnesisTemplate: null })
+        .set({ anamnesisTemplateChoice: null })
         .where(eq(clinics.id, other));
     }
     expect(await getAnamnesis(CLINIC, patientId, id)).not.toBeNull();

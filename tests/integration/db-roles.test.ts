@@ -179,7 +179,7 @@ describe("database roles", () => {
       inClinic(CLINIC, (tx) =>
         tx
           .update(clinics)
-          .set({ anamnesisTemplate: null })
+          .set({ anamnesisTemplateChoice: null })
           .where(eq(clinics.id, CLINIC)),
       ),
     );

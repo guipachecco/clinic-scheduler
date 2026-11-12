@@ -2,7 +2,11 @@
 
 import * as z from "zod";
 
-import { requireAdmin } from "@/modules/auth/session";
+import {
+  moduleActive,
+  requireAdmin,
+  type PanelContext,
+} from "@/modules/auth/session";
 import {
   clinicPageSchema,
   loyaltySchema,
@@ -18,6 +22,7 @@ import {
   updateLoyalty,
   updateProduct,
 } from "@/modules/clinic-page/panel";
+import { MODULE_OFF_ERROR, type ClinicModule } from "@/modules/clinics/modules";
 
 // Server Actions of "Minha página". Each one checks the session first,
 // returns values (never a redirect) and turns unexpected errors into a
@@ -37,6 +42,13 @@ const failure = (formError: string): ActionFailure => ({
   fieldErrors: {},
   formError,
 });
+
+// The session of an action of an optional module, or null while the clinic
+// has it off: hiding the link is not enough, a direct call is refused too.
+async function moduleSession(key: ClinicModule): Promise<PanelContext | null> {
+  const session = await requireAdmin();
+  return moduleActive(session, key) ? session : null;
+}
 
 function collectErrors(error: z.ZodError): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
@@ -66,7 +78,8 @@ export async function savePageAction(
 export async function saveLoyaltyAction(
   input: z.input<typeof loyaltySchema>,
 ): Promise<{ ok: true } | ActionFailure> {
-  const session = await requireAdmin();
+  const session = await moduleSession("loyalty");
+  if (!session) return failure(MODULE_OFF_ERROR);
   const parsed = loyaltySchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, fieldErrors: collectErrors(parsed.error) };
@@ -82,7 +95,8 @@ export async function saveLoyaltyAction(
 export async function createProductAction(
   input: z.input<typeof productSchema>,
 ): Promise<{ ok: true } | ActionFailure> {
-  const session = await requireAdmin();
+  const session = await moduleSession("products");
+  if (!session) return failure(MODULE_OFF_ERROR);
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, fieldErrors: collectErrors(parsed.error) };
@@ -99,7 +113,8 @@ export async function updateProductAction(
   id: string,
   input: z.input<typeof productSchema>,
 ): Promise<{ ok: true } | ActionFailure> {
-  const session = await requireAdmin();
+  const session = await moduleSession("products");
+  if (!session) return failure(MODULE_OFF_ERROR);
   const parsed = productSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, fieldErrors: collectErrors(parsed.error) };
@@ -116,7 +131,8 @@ export async function updateProductAction(
 export async function deleteProductAction(
   id: string,
 ): Promise<{ ok: true } | ActionFailure> {
-  const session = await requireAdmin();
+  const session = await moduleSession("products");
+  if (!session) return failure(MODULE_OFF_ERROR);
   try {
     const found = await deleteProduct(session.clinicId, id);
     if (!found) return failure("Produto não encontrado.");
@@ -129,7 +145,8 @@ export async function deleteProductAction(
 export async function addExampleProductsAction(): Promise<
   { ok: true } | ActionFailure
 > {
-  const session = await requireAdmin();
+  const session = await moduleSession("products");
+  if (!session) return failure(MODULE_OFF_ERROR);
   try {
     await addExampleProducts(session.clinicId);
   } catch {
@@ -142,7 +159,8 @@ export async function setReviewHiddenAction(
   id: string,
   hidden: boolean,
 ): Promise<{ ok: true } | ActionFailure> {
-  const session = await requireAdmin();
+  const session = await moduleSession("reviews");
+  if (!session) return failure(MODULE_OFF_ERROR);
   try {
     const found = await setReviewHidden(
       session.clinicId,
@@ -160,7 +178,8 @@ export async function setReviewHiddenAction(
 export async function redeemLoyaltyAction(
   patientId: string,
 ): Promise<{ ok: true } | ActionFailure> {
-  const session = await requireAdmin();
+  const session = await moduleSession("loyalty");
+  if (!session) return failure(MODULE_OFF_ERROR);
   try {
     const result = await redeemLoyalty(
       session.clinicId,

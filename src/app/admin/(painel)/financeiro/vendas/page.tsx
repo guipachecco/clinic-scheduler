@@ -1,7 +1,7 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { PAYMENT_PLAN_LABELS } from "@/modules/finance/fields";
 import { listSales } from "@/modules/finance/sales";
 import { formatLocal } from "@/modules/schedule/time";
@@ -11,7 +11,7 @@ import { FinanceTabs, money, PageTitle } from "../ui";
 export const metadata: Metadata = { title: "Vendas" };
 
 export default async function SalesPage() {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const sales = await listSales(clinicId);
 
   return (

@@ -2,7 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { listCash } from "@/modules/finance/reports";
 import { todayLocal } from "@/modules/schedule/time";
 
@@ -26,7 +26,7 @@ export default async function CashPage({
 }: {
   searchParams: Promise<{ mes?: string }>;
 }) {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const { mes } = await searchParams;
   const month = monthRange(mes, todayLocal());
   const entries = await listCash(clinicId, month);

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { requireAdmin } from "@/modules/auth/session";
+import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import { getClinicPageSettings } from "@/modules/clinic-page/panel";
 import { getBuilderState } from "@/modules/page-builder/builder";
 import { formatStoredPhone } from "@/modules/patients/fields";
@@ -14,7 +14,11 @@ import { PageForm } from "./page-form";
 export const metadata: Metadata = { title: "Minha página" };
 
 export default async function ClinicPageSettingsPage() {
-  const { clinicId } = await requireAdmin();
+  const session = await requireAdmin();
+  const { clinicId } = session;
+  const productsOn = moduleActive(session, "products");
+  const reviewsOn = moduleActive(session, "reviews");
+  const loyaltyOn = moduleActive(session, "loyalty");
   // The builder state throws for a missing clinic, so it waits for the check.
   const settings = await getClinicPageSettings(clinicId);
   if (!settings) notFound();
@@ -26,14 +30,22 @@ export default async function ClinicPageSettingsPage() {
         <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
           Minha página
         </h1>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline">
-            <Link href={"/admin/pagina/produtos" as Route}>Produtos</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href={"/admin/pagina/avaliacoes" as Route}>Avaliações</Link>
-          </Button>
-        </div>
+        {productsOn || reviewsOn ? (
+          <div className="flex flex-wrap gap-2">
+            {productsOn ? (
+              <Button asChild variant="outline">
+                <Link href={"/admin/pagina/produtos" as Route}>Produtos</Link>
+              </Button>
+            ) : null}
+            {reviewsOn ? (
+              <Button asChild variant="outline">
+                <Link href={"/admin/pagina/avaliacoes" as Route}>
+                  Avaliações
+                </Link>
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       <section
@@ -69,24 +81,27 @@ export default async function ClinicPageSettingsPage() {
             amenities: settings.amenities,
             onlineBookingEnabled: settings.onlineBookingEnabled,
           }}
+          showOnlineBooking={moduleActive(session, "online_booking")}
         />
       </section>
 
-      <section aria-labelledby="fidelidade" className="grid gap-4">
-        <h2 id="fidelidade" className="font-heading text-lg font-bold">
-          Cartão fidelidade
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          A cliente ganha um prêmio a cada número de visitas concluídas.
-        </p>
-        <LoyaltyForm
-          defaults={{
-            enabled: settings.loyaltyEnabled,
-            visits: String(settings.loyaltyVisits),
-            reward: settings.loyaltyReward ?? "",
-          }}
-        />
-      </section>
+      {loyaltyOn ? (
+        <section aria-labelledby="fidelidade" className="grid gap-4">
+          <h2 id="fidelidade" className="font-heading text-lg font-bold">
+            Cartão fidelidade
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            A cliente ganha um prêmio a cada número de visitas concluídas.
+          </p>
+          <LoyaltyForm
+            defaults={{
+              enabled: settings.loyaltyEnabled,
+              visits: String(settings.loyaltyVisits),
+              reward: settings.loyaltyReward ?? "",
+            }}
+          />
+        </section>
+      ) : null}
     </div>
   );
 }

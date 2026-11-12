@@ -1,7 +1,7 @@
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { listReceivables } from "@/modules/finance/reports";
 import { listPaymentMethods } from "@/modules/finance/sales";
 import { todayLocal } from "@/modules/schedule/time";
@@ -12,7 +12,7 @@ import { PaymentForm } from "../vendas/[id]/sale-forms";
 export const metadata: Metadata = { title: "A receber" };
 
 export default async function ReceivablesPage() {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const today = todayLocal();
   const [receivables, methods] = await Promise.all([
     listReceivables(clinicId, today),

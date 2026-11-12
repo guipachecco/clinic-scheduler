@@ -6,6 +6,7 @@ import { cache } from "react";
 
 import { auth } from "@/lib/auth";
 import { getClinic, type ClinicSummary } from "@/modules/clinics/clinics";
+import { hasModule, type ClinicModule } from "@/modules/clinics/modules";
 
 // Session of the current request, read once per render.
 export const getSession = cache(async () =>
@@ -84,6 +85,21 @@ export const getPanelContext = cache(async (): Promise<PanelContext | null> => {
     isRoot: session.user.role === "root",
   };
 });
+
+// Like requireAdmin, for the pages of an optional module: 404 while the
+// clinic has it off. Server Actions answer instead (see moduleActive).
+export async function requireModule(key: ClinicModule): Promise<PanelContext> {
+  const ctx = await requireAdmin();
+  if (!hasModule(ctx.clinic, key)) notFound();
+  return ctx;
+}
+
+// Whether the clinic of this panel request has the module on. For Server
+// Actions (which refuse with MODULE_OFF_ERROR) and for pages that hide a
+// block of an optional module.
+export function moduleActive(ctx: PanelContext, key: ClinicModule): boolean {
+  return hasModule(ctx.clinic, key);
+}
 
 // Pages and actions that only root may use (managing clinics).
 export async function requireRoot(): Promise<PanelSession> {

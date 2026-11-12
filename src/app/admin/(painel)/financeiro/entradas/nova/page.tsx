@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { listPaymentMethods } from "@/modules/finance/sales";
 import { todayLocal } from "@/modules/schedule/time";
 
@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Nova entrada" };
 // Money received outside an appointment or a sale (a product, a walk-in).
 // Once saved, the cash book shows it.
 export default async function NewReceiptPage() {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const methods = await listPaymentMethods(clinicId);
 
   return (

@@ -1,5 +1,9 @@
 import * as z from "zod";
 
+import { BUSINESS_TYPES } from "@/modules/business-type/vocabulary";
+
+import { CLINIC_MODULES, modulesSchema } from "./modules";
+
 // Client-safe validation for the clinic form (root only).
 
 export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -29,12 +33,18 @@ export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
 
 export const RESERVED_SLUG_ERROR = "Esse endereço é reservado pelo sistema";
 
+const nameField = z
+  .string()
+  .trim()
+  .min(1, "Informe o nome da clínica.")
+  .max(100, "O nome pode ter no máximo 100 caracteres.");
+
+const businessTypeField = z.enum(BUSINESS_TYPES);
+
 export const clinicFormSchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1, "Informe o nome da clínica.")
-    .max(100, "O nome pode ter no máximo 100 caracteres."),
+  name: nameField,
+  businessType: businessTypeField.default("clinic"),
+  modules: modulesSchema.default([...CLINIC_MODULES]),
   slug: z
     .string()
     .trim()
@@ -50,3 +60,13 @@ export const clinicFormSchema = z.object({
 
 export type ClinicFormInput = z.input<typeof clinicFormSchema>;
 export type ClinicFormValues = z.output<typeof clinicFormSchema>;
+
+// Editing never touches the address (slug): it is the clinic's public URL.
+export const clinicEditSchema = z.object({
+  name: nameField,
+  businessType: businessTypeField,
+  modules: modulesSchema,
+});
+
+export type ClinicEditInput = z.input<typeof clinicEditSchema>;
+export type ClinicEditValues = z.output<typeof clinicEditSchema>;

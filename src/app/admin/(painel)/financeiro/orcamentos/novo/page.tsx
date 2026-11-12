@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 import type { Metadata } from "next";
 
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { DEFAULT_QUOTE_VALIDITY_DAYS } from "@/modules/finance/fields";
 import { getPatient } from "@/modules/patients/patients";
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
@@ -18,7 +18,7 @@ export default async function NewQuotePage({
 }: {
   searchParams: Promise<{ paciente?: string }>;
 }) {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const { paciente } = await searchParams;
   const [services, patient] = await Promise.all([
     quoteServiceOptions(clinicId),

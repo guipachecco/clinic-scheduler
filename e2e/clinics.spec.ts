@@ -59,9 +59,14 @@ test.describe("clinicas", () => {
     await expect(page.getByText("/grais")).toBeVisible();
   });
 
-  test("creates a clinic with the address suggested from the name", async () => {
+  test("creates a clinic without Produtos and Financeiro", async () => {
     await page.getByLabel("Nome da clínica").fill(NEW_CLINIC);
     await expect(page.getByLabel("Endereço da página")).toHaveValue(NEW_SLUG);
+    await page
+      .getByLabel("Tipo de negócio")
+      .selectOption({ label: "Manicure e estética" });
+    await page.getByRole("checkbox", { name: "Produtos" }).uncheck();
+    await page.getByRole("checkbox", { name: "Financeiro" }).uncheck();
     await page.getByRole("button", { name: "Criar clínica" }).click();
     await expect(page.getByText(`/${NEW_SLUG}`)).toBeVisible();
   });
@@ -79,7 +84,49 @@ test.describe("clinicas", () => {
       page.getByRole("heading", { name: "Outros", level: 2 }),
     ).toBeVisible();
     await page.goto("/admin/pacientes");
-    await expect(page.getByText(/Nenhum paciente/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/Nenhum (paciente|cliente)/i).first(),
+    ).toBeVisible();
+  });
+
+  test("the panel of that clinic hides the turned-off modules", async () => {
+    await page.goto("/admin");
+    const nav = page.getByRole("navigation", { name: "Menu principal" });
+    await expect(nav.getByRole("link", { name: "Clientes" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Financeiro" })).toHaveCount(0);
+    for (const path of ["/admin/financeiro", "/admin/pagina/produtos"]) {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(404);
+      await expect(
+        page.getByRole("heading", { name: "Página não encontrada" }),
+      ).toBeVisible();
+    }
+  });
+
+  test("root turns Financeiro back on from the edit page", async () => {
+    await page.goto("/admin/clinicas");
+    await page
+      .getByRole("listitem")
+      .filter({ hasText: NEW_CLINIC })
+      .getByRole("link", { name: "Editar" })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/clinicas\/[0-9a-f-]+$/);
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("checkbox", { name: "Financeiro" }).check();
+    await page.getByRole("button", { name: "Salvar" }).click();
+    await expect(page.getByText("Alterações salvas.")).toBeVisible();
+    await page.goto("/admin/clinicas");
+    await page
+      .getByRole("listitem")
+      .filter({ hasText: NEW_CLINIC })
+      .getByRole("button", { name: "Abrir painel" })
+      .click();
+    await expect(page).toHaveURL(/\/admin$/);
+    await expect(
+      page
+        .getByRole("navigation", { name: "Menu principal" })
+        .getByRole("link", { name: "Financeiro" }),
+    ).toBeVisible();
   });
 
   test("switches back to the first clinic", async () => {

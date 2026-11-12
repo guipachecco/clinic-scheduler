@@ -47,8 +47,8 @@ export async function getClinicPageSettings(
         mapsUrl: clinics.mapsUrl,
         instagramHandle: clinics.instagramHandle,
         amenities: clinics.amenities,
-        onlineBookingEnabled: clinics.onlineBookingEnabled,
-        loyaltyEnabled: clinics.loyaltyEnabled,
+        onlineBookingEnabled: clinics.onlineBookingChoice,
+        loyaltyEnabled: clinics.loyaltyChoice,
         loyaltyVisits: clinics.loyaltyVisits,
         loyaltyReward: clinics.loyaltyReward,
       })
@@ -72,7 +72,7 @@ export async function updateClinicPage(
         mapsUrl: input.mapsUrl,
         instagramHandle: input.instagramHandle,
         amenities: input.amenities,
-        onlineBookingEnabled: input.onlineBookingEnabled,
+        onlineBookingChoice: input.onlineBookingEnabled,
         updatedAt: new Date(),
       })
       .where(eq(clinics.id, clinicId)),
@@ -87,7 +87,7 @@ export async function updateLoyalty(
     tx
       .update(clinics)
       .set({
-        loyaltyEnabled: input.enabled,
+        loyaltyChoice: input.enabled,
         loyaltyVisits: input.visits,
         loyaltyReward: input.reward === "" ? null : input.reward,
         updatedAt: new Date(),

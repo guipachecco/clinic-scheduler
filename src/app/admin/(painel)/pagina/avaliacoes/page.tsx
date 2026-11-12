@@ -2,7 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { getClinicTimezone, listReviews } from "@/modules/clinic-page/panel";
 
 import { ReviewVisibilityButton } from "./review-actions";
@@ -10,7 +10,7 @@ import { ReviewVisibilityButton } from "./review-actions";
 export const metadata: Metadata = { title: "Avaliações" };
 
 export default async function ReviewsPage() {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("reviews");
   const [reviews, timeZone] = await Promise.all([
     listReviews(clinicId),
     getClinicTimezone(clinicId),

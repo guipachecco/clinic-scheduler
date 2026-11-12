@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getAppointment } from "@/modules/appointments/appointments";
 import { CANCELLATION_REASON_LABELS } from "@/modules/appointments/fields";
-import { requireAdmin } from "@/modules/auth/session";
+import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import {
   getAppointmentBilling,
   RECEIVABLE_STATUSES,
@@ -43,17 +43,24 @@ export default async function AppointmentPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { clinicId } = await requireAdmin();
+  const session = await requireAdmin();
+  const { clinicId } = session;
   const { id } = await params;
   const appointment = await getAppointment(clinicId, id);
   if (!appointment) notFound();
   // A package session paid per session: its open installment, to receive now.
   // Otherwise a single appointment is received on the spot ("Receber").
-  const [sessionInstallment, methods, billing] = await Promise.all([
-    findSessionInstallment(clinicId, appointment.id),
-    listPaymentMethods(clinicId),
-    getAppointmentBilling(clinicId, appointment.id),
-  ]);
+  // With the finance module off there is no payment block at all.
+  const [sessionInstallment, methods, billing] = moduleActive(
+    session,
+    "finance",
+  )
+    ? await Promise.all([
+        findSessionInstallment(clinicId, appointment.id),
+        listPaymentMethods(clinicId),
+        getAppointmentBilling(clinicId, appointment.id),
+      ])
+    : [null, [], null];
   const receivable =
     !sessionInstallment &&
     billing !== null &&

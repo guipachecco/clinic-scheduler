@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
-import { requireAdmin } from "@/modules/auth/session";
+import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import {
   ageOn,
   formatStoredCpf,
@@ -34,7 +34,11 @@ export default async function PatientPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { clinicId, clinic } = await requireAdmin();
+  const session = await requireAdmin();
+  const { clinicId, clinic } = session;
+  // Optional modules: their blocks leave the page while off.
+  const financeOn = moduleActive(session, "finance");
+  const loyaltyOn = moduleActive(session, "loyalty");
   const { id } = await params;
   const patient = await getPatient(clinicId, id);
   if (!patient) notFound();
@@ -60,7 +64,9 @@ export default async function PatientPage({
           {clinic.anamnesisTemplate ? " As anamneses foram apagadas." : null}
         </p>
         <AppointmentHistory patientId={patient.id} canSchedule={false} />
-        <PatientFinance patientId={patient.id} canQuote={false} />
+        {financeOn ? (
+          <PatientFinance patientId={patient.id} canQuote={false} />
+        ) : null}
         <Button asChild variant="outline" className="w-fit">
           <Link href="/admin/pacientes">Voltar à lista</Link>
         </Button>
@@ -149,8 +155,8 @@ export default async function PatientPage({
 
       {clinic.anamnesisTemplate ? <Anamneses patientId={patient.id} /> : null}
       <AppointmentHistory patientId={patient.id} canSchedule />
-      <PatientFinance patientId={patient.id} canQuote />
-      <PatientLoyalty patientId={patient.id} />
+      {financeOn ? <PatientFinance patientId={patient.id} canQuote /> : null}
+      {loyaltyOn ? <PatientLoyalty patientId={patient.id} /> : null}
 
       <details className="rounded-2xl border border-dashed p-4 md:p-6">
         <summary className="flex h-11 cursor-pointer items-center rounded-md text-sm font-medium text-muted-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">

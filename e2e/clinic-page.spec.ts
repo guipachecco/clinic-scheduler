@@ -175,8 +175,8 @@ test.describe("página inicial da clínica", () => {
       } = await client.query<{ id: string }>(
         `INSERT INTO clinics (slug, name, display_name, headline, about,
            area_label, whatsapp_phone, contact_email, address,
-           instagram_handle, amenities, loyalty_enabled, loyalty_visits,
-           loyalty_reward, online_booking_enabled)
+           instagram_handle, amenities, loyalty_choice, loyalty_visits,
+           loyalty_reward, online_booking_choice)
          VALUES ($1, 'Clínica Página Cheia (teste)', 'Clínica Cheia',
            'Cuidado com a sua pele', 'Atendimento com hora marcada.',
            'Estética facial', '+5511987650101', 'cheia@example.test',
@@ -221,7 +221,7 @@ test.describe("página inicial da clínica", () => {
         rows: [offline],
       } = await client.query<{ id: string }>(
         `INSERT INTO clinics (slug, name, whatsapp_phone,
-           online_booking_enabled)
+           online_booking_choice)
          VALUES ($1, 'Clínica Página Sem Online (teste)', '+5511987650102',
            false)
          RETURNING id`,
@@ -232,8 +232,8 @@ test.describe("página inicial da clínica", () => {
       const {
         rows: [review],
       } = await client.query<{ id: string }>(
-        `INSERT INTO clinics (slug, name, display_name, loyalty_enabled,
-           loyalty_visits, loyalty_reward, online_booking_enabled)
+        `INSERT INTO clinics (slug, name, display_name, loyalty_choice,
+           loyalty_visits, loyalty_reward, online_booking_choice)
          VALUES ($1, 'Clínica Página Avaliação (teste)', 'Clínica Avaliação',
            true, 2, $2, true)
          RETURNING id`,

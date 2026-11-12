@@ -2,7 +2,7 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { requireAdmin } from "@/modules/auth/session";
+import { requireModule } from "@/modules/auth/session";
 import { financeSummary, listReceivables } from "@/modules/finance/reports";
 import { todayLocal } from "@/modules/schedule/time";
 
@@ -20,7 +20,7 @@ import {
 export const metadata: Metadata = { title: "Financeiro" };
 
 export default async function FinancePage() {
-  const { clinicId } = await requireAdmin();
+  const { clinicId } = await requireModule("finance");
   const today = todayLocal();
   const month = monthRange(undefined, today);
   const [summary, receivables] = await Promise.all([

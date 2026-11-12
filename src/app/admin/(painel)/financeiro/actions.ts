@@ -2,7 +2,12 @@
 
 import * as z from "zod";
 
-import { requireAdmin } from "@/modules/auth/session";
+import {
+  moduleActive,
+  requireAdmin,
+  type PanelContext,
+} from "@/modules/auth/session";
+import { MODULE_OFF_ERROR } from "@/modules/clinics/modules";
 import { cancelExpense, createExpense } from "@/modules/finance/expenses";
 import {
   approveSchema,
@@ -64,6 +69,16 @@ function invalid(error: z.ZodError): ActionResult {
   return { ok: false, fieldErrors: issuesToFieldErrors(error.issues) };
 }
 
+// The session of a financial action, or null while the clinic has the
+// finance module off: hiding the menu is not enough, a direct call is
+// refused too. Every action below starts here.
+async function financeSession(): Promise<PanelContext | null> {
+  const ctx = await requireAdmin();
+  return moduleActive(ctx, "finance") ? ctx : null;
+}
+
+const MODULE_OFF: ActionResult = { ok: false, formError: MODULE_OFF_ERROR };
+
 async function run(work: () => Promise<ActionResult>): Promise<ActionResult> {
   try {
     return await work();
@@ -78,7 +93,9 @@ export async function saveQuoteAction(
   id: string | null,
   input: QuoteFormInput,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const parsed = quoteFormSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   if (id !== null && !idSchema.safeParse(id).success) {
@@ -95,7 +112,9 @@ export async function quoteStatusAction(
   id: string,
   to: "sent" | "rejected" | "cancelled",
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   if (
     !idSchema.safeParse(id).success ||
     !["sent", "rejected", "cancelled"].includes(to)
@@ -106,7 +125,9 @@ export async function quoteStatusAction(
 }
 
 export async function duplicateQuoteAction(id: string): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   if (!idSchema.safeParse(id).success)
     return { ok: false, formError: GENERIC_ERROR };
   const validUntil = DateTime.now()
@@ -120,7 +141,9 @@ export async function approveQuoteAction(
   id: string,
   input: ApproveInput,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   if (!idSchema.safeParse(id).success)
     return { ok: false, formError: GENERIC_ERROR };
   const parsed = approveSchema.safeParse(input);
@@ -142,7 +165,9 @@ export async function approveQuoteAction(
 export async function receivePaymentAction(
   input: PaymentInput,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const parsed = paymentSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   return run(() => receivePayment(clinicId, parsed.data, user.id));
@@ -152,7 +177,9 @@ export async function reversePaymentAction(
   paymentId: string,
   reason: string,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const parsed = reasonSchema.safeParse(reason);
   if (!parsed.success) return invalid(parsed.error);
   if (!idSchema.safeParse(paymentId).success) {
@@ -173,7 +200,9 @@ export type ChargeActionResult = ActionResult & {
 export async function createChargeAction(
   installmentId: string,
 ): Promise<ChargeActionResult> {
-  const { clinicId, clinic, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, clinic, user } = session;
   if (!idSchema.safeParse(installmentId).success) {
     return { ok: false, formError: GENERIC_ERROR };
   }
@@ -205,7 +234,9 @@ export async function createChargeAction(
 }
 
 export async function disconnectMercadoPagoAction(): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   return run(async () => {
     await disconnect(clinicId, user.id);
     return { ok: true };
@@ -217,7 +248,9 @@ export async function disconnectMercadoPagoAction(): Promise<ActionResult> {
 export async function createReceiptAction(
   input: ReceiptInput,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const parsed = receiptSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   return run(() => createReceipt(clinicId, parsed.data, user.id));
@@ -227,7 +260,9 @@ export async function reverseReceiptAction(
   receiptId: string,
   reason: string,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const parsed = reasonSchema.safeParse(reason);
   if (!parsed.success) return invalid(parsed.error);
   if (!idSchema.safeParse(receiptId).success) {
@@ -240,7 +275,9 @@ export async function cancelSaleAction(
   saleId: string,
   input: { reason: string; cancelFutureSessions: boolean },
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const reason = reasonSchema.safeParse(input.reason);
   if (!reason.success) return invalid(reason.error);
   if (!idSchema.safeParse(saleId).success) {
@@ -263,7 +300,9 @@ export async function reviseSaleAction(
   saleId: string,
   input: ReviseInput,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   if (!idSchema.safeParse(saleId).success) {
     return { ok: false, formError: GENERIC_ERROR };
   }
@@ -277,7 +316,9 @@ export async function reviseSaleAction(
 export async function scheduleSessionsAction(
   input: ScheduleSessionsInput,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const parsed = scheduleSessionsSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   return run(() => scheduleSessions(clinicId, parsed.data, user.id));
@@ -288,7 +329,9 @@ export async function scheduleSessionsAction(
 export async function createExpenseAction(
   input: ExpenseInput,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const parsed = expenseSchema.safeParse(input);
   if (!parsed.success) return invalid(parsed.error);
   return run(() => createExpense(clinicId, parsed.data, user.id));
@@ -298,7 +341,9 @@ export async function cancelExpenseAction(
   id: string,
   reason: string,
 ): Promise<ActionResult> {
-  const { clinicId, user } = await requireAdmin();
+  const session = await financeSession();
+  if (!session) return MODULE_OFF;
+  const { clinicId, user } = session;
   const parsed = reasonSchema.safeParse(reason);
   if (!parsed.success) return invalid(parsed.error);
   if (!idSchema.safeParse(id).success)

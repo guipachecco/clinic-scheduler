@@ -23,8 +23,10 @@ import { CLINIC_BRANDING, resolvePalette } from "@/modules/branding/palettes";
 import {
   RESERVED_SLUG_ERROR,
   RESERVED_SLUGS,
-  type ClinicFormValues,
+  type ClinicEditValues,
+  type ClinicFormInput,
 } from "./fields";
+import { CLINIC_MODULES, modulesSchema, type ClinicModule } from "./modules";
 
 // Data functions for the clinics themselves. Only root creates or changes
 // clinics (as app_platform); every other module receives a clinicId and stays
@@ -37,11 +39,17 @@ export type ClinicSummary = {
   isActive: boolean;
   anamnesisTemplate: string | null;
   businessType: BusinessType;
+  modules: ClinicModule[];
 };
 
 export type ClinicResult =
   | { ok: true; id: string }
-  | { ok: false; fieldErrors: Partial<Record<keyof ClinicFormValues, string>> };
+  | {
+      ok: false;
+      fieldErrors: Partial<
+        Record<keyof ClinicFormInput | keyof ClinicEditValues, string>
+      >;
+    };
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -55,6 +63,7 @@ const summaryColumns = {
   isActive: clinics.isActive,
   anamnesisTemplate: clinics.anamnesisTemplate,
   businessType: clinics.businessType,
+  modules: clinics.modules,
 };
 
 export async function getClinic(id: string): Promise<ClinicSummary | null> {
@@ -133,7 +142,7 @@ export async function listClinics(): Promise<ClinicSummary[]> {
 // did for the first clinic), plus the default payment methods and expense
 // categories (as migration 0009 did).
 export async function createClinic(
-  values: ClinicFormValues,
+  values: ClinicFormInput,
   actorUserId: string,
 ): Promise<ClinicResult> {
   // Also checked by the form schema; repeated here for every other caller.
@@ -154,6 +163,8 @@ export async function createClinic(
         .values({
           name: values.name,
           slug: values.slug,
+          businessType: values.businessType ?? "clinic",
+          modules: modulesSchema.parse(values.modules ?? CLINIC_MODULES),
           theme: { paletteId: resolvePalette(values.slug, undefined).id },
           displayName: CLINIC_BRANDING[values.slug]?.displayName ?? null,
           areaLabel: CLINIC_BRANDING[values.slug]?.areaLabel ?? null,
@@ -216,6 +227,80 @@ export async function createClinic(
     }
     throw new Error("Não foi possível criar a clínica.", { cause: error });
   }
+}
+
+export async function getClinicForEdit(id: string): Promise<{
+  id: string;
+  slug: string;
+  name: string;
+  businessType: BusinessType;
+  modules: ClinicModule[];
+} | null> {
+  if (!UUID_PATTERN.test(id)) return null;
+  const [row] = await platformDb
+    .select({
+      id: clinics.id,
+      slug: clinics.slug,
+      name: clinics.name,
+      businessType: clinics.businessType,
+      modules: clinics.modules,
+    })
+    .from(clinics)
+    .where(eq(clinics.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+// Root changes the name, the type and the modules of a clinic (never the
+// slug). Turning a module off keeps its data; only the switches change.
+export async function updateClinic(
+  id: string,
+  values: ClinicEditValues,
+  actorUserId: string,
+): Promise<ClinicResult> {
+  const notFound: ClinicResult = {
+    ok: false,
+    fieldErrors: { name: "Clínica não encontrada." },
+  };
+  if (!UUID_PATTERN.test(id)) return notFound;
+  return platformDb.transaction(async (tx): Promise<ClinicResult> => {
+    const [current] = await tx
+      .select({
+        name: clinics.name,
+        businessType: clinics.businessType,
+        modules: clinics.modules,
+      })
+      .from(clinics)
+      .where(eq(clinics.id, id))
+      .limit(1);
+    if (!current) return notFound;
+    await tx
+      .update(clinics)
+      .set({
+        name: values.name,
+        businessType: values.businessType,
+        modules: values.modules,
+        updatedAt: new Date(),
+      })
+      .where(eq(clinics.id, id));
+    await tx.insert(auditLogs).values({
+      clinicId: id,
+      actorType: "admin",
+      actorUserId,
+      action: "clinic.updated",
+      entityType: "clinic",
+      entityId: id,
+      changes: {
+        name: { before: current.name, after: values.name },
+        modules: { before: current.modules, after: values.modules },
+        businessType: {
+          before: current.businessType,
+          after: values.businessType,
+        },
+      },
+    });
+    return { ok: true, id };
+  });
 }
 
 export async function setClinicActive(
