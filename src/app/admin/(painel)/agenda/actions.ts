@@ -1,6 +1,7 @@
 "use server";
 
 import { DateTime } from "luxon";
+import { revalidatePath } from "next/cache";
 import * as z from "zod";
 
 import {
@@ -20,9 +21,12 @@ import {
   type RescheduleFormInput,
   type StatusChangeInput,
 } from "@/modules/appointments/fields";
-import { requireAdmin } from "@/modules/auth/session";
+import { moduleActive, requireAdmin } from "@/modules/auth/session";
+import { MODULE_OFF_ERROR } from "@/modules/clinics/modules";
 import { TIME_BLOCK_TYPES } from "@/modules/schedule/fields";
 import { findBlocksAndHours } from "@/modules/schedule/schedule";
+import { usageSchema, type UsageInput } from "@/modules/stock/fields";
+import { recordUsage, reverseMovement } from "@/modules/stock/stock";
 
 // Server Actions for the calendar and the appointment pages. Each one checks the session first, returns
 // values (never a redirect) and turns unexpected errors into a generic
@@ -199,4 +203,104 @@ export async function changeStatusAction(
   } catch {
     return { ok: false, formError: STATUS_ERROR };
   }
+}
+
+// ------------------------------------------------------------ stock usage
+
+type UsageFieldErrors = {
+  productId?: string;
+  quantity?: string;
+  saleItemId?: string;
+};
+
+export type UsageActionResult =
+  | { ok: true }
+  | { ok: false; fieldErrors: UsageFieldErrors; formError?: string };
+
+const USAGE_ERROR = "Não foi possível salvar o produto. Tente novamente.";
+
+const usageFailure = (formError: string): UsageActionResult => ({
+  ok: false,
+  fieldErrors: {},
+  formError,
+});
+
+// The stock changed: the appointment, the product pages (balance and
+// history) and the sale pages ("Produtos da venda") show it.
+function revalidateStock(appointmentId: string) {
+  revalidatePath(`/admin/agenda/${appointmentId}`);
+  revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/admin/financeiro/vendas", "layout");
+}
+
+// "Produtos usados" > "Registrar". Needs the products module; counting the
+// usage against a sale ("Conta na venda nº X") needs finance too.
+export async function recordUsageAction(
+  appointmentId: string,
+  input: UsageInput,
+): Promise<UsageActionResult> {
+  const session = await requireAdmin();
+  if (!moduleActive(session, "products")) return usageFailure(MODULE_OFF_ERROR);
+  if (!z.uuid().safeParse(appointmentId).success) {
+    return usageFailure("Atendimento não encontrado.");
+  }
+  const parsed = usageSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: UsageFieldErrors = {};
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[0];
+      if (
+        (key === "productId" || key === "quantity" || key === "saleItemId") &&
+        !(key in fieldErrors)
+      ) {
+        fieldErrors[key] = issue.message;
+      }
+    }
+    return { ok: false, fieldErrors };
+  }
+  if (parsed.data.saleItemId && !moduleActive(session, "finance")) {
+    return usageFailure(MODULE_OFF_ERROR);
+  }
+  let result;
+  try {
+    result = await recordUsage(
+      session.clinicId,
+      appointmentId,
+      parsed.data,
+      session.user.id,
+    );
+  } catch {
+    return usageFailure(USAGE_ERROR);
+  }
+  if (!result.ok) return usageFailure(result.formError);
+  revalidateStock(appointmentId);
+  return { ok: true };
+}
+
+// "Desfazer" on a product used in the appointment.
+export async function reverseUsageAction(
+  appointmentId: string,
+  movementId: string,
+): Promise<UsageActionResult> {
+  const session = await requireAdmin();
+  if (!moduleActive(session, "products")) return usageFailure(MODULE_OFF_ERROR);
+  if (
+    !z.uuid().safeParse(appointmentId).success ||
+    !z.uuid().safeParse(movementId).success
+  ) {
+    return usageFailure("Movimento não encontrado.");
+  }
+  let result;
+  try {
+    result = await reverseMovement(
+      session.clinicId,
+      movementId,
+      session.user.id,
+    );
+  } catch {
+    return usageFailure(USAGE_ERROR);
+  }
+  if (!result.ok) return usageFailure(result.formError);
+  revalidateStock(appointmentId);
+  return { ok: true };
 }

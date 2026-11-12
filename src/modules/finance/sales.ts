@@ -507,6 +507,32 @@ export async function findSessionInstallment(
   };
 }
 
+// The sale of an appointment's session installment once something was paid
+// on it (cancelled sales and installments left out): after the payment, the
+// appointment page points to the sale's products still to hand over.
+export async function findPaidSessionSale(
+  clinicId: string,
+  appointmentId: string,
+): Promise<string | null> {
+  if (!UUID_PATTERN.test(appointmentId)) return null;
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ saleId: installments.saleId, paidCents: paidOf() })
+      .from(installments)
+      .innerJoin(sales, eq(installments.saleId, sales.id))
+      .where(
+        and(
+          eq(installments.clinicId, clinicId),
+          eq(installments.appointmentId, appointmentId),
+          isNull(installments.cancelledAt),
+          isNull(sales.cancelledAt),
+        ),
+      )
+      .limit(1),
+  );
+  return row && row.paidCents > 0 ? row.saleId : null;
+}
+
 // --------------------------------------------------------------- payments
 
 export async function receivePayment(
