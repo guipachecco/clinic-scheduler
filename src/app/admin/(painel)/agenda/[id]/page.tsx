@@ -12,15 +12,22 @@ import {
   RECEIVABLE_STATUSES,
 } from "@/modules/finance/receipts";
 import {
+  findPaidSessionSale,
   findSessionInstallment,
   listPaymentMethods,
 } from "@/modules/finance/sales";
+import { listActiveProducts } from "@/modules/products/products";
 import {
   CLINIC_TIME_ZONE,
   formatLocal,
   todayLocal,
 } from "@/modules/schedule/time";
 import { listActiveServices } from "@/modules/services/services";
+import {
+  listAppointmentUsage,
+  listOpenSaleItems,
+  saleProductProgress,
+} from "@/modules/stock/stock";
 
 import { AppointmentForm, type ServiceOption } from "../appointment-form";
 import {
@@ -31,6 +38,7 @@ import { formatDay, money } from "../../financeiro/ui";
 import { PaymentForm } from "../../financeiro/vendas/[id]/sale-forms";
 import { StatusBadge } from "../status-badge";
 
+import { UndoUsageButton, UsageForm } from "./product-usage";
 import { StatusActions } from "./status-actions";
 
 // No patient data in the title: it would reach the browser history.
@@ -61,6 +69,44 @@ export default async function AppointmentPage({
         getAppointmentBilling(clinicId, appointment.id),
       ])
     : [null, [], null];
+  const financeOn = moduleActive(session, "finance");
+  const productsOn = moduleActive(session, "products");
+  // "Produtos usados": stock needs products; only confirmed or completed
+  // appointments use products. The sale picker needs finance too.
+  const usageOpen =
+    productsOn &&
+    (appointment.status === "confirmed" || appointment.status === "completed");
+  const [usageProducts, usages, openItems] = usageOpen
+    ? await Promise.all([
+        listActiveProducts(clinicId),
+        listAppointmentUsage(clinicId, appointment.id),
+        financeOn ? listOpenSaleItems(clinicId, appointment.patientId) : [],
+      ])
+    : [[], [], []];
+  // After a payment of this session installment, the sale may still have
+  // products to hand over: point to them.
+  const paidSaleId =
+    financeOn && productsOn
+      ? await findPaidSessionSale(clinicId, appointment.id)
+      : null;
+  const productsPending = paidSaleId
+    ? (await saleProductProgress(clinicId, paidSaleId)).some(
+        (item) => item.remaining > 0,
+      )
+    : false;
+  const handOverLink =
+    paidSaleId && productsPending ? (
+      <p>
+        <Link
+          href={
+            `/admin/financeiro/vendas/${paidSaleId}#produtos-da-venda` as Route
+          }
+          className="font-semibold text-primary underline underline-offset-4"
+        >
+          Dar baixa nos produtos da venda
+        </Link>
+      </p>
+    ) : null;
   const receivable =
     !sessionInstallment &&
     billing !== null &&
@@ -159,6 +205,18 @@ export default async function AppointmentPage({
             today={todayLocal()}
             label="Receber agora"
           />
+          {handOverLink}
+        </section>
+      ) : handOverLink ? (
+        <section
+          aria-labelledby="sessao-paga"
+          className="grid gap-3 rounded-2xl border bg-card p-4"
+        >
+          <h2 id="sessao-paga" className="font-heading text-lg font-bold">
+            Pagamento da sessão
+          </h2>
+          <p>Sessão paga.</p>
+          {handOverLink}
         </section>
       ) : null}
 
@@ -193,6 +251,62 @@ export default async function AppointmentPage({
             defaultAmountCents={billing?.servicePriceCents}
             methods={methods}
             today={todayLocal()}
+          />
+        </section>
+      ) : null}
+
+      {usageOpen ? (
+        <section
+          aria-labelledby="produtos-usados"
+          className="grid gap-4 rounded-2xl border bg-card p-4"
+        >
+          <h2 id="produtos-usados" className="font-heading text-lg font-bold">
+            Produtos usados
+          </h2>
+          {usages.length > 0 ? (
+            <ul className="grid gap-2">
+              {usages.map((usage) => (
+                <li
+                  key={usage.movementId}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2"
+                >
+                  <span
+                    className={
+                      usage.reversed
+                        ? "text-muted-foreground line-through"
+                        : undefined
+                    }
+                  >
+                    {usage.productName} · {usage.quantity}
+                    {usage.saleNumber !== null
+                      ? ` · venda nº ${usage.saleNumber}`
+                      : ""}
+                  </span>
+                  {usage.reversed ? (
+                    <span className="text-sm text-muted-foreground">
+                      Desfeita
+                    </span>
+                  ) : (
+                    <UndoUsageButton
+                      appointmentId={appointment.id}
+                      movementId={usage.movementId}
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <UsageForm
+            appointmentId={appointment.id}
+            products={usageProducts.map(({ id, name }) => ({ id, name }))}
+            openItems={openItems.map(
+              ({ saleItemId, saleNumber, productId, remaining }) => ({
+                saleItemId,
+                saleNumber,
+                productId,
+                remaining,
+              }),
+            )}
           />
         </section>
       ) : null}

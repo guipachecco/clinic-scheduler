@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { STATUS_LABELS, type Status } from "@/modules/appointments/fields";
-import { requireModule } from "@/modules/auth/session";
+import { moduleActive, requireModule } from "@/modules/auth/session";
 import { PAYMENT_PLAN_LABELS } from "@/modules/finance/fields";
 import { getSale, listPaymentMethods } from "@/modules/finance/sales";
 import {
@@ -14,10 +14,12 @@ import { listSaleCharges } from "@/modules/mercado-pago/charges";
 import { getPatient } from "@/modules/patients/patients";
 import { formatLocal, todayLocal } from "@/modules/schedule/time";
 import { listCatalog } from "@/modules/services/services";
+import { saleProductProgress } from "@/modules/stock/stock";
 
 import { FinanceTabs, formatDay, money, PageTitle, StateBadge } from "../../ui";
 
 import { ChargeLink } from "./charge-link";
+import { HandOverAllButton } from "./hand-over-all";
 import {
   CancelSaleForm,
   PaymentForm,
@@ -34,7 +36,8 @@ export default async function SalePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { clinicId, clinic } = await requireModule("finance");
+  const session = await requireModule("finance");
+  const { clinicId, clinic } = session;
   const { id } = await params;
   const today = todayLocal();
   const [sale, methods, catalog, connection] = await Promise.all([
@@ -75,6 +78,12 @@ export default async function SalePage({
       : [],
   );
   const hasProducts = serviceItems.length < sale.items.length;
+  // "Produtos da venda": the stock is the products module's.
+  const progress =
+    hasProducts && moduleActive(session, "products")
+      ? await saleProductProgress(clinicId, sale.id)
+      : [];
+  const productsLeft = progress.some((item) => item.remaining > 0);
   const openInstallments = sale.installments.filter(
     (i) => i.state !== "cancelled" && i.paidCents === 0,
   ).length;
@@ -278,6 +287,37 @@ export default async function SalePage({
           </ul>
         )}
       </section>
+
+      {progress.length > 0 ? (
+        <section
+          id="produtos-da-venda"
+          aria-labelledby="produtos-da-venda-titulo"
+          className="grid scroll-mt-4 gap-3"
+        >
+          <h2
+            id="produtos-da-venda-titulo"
+            className="font-heading text-lg font-bold"
+          >
+            Produtos da venda
+          </h2>
+          <ul className="grid gap-2">
+            {progress.map((item) => (
+              <li
+                key={item.saleItemId}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3"
+              >
+                <span className="font-medium">{item.productName}</span>
+                <span className="tabular-nums">
+                  {item.done} de {item.sold} com baixa
+                </span>
+              </li>
+            ))}
+          </ul>
+          {active && productsLeft ? (
+            <HandOverAllButton saleId={sale.id} />
+          ) : null}
+        </section>
+      ) : null}
 
       <section aria-labelledby="pagamentos" className="grid gap-3">
         <h2 id="pagamentos" className="font-heading text-lg font-bold">

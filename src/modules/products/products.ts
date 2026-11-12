@@ -11,6 +11,7 @@ import {
   products,
   quoteItems,
   saleItems,
+  stockMovements,
 } from "@/db/schema";
 
 import type {
@@ -54,7 +55,10 @@ export type ProductListItem = {
   priceCents: number | null;
   showOnPage: boolean;
   isActive: boolean;
-  // Cited by a quote or a sale: it can be deactivated but never deleted.
+  // Units in stock (products.stock_quantity).
+  stockQuantity: number;
+  // Cited by a quote, a sale or a stock movement: it can be deactivated but
+  // never deleted.
   inUse: boolean;
 };
 
@@ -240,7 +244,8 @@ export async function getProduct(
   return row ?? null;
 }
 
-// A product cited by a quote or a sale is never deleted (deactivate it).
+// A product cited by a quote, a sale or a stock movement is never deleted
+// (deactivate it).
 export async function deleteProduct(
   clinicId: string,
   id: string,
@@ -272,7 +277,21 @@ export async function deleteProduct(
           .where(
             and(eq(saleItems.clinicId, clinicId), eq(saleItems.productId, id)),
           );
-        if (Number(quoted?.total ?? 0) + Number(sold?.total ?? 0) > 0) {
+        const [moved] = await tx
+          .select({ total: count() })
+          .from(stockMovements)
+          .where(
+            and(
+              eq(stockMovements.clinicId, clinicId),
+              eq(stockMovements.productId, id),
+            ),
+          );
+        if (
+          Number(quoted?.total ?? 0) +
+            Number(sold?.total ?? 0) +
+            Number(moved?.total ?? 0) >
+          0
+        ) {
           return { ok: false, reason: "in_use" };
         }
         await tx
@@ -442,11 +461,13 @@ export async function listProductCatalog(
         priceCents: products.priceCents,
         showOnPage: products.showOnPage,
         isActive: products.isActive,
+        stockQuantity: products.stockQuantity,
         // Column names are written out: inside the subquery an unqualified
         // clinic_id would mean the subquery's own table.
         inUse: sql<boolean>`(
           exists (select 1 from quote_items qi where qi.clinic_id = "products"."clinic_id" and qi.product_id = "products"."id")
           or exists (select 1 from sale_items si where si.clinic_id = "products"."clinic_id" and si.product_id = "products"."id")
+          or exists (select 1 from stock_movements sm where sm.clinic_id = "products"."clinic_id" and sm.product_id = "products"."id")
         )`,
       })
       .from(products)
@@ -466,6 +487,7 @@ export async function listProductCatalog(
         priceCents: row.priceCents,
         showOnPage: row.showOnPage,
         isActive: row.isActive,
+        stockQuantity: row.stockQuantity,
         inUse: row.inUse,
       })),
   }));

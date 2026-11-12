@@ -3,3 +3,4 @@ export * from "./clinic";
 export * from "./finance";
 export * from "./mercado-pago";
 export * from "./anamnesis";
+export * from "./stock";

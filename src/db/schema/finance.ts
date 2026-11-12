@@ -162,6 +162,7 @@ export const quoteItems = pgTable(
       foreignColumns: [products.clinicId, products.id],
     }).onDelete("restrict"),
     index("quote_items_quote_idx").on(t.quoteId),
+    index("quote_items_product_idx").on(t.clinicId, t.productId),
     check(
       "quote_items_kind_check",
       sql`num_nonnulls(${t.serviceId}, ${t.productId}) = 1`,
@@ -252,6 +253,7 @@ export const saleItems = pgTable(
       sql`num_nonnulls(${t.serviceId}, ${t.productId}) = 1`,
     ),
     index("sale_items_sale_idx").on(t.saleId),
+    index("sale_items_product_idx").on(t.clinicId, t.productId),
     check("sale_items_sessions_check", sql`${t.sessions} between 0 and 200`),
     check("sale_items_total_check", sql`${t.totalCents} >= 0`),
   ],

@@ -148,7 +148,7 @@ test.describe("produtos", () => {
     await page.getByRole("button", { name: "Aprovar e criar a venda" }).click();
     await expect(page).toHaveURL(/\/admin\/financeiro\/vendas\/[0-9a-f-]+$/);
     await expect(page.getByText("Quantidade 2")).toBeVisible();
-    await expect(page.getByText(PRODUCT)).toBeVisible();
+    await expect(page.getByText(PRODUCT).first()).toBeVisible();
   });
 
   test("the old address redirects", async () => {

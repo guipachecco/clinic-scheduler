@@ -614,6 +614,8 @@ export const PRODUCT_OTHER_CATEGORY_NAME = "Outros";
 // Products the clinic sells. "Ativo" means it can be used (quotes); "Mostrar
 // na página" means it is listed on the public page. Clients see only the
 // products that are both (policy products_client, migration 0028).
+// stock_quantity is the balance of the product's stock movements (stock.ts);
+// clients never read it (no column grant, migration 0029).
 export const products = pgTable(
   "products",
   {
@@ -627,6 +629,7 @@ export const products = pgTable(
     description: text("description"),
     isActive: boolean("is_active").notNull().default(true),
     showOnPage: boolean("show_on_page").notNull().default(true),
+    stockQuantity: integer("stock_quantity").notNull().default(0),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -648,6 +651,7 @@ export const products = pgTable(
       "products_description_check",
       sql`${t.description} is null or char_length(${t.description}) <= 300`,
     ),
+    check("products_stock_check", sql`${t.stockQuantity} >= 0`),
   ],
 );
 

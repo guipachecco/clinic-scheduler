@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import * as z from "zod";
 
 import {
@@ -49,6 +50,7 @@ import {
 import { DateTime } from "luxon";
 
 import { CLINIC_TIME_ZONE, todayLocal } from "@/modules/schedule/time";
+import { handOverAll } from "@/modules/stock/stock";
 
 // Server Actions of the financial module. Each one checks the session first,
 // takes the clinic from it, parses the raw input again, and turns unexpected
@@ -318,6 +320,25 @@ export async function reviseSaleAction(
   return run(() =>
     reviseSale(clinicId, saleId, parsed.data, user.id, todayLocal()),
   );
+}
+
+// "Produtos da venda" > "Dar baixa em tudo": the stock is the products
+// module's, so it needs products as well as finance.
+export async function handOverAllAction(saleId: string): Promise<ActionResult> {
+  const session = await financeSession();
+  if (!session || !moduleActive(session, "products")) return MODULE_OFF;
+  const { clinicId, user } = session;
+  if (!idSchema.safeParse(saleId).success) {
+    return { ok: false, formError: "Venda não encontrada." };
+  }
+  const result = await run(() => handOverAll(clinicId, saleId, user.id));
+  if (result.ok) {
+    revalidatePath(`/admin/financeiro/vendas/${saleId}`);
+    revalidatePath("/admin/produtos", "layout");
+    // The appointments of the sale stop offering "Dar baixa nos produtos".
+    revalidatePath("/admin/agenda", "layout");
+  }
+  return result;
 }
 
 export async function scheduleSessionsAction(

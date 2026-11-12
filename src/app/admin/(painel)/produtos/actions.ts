@@ -23,6 +23,8 @@ import {
   updateProduct,
   updateProductCategory,
 } from "@/modules/products/products";
+import { entrySchema, type EntryInput } from "@/modules/stock/fields";
+import { recordEntry, reverseMovement } from "@/modules/stock/stock";
 
 // Server Actions of the products catalog. Each one checks the session and the
 // "products" module first; unexpected errors become a generic message.
@@ -149,6 +151,82 @@ export async function addExampleProductsAction(): Promise<SaveResult> {
     return failure("Não foi possível adicionar os exemplos. Tente novamente.");
   }
   revalidatePath("/admin/produtos");
+  return { ok: true };
+}
+
+export type StockActionResult =
+  | { ok: true }
+  | {
+      ok: false;
+      fieldErrors: { quantity?: string; note?: string };
+      formError?: string;
+    };
+
+const stockFailure = (formError: string): StockActionResult => ({
+  ok: false,
+  fieldErrors: {},
+  formError,
+});
+
+export async function recordEntryAction(
+  productId: string,
+  input: EntryInput,
+): Promise<StockActionResult> {
+  const session = await productsSession();
+  if (!session) return stockFailure(MODULE_OFF_ERROR);
+  if (!idSchema.safeParse(productId).success) {
+    return stockFailure("Produto não encontrado.");
+  }
+  const parsed = entrySchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: { quantity?: string; note?: string } = {};
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[0];
+      if ((key === "quantity" || key === "note") && !(key in fieldErrors)) {
+        fieldErrors[key] = issue.message;
+      }
+    }
+    return { ok: false, fieldErrors };
+  }
+  let result;
+  try {
+    result = await recordEntry(
+      session.clinicId,
+      productId,
+      parsed.data,
+      session.user.id,
+    );
+  } catch {
+    return stockFailure(GENERIC_ERROR);
+  }
+  if (!result.ok) return stockFailure(result.formError);
+  revalidatePath("/admin/produtos");
+  revalidatePath(`/admin/produtos/${productId}`);
+  return { ok: true };
+}
+
+export async function reverseMovementAction(
+  movementId: string,
+): Promise<SaveResult> {
+  const session = await productsSession();
+  if (!session) return failure(MODULE_OFF_ERROR);
+  if (!idSchema.safeParse(movementId).success) {
+    return failure("Movimento não encontrado.");
+  }
+  let result;
+  try {
+    result = await reverseMovement(
+      session.clinicId,
+      movementId,
+      session.user.id,
+    );
+  } catch {
+    return failure(GENERIC_ERROR);
+  }
+  if (!result.ok) return failure(result.formError);
+  revalidatePath("/admin/produtos", "layout");
+  revalidatePath("/admin/agenda", "layout");
+  revalidatePath("/admin/financeiro", "layout");
   return { ok: true };
 }
 
