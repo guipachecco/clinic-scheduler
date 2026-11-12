@@ -72,6 +72,7 @@ async function removeClinics(client: Client) {
     "loyalty_redemptions",
     "appointments",
     "products",
+    "product_categories",
     "payment_methods",
     "services",
     "service_categories",
@@ -188,10 +189,17 @@ test.describe("página inicial da clínica", () => {
       const fullId = full!.id;
       await addHours(client, fullId);
       serviceId = await addService(client, fullId, FULL.service);
-      await client.query(
-        `INSERT INTO products (clinic_id, name, price_cents, description)
-         VALUES ($1, 'Protetor solar (página)', 7990, 'FPS 50')`,
+      const {
+        rows: [category],
+      } = await client.query<{ id: string }>(
+        `INSERT INTO product_categories (clinic_id, name)
+         VALUES ($1, 'Outros') RETURNING id`,
         [fullId],
+      );
+      await client.query(
+        `INSERT INTO products (clinic_id, category_id, name, price_cents, description)
+         VALUES ($1, $2, 'Protetor solar (página)', 7990, 'FPS 50')`,
+        [fullId, category!.id],
       );
       await client.query(
         `INSERT INTO payment_methods (clinic_id, name) VALUES ($1, 'PIX')`,

@@ -157,3 +157,12 @@ export const TEST_ADMIN_PAGE_BUILDER = {
   name: "Dono da Barbearia",
   password: "senha-de-teste-montar-pagina-bem-longa",
 };
+
+// Owner used by the products suite (e2e/products.spec.ts).
+export const TEST_ADMIN_PRODUCTS = {
+  role: "admin" as const,
+  clinicSlug: "grais",
+  email: "produtos@example.test",
+  name: "Administradora de Produtos",
+  password: "senha-de-teste-produtos-bem-longa",
+};
