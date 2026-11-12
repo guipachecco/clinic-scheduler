@@ -5,15 +5,18 @@ import { Icon } from "../[slug]/icons";
 
 // The top of a clinic's card on the Zemana pages (the clinic list and "Suas
 // clínicas"): the cover photo (or a neutral area), the owner's photo or
-// initials over it, the name and the area.
+// initials over it, the name, the area and (on "Suas clínicas") the address.
 export function ClinicCardHeader({
   clinic,
   badge,
+  address,
   headingLevel = 2,
 }: {
   clinic: PublicClinicCard;
   // Shown on the cover's corner (the review score).
   badge?: React.ReactNode;
+  // One line under the area, to tell apart clinics with similar names.
+  address?: string | null;
   headingLevel?: 2 | 3;
 }) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
@@ -65,13 +68,19 @@ export function ClinicCardHeader({
             {initialsFor(clinic.name)}
           </div>
         )}
-        <div className="min-w-0 pt-8">
+        <div className="min-w-0 flex-1 pt-8">
           <Heading className="truncate font-heading text-lg font-semibold">
             {clinic.name}
           </Heading>
           {clinic.areaLabel ? (
             <p className="truncate text-sm text-muted-foreground">
               {clinic.areaLabel}
+            </p>
+          ) : null}
+          {address ? (
+            <p className="flex min-w-0 items-center gap-1 text-sm text-muted-foreground">
+              <Icon name="map" className="size-3.5 shrink-0" />
+              <span className="truncate">{address}</span>
             </p>
           ) : null}
         </div>

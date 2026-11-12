@@ -5,9 +5,10 @@ import { sql } from "drizzle-orm";
 import { clientDb } from "@/db/client";
 
 // The two clinic lists of the Zemana pages, read as app_client through the
-// definer functions of migration 0021. No clinic setting is needed: both
-// cross clinics on purpose and return public data, plus (for "Suas
-// clínicas") the signed-in client's own next appointment and loyalty counts.
+// definer functions of migrations 0021 and 0030. No clinic setting is needed:
+// both cross clinics on purpose and return public data, plus (for "Suas
+// clínicas") the signed-in client's own next appointment, last visit and
+// loyalty counts.
 
 export type PublicClinicCard = {
   slug: string;
@@ -31,6 +32,10 @@ export type MyClinic = PublicClinicCard & {
     prize: boolean;
   } | null;
   nextAppointment: { startsAt: Date; service: string } | null;
+  // Free text the clinic typed for its page; tells apart similar names.
+  address: string | null;
+  // Her last completed visit there, for the order of "Suas clínicas".
+  lastVisitAt: Date | null;
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -69,6 +74,8 @@ export async function listMyClinics(userId: string): Promise<MyClinic[]> {
     loyalty_redeemed: number;
     next_starts_at: string | Date | null;
     next_service: string | null;
+    address: string | null;
+    last_visit_at: string | Date | null;
   }>(sql`select * from client_my_clinics(${userId}::uuid)`);
   return result.rows.map((row) => {
     const visits =
@@ -108,6 +115,8 @@ export async function listMyClinics(userId: string): Promise<MyClinic[]> {
               service: row.next_service,
             }
           : null,
+      address: row.address?.trim() || null,
+      lastVisitAt: row.last_visit_at ? new Date(row.last_visit_at) : null,
     };
   });
 }

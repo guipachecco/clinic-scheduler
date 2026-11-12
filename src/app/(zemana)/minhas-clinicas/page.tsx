@@ -10,9 +10,16 @@ import { whatsappUrl } from "@/app/[slug]/ui";
 import { Button } from "@/components/ui/button";
 import { getSession } from "@/modules/auth/session";
 import { listMyClinics, type MyClinic } from "@/modules/clients/my-clinics";
+import {
+  clinicSearchText,
+  orderMyClinics,
+  SEARCH_MIN_CLINICS,
+} from "@/modules/clients/my-clinics-list";
 
 import { AuthShell } from "../auth-shell";
 import { ClinicCardHeader } from "../clinic-card";
+
+import { ClinicList } from "./clinic-list";
 
 export const metadata: Metadata = { title: "Suas clínicas" };
 
@@ -89,9 +96,10 @@ function ClinicCard({ clinic }: { clinic: MyClinic }) {
   const linkClass =
     "inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary";
   return (
-    <li className="grid gap-3 rounded-2xl border bg-card p-2 pb-3">
+    <div className="grid gap-3 rounded-2xl border bg-card p-2 pb-3">
       <ClinicCardHeader
         clinic={clinic}
+        address={clinic.address}
         badge={
           clinic.rating ? (
             <span className="inline-flex items-center gap-1">
@@ -134,7 +142,7 @@ function ClinicCard({ clinic }: { clinic: MyClinic }) {
           ) : null}
         </div>
       </div>
-    </li>
+    </div>
   );
 }
 
@@ -143,7 +151,7 @@ export default async function MyClinicsPage() {
   if (!session) redirect("/entrar");
   if (session.user.role !== "client") redirect("/admin");
   // Only the id from the session reaches the database function.
-  const clinics = await listMyClinics(session.user.id);
+  const clinics = orderMyClinics(await listMyClinics(session.user.id));
   const firstName = session.user.name.trim().split(/\s+/)[0] ?? "";
 
   return (
@@ -194,11 +202,14 @@ export default async function MyClinicsPage() {
         </div>
       ) : (
         <>
-          <ul className="grid gap-4">
-            {clinics.map((clinic) => (
-              <ClinicCard key={clinic.slug} clinic={clinic} />
-            ))}
-          </ul>
+          <ClinicList
+            searchable={clinics.length >= SEARCH_MIN_CLINICS}
+            entries={clinics.map((clinic) => ({
+              slug: clinic.slug,
+              searchText: clinicSearchText(clinic),
+              card: <ClinicCard clinic={clinic} />,
+            }))}
+          />
           <Link
             href="/clinicas"
             className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border-2 border-dashed font-semibold text-primary hover:bg-accent"
