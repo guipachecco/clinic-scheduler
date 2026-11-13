@@ -615,7 +615,7 @@ export function AgendaCalendar({
               locale={ptBrLocale}
               timeZone={CLINIC_TIME_ZONE}
               firstDay={1}
-              initialView={isDesktop ? "timeGridWeek" : "listWeek"}
+              initialView={isDesktop ? "timeGridWeek" : "timeGridDay"}
               // The header and toolbar above drive the calendar.
               headerToolbar={false}
               footerToolbar={false}
