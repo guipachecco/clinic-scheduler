@@ -298,13 +298,16 @@ test.describe("agenda", () => {
     await expect(page.getByText("Não foi possível carregar")).toHaveCount(0);
   });
 
-  test("a phone shows the day list instead of the calendar", async () => {
+  test("a phone opens the calendar on the day's time grid", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/admin/agenda");
+    await expect(calendar().locator(".fc-timegrid")).toBeVisible();
     await expect(
-      page.getByRole("navigation", { name: "Dias da semana" }),
-    ).toBeVisible();
-    await expect(calendar()).toBeHidden();
+      views().getByRole("button", { name: "Dia", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(
+      views().getByRole("button", { name: "Semana", exact: true }),
+    ).toHaveCount(0);
     await page.setViewportSize({ width: 1280, height: 720 });
   });
 
