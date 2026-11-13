@@ -843,6 +843,51 @@ export const appointments = pgTable(
   ],
 );
 
+// The services of a visit that has more than one (migration 0034), in the
+// order they are named. Such an appointment keeps the first one in
+// appointments.service_id, every name joined in service_name and the total
+// in service_duration_minutes; an appointment with a single service has no
+// rows here.
+export const appointmentServices = pgTable(
+  "appointment_services",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull(),
+    appointmentId: uuid("appointment_id").notNull(),
+    serviceId: uuid("service_id").notNull(),
+    serviceName: text("service_name").notNull(),
+    durationMinutes: integer("duration_minutes").notNull(),
+    position: smallint("position").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "appointment_services_appointment_fk",
+      columns: [t.clinicId, t.appointmentId],
+      foreignColumns: [appointments.clinicId, appointments.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "appointment_services_service_fk",
+      columns: [t.clinicId, t.serviceId],
+      foreignColumns: [services.clinicId, services.id],
+    }).onDelete("restrict"),
+    unique("appointment_services_service_unique").on(
+      t.appointmentId,
+      t.serviceId,
+    ),
+    unique("appointment_services_position_unique").on(
+      t.appointmentId,
+      t.position,
+    ),
+    index("appointment_services_service_idx").on(t.clinicId, t.serviceId),
+    check("appointment_services_duration_check", sql`${t.durationMinutes} > 0`),
+    check(
+      "appointment_services_position_check",
+      sql`${t.position} between 0 and 9`,
+    ),
+  ],
+);
+
 // Who changed what and when. `changes` must never contain personal data:
 // store ids, statuses and times only.
 export const auditLogs = pgTable(

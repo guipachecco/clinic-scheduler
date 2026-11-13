@@ -1,10 +1,11 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 
 import { inClinic } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import {
+  appointmentServices,
   appointments,
   auditLogs,
   installments,
@@ -42,7 +43,8 @@ export type AppointmentBilling = {
   inPackage: boolean;
   // The receipt that counts, once she received it.
   receipt: AppointmentReceipt | null;
-  // The service's price today, to prefill "Receber" (null when it has none).
+  // The price today of the visit's service, or of all of them when it has
+  // several, to prefill "Receber" (null when none has a price).
   servicePriceCents: number | null;
 };
 
@@ -97,19 +99,38 @@ export async function getAppointmentBilling(
       )
       .orderBy(desc(receipts.createdAt))
       .limit(1);
-    const [service] = await tx
-      .select({ priceCents: services.priceCents })
-      .from(services)
+    // A visit with several services (appointment_services) adds them up.
+    const visit = await tx
+      .select({ serviceId: appointmentServices.serviceId })
+      .from(appointmentServices)
       .where(
         and(
-          eq(services.id, appointment.serviceId),
-          eq(services.clinicId, clinicId),
+          eq(appointmentServices.clinicId, clinicId),
+          eq(appointmentServices.appointmentId, appointmentId),
         ),
       );
+    const serviceIds =
+      visit.length > 0
+        ? visit.map((row) => row.serviceId)
+        : [appointment.serviceId];
+    const prices = (
+      await tx
+        .select({ priceCents: services.priceCents })
+        .from(services)
+        .where(
+          and(
+            inArray(services.id, serviceIds),
+            eq(services.clinicId, clinicId),
+          ),
+        )
+    ).flatMap((row) => (row.priceCents === null ? [] : [row.priceCents]));
     return {
       inPackage: Boolean(session),
       receipt: receipt ?? null,
-      servicePriceCents: service?.priceCents ?? null,
+      servicePriceCents:
+        prices.length > 0
+          ? prices.reduce((sum, cents) => sum + cents, 0)
+          : null,
     };
   });
 }

@@ -111,6 +111,7 @@ test.describe("client area", () => {
     await expect(page).toHaveURL(new RegExp(`/${A.slug}/marcar$`));
 
     await page.getByRole("button", { name: A.service }).click();
+    await page.getByRole("button", { name: "Continuar" }).click();
     await page
       .getByRole("group", { name: "Dias" })
       .getByRole("button", { disabled: false })
@@ -263,6 +264,7 @@ test.describe("client area", () => {
         : route.continue(),
     );
     await client.getByRole("button", { name: A.service }).click();
+    await client.getByRole("button", { name: "Continuar" }).click();
     await expect(
       client.getByText("Não foi possível carregar. Tente novamente."),
     ).toBeVisible();
@@ -280,6 +282,7 @@ test.describe("client area", () => {
   test("day strip dims days past the limit and the arrows cross a month", async () => {
     await client.goto(`/${A.slug}/marcar`);
     await client.getByRole("button", { name: A.service }).click();
+    await client.getByRole("button", { name: "Continuar" }).click();
     const days = client.getByRole("group", { name: "Dias" });
     await expect(days).toBeVisible();
     const month = client.getByTestId("strip-month");
@@ -305,6 +308,7 @@ test.describe("client area", () => {
   test("period chips jump to their group of times", async () => {
     await client.goto(`/${A.slug}/marcar`);
     await client.getByRole("button", { name: A.service }).click();
+    await client.getByRole("button", { name: "Continuar" }).click();
     await client
       .getByRole("group", { name: "Dias" })
       .getByRole("button", { disabled: false })
@@ -325,6 +329,7 @@ test.describe("client area", () => {
   test("the sheet closes on Escape and on the close button", async () => {
     await client.goto(`/${A.slug}/marcar`);
     await client.getByRole("button", { name: A.service }).click();
+    await client.getByRole("button", { name: "Continuar" }).click();
     await client
       .getByRole("group", { name: "Dias" })
       .getByRole("button", { disabled: false })
@@ -387,6 +392,68 @@ test.describe("client area", () => {
     }
   });
 
+  test("two services go in one appointment", async () => {
+    const SECOND = "Hidratação (teste)";
+    const BOTH = `${A.service} + ${SECOND}`;
+    const [second] = await query<{ id: string }>(
+      `INSERT INTO services (clinic_id, category_id, name, slug, duration_minutes,
+                             sort_order, is_active, online_booking_enabled)
+       SELECT s.clinic_id, s.category_id, $2, 'hidratacao-teste', 30, 99, true, true
+       FROM services s JOIN clinics c ON c.id = s.clinic_id
+       WHERE c.slug = $1
+       RETURNING id`,
+      [A.slug, SECOND],
+    );
+    try {
+      await client.goto(`/${A.slug}/marcar`);
+      await client.getByRole("button", { name: A.service }).click();
+      await client.getByRole("button", { name: SECOND }).click();
+      await expect(
+        client.getByRole("button", { name: A.service }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await expect(client.getByText(/^2 serviços · /)).toBeVisible();
+      await client.getByRole("button", { name: "Continuar" }).click();
+      await expect(client.getByText(BOTH)).toBeVisible();
+
+      await client
+        .getByRole("group", { name: "Dias" })
+        .getByRole("button", { disabled: false })
+        .last()
+        .click();
+      await client
+        .getByRole("group", { name: "Horários livres" })
+        .getByRole("button")
+        .first()
+        .click();
+      const sheet = client.getByRole("dialog");
+      await expect(sheet.getByText(A.service)).toBeVisible();
+      await expect(sheet.getByText(SECOND)).toBeVisible();
+      await sheet
+        .getByRole("button", { name: "Confirmar agendamento" })
+        .click();
+      await expect(
+        client.getByRole("heading", { name: "Horário marcado" }),
+      ).toBeVisible();
+      await expect(client.getByText(BOTH)).toBeVisible();
+
+      // One appointment for the visit, as long as the two services together.
+      const booked = await query<{ minutes: number; services: number }>(
+        `SELECT extract(epoch FROM a.ends_at - a.starts_at)::int / 60 AS minutes,
+                (SELECT count(*)::int FROM appointment_services v
+                 WHERE v.appointment_id = a.id) AS services
+         FROM appointments a WHERE a.service_name = $1`,
+        [BOTH],
+      );
+      expect(booked).toHaveLength(1);
+      expect(booked[0]!.services).toBe(2);
+      expect(booked[0]!.minutes).toBeGreaterThan(30);
+    } finally {
+      // Leaves the clinic as the other tests expect it.
+      await query(`DELETE FROM appointments WHERE service_name = $1`, [BOTH]);
+      await query(`DELETE FROM services WHERE id = $1`, [second!.id]);
+    }
+  });
+
   test("my appointments has no cancel button", async () => {
     await client.goto(`/${A.slug}/meus-horarios`);
     await expect(
@@ -434,6 +501,7 @@ test.describe("client area", () => {
 
     await client.goto(`/${A.slug}/marcar`);
     await client.getByRole("button", { name: A.service }).click();
+    await client.getByRole("button", { name: "Continuar" }).click();
     await expect(client.getByRole("group", { name: "Dias" })).toBeVisible();
     expect(await noSidewaysScroll(client)).toBe(true);
 

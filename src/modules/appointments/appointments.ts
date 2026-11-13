@@ -6,6 +6,7 @@ import { inClinic, type Tx } from "@/db/client";
 import { isAppointmentOverlapError, isUniqueViolation } from "@/db/errors";
 import {
   ACTIVE_APPOINTMENT_STATUSES,
+  appointmentServices,
   appointments,
   auditLogs,
   patients,
@@ -743,6 +744,18 @@ export async function updateAppointment(
         .where(
           and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)),
         );
+      // The panel picks one service: a visit booked online with several
+      // becomes an appointment of the new service alone.
+      if (serviceChanged) {
+        await tx
+          .delete(appointmentServices)
+          .where(
+            and(
+              eq(appointmentServices.appointmentId, id),
+              eq(appointmentServices.clinicId, clinicId),
+            ),
+          );
+      }
 
       const serviceChanges = serviceChanged
         ? {
