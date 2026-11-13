@@ -225,6 +225,13 @@
       "when": 1794526997307,
       "tag": "0031_client_category_names",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794527699911,
+      "tag": "0032_professionals",
+      "breakpoints": true
     }
   ]
 }

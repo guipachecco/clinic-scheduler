@@ -870,6 +870,7 @@ describe("client access", () => {
         "clinics",
         "patients",
         "products",
+        "professionals",
         "reviews",
         "service_categories",
         "services",
@@ -898,6 +899,8 @@ describe("client access", () => {
     expect(functions.rows).toEqual(
       [
         "client_business_hours",
+        // Per clinic (0014) and per professional (0032).
+        "client_busy_intervals",
         "client_busy_intervals",
         "client_clinic_cover",
         "client_clinic_cover_size",

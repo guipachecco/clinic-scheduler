@@ -242,23 +242,54 @@ test.describe("agenda", () => {
 
   test("the month and day views load without an error", async () => {
     // A range outside the one already loaded asks the server again (a Server
-    // Action POST); its answer must be a success.
-    const expectLoad = async (action: () => Promise<void>) => {
-      const loaded = page.waitForResponse(
-        (response) =>
-          response.request().method() === "POST" &&
-          new URL(response.url()).pathname === "/admin/agenda",
-      );
+    // Action POST); its answer must be a success. The answer is read in the
+    // test runner (route.fetch), not from the browser: Chromium does not keep
+    // the body of these streamed responses reliably, and reading it later
+    // failed with "No data found for resource" although the page had loaded.
+    const answers = new Map<string, string>();
+    await page.route("**/admin/agenda", async (route) => {
+      const request = route.request();
+      const from = /"from":"([^"]+)"/.exec(request.postData() ?? "")?.[1];
+      if (request.method() !== "POST" || !from) return route.fallback();
+      const response = await route.fetch();
+      const body = await response.text();
+      answers.set(from.slice(0, 10), body);
+      await route.fulfill({ response, body });
+    });
+
+    const today = DateTime.now()
+      .setZone("America/Sao_Paulo")
+      .setLocale("pt-BR");
+    // The month grid starts on the Monday on or before the 1st.
+    const expectMonthLoad = async (
+      monthStart: DateTime,
+      action: () => Promise<void>,
+    ) => {
+      const from = monthStart
+        .minus({ days: monthStart.weekday - 1 })
+        .toISODate()!;
       await action();
-      const body = await (await loaded).text();
-      expect(body).toContain('"ok":true');
+      // The range under the page title (the phone day list has its own).
+      const header = page.locator("header", {
+        has: page.getByRole("heading", { name: "Agenda", exact: true }),
+      });
+      await expect(
+        header.getByText(monthStart.toFormat("LLLL 'de' yyyy"), {
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect.poll(() => answers.get(from)).toContain('"ok":true');
+      await expect(page.getByText("Não foi possível carregar")).toHaveCount(0);
     };
+
     const month = views().getByRole("button", { name: "Mês", exact: true });
-    await expectLoad(() => month.click());
+    const thisMonth = today.startOf("month");
+    await expectMonthLoad(thisMonth, () => month.click());
     await expect(month).toHaveAttribute("aria-pressed", "true");
-    await expectLoad(() =>
+    await expectMonthLoad(thisMonth.plus({ months: 1 }), () =>
       page.getByRole("button", { name: "Próximo mês" }).click(),
     );
+    await page.unroute("**/admin/agenda");
 
     const day = views().getByRole("button", { name: "Dia", exact: true });
     await day.click();

@@ -166,12 +166,14 @@ function renderEvent(arg: EventContentArg) {
       </span>
     );
   }
-  const { patientLabel, serviceLabel, status, online } = arg.event
-    .extendedProps as {
+  const { patientLabel, serviceLabel, status, online, professionalName } = arg
+    .event.extendedProps as {
     patientLabel?: string;
     serviceLabel?: string;
     status?: Status;
     online?: boolean;
+    // Set only when the clinic has more than one active professional.
+    professionalName?: string;
   };
   if (!patientLabel) return true;
   const statusText = status ? ` · ${STATUS_LABELS[status].toLowerCase()}` : "";
@@ -182,6 +184,7 @@ function renderEvent(arg: EventContentArg) {
       <span className="sr-only"> · </span>
       <span className="agenda-event-service">
         {serviceLabel}
+        {professionalName ? ` · ${professionalName}` : ""}
         {statusText}
         {online ? " · Online" : ""}
       </span>
@@ -228,6 +231,7 @@ export function AgendaCalendar({
   slotStepMinutes,
   businessHours,
   canCreate,
+  showProfessional = false,
   notice,
   aside,
 }: {
@@ -236,6 +240,8 @@ export function AgendaCalendar({
   slotStepMinutes: number;
   businessHours: BusinessHoursInterval[];
   canCreate: boolean;
+  // More than one active professional: each event names hers.
+  showProfessional?: boolean;
   notice?: ReactNode;
   aside?: ReactNode;
 }) {
@@ -298,6 +304,9 @@ export function AgendaCalendar({
                 serviceLabel: event.serviceLabel,
                 status: event.status,
                 online: event.online,
+                ...(showProfessional
+                  ? { professionalName: event.professionalName }
+                  : {}),
               },
               // Editable events inherit the calendar's `editable`, which is
               // off on phones and while a move is saving or undecided. The
@@ -326,7 +335,7 @@ export function AgendaCalendar({
         },
       );
     },
-    [includeCancelled],
+    [includeCancelled, showProfessional],
   );
 
   async function submitMove(move: Move, acknowledgeWarnings: boolean) {

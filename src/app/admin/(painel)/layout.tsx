@@ -47,6 +47,7 @@ export default async function PanelLayout({
         ]
       : []),
     { href: "/admin/expediente", label: "Expediente", icon: "clock" },
+    { href: "/admin/equipe", label: "Equipe", icon: "team" },
     // Optional module: off, it leaves the menu (the routes answer 404).
     ...(moduleActive(session, "finance")
       ? [

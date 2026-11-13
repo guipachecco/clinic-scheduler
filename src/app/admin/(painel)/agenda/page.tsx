@@ -10,6 +10,7 @@ import {
 import { requireAdmin } from "@/modules/auth/session";
 import { getClinicTimezone } from "@/modules/clinic-page/panel";
 import { getDayAgenda, getWeekMarks } from "@/modules/dashboard/dashboard";
+import { listActiveProfessionals } from "@/modules/professionals/professionals";
 import {
   getBusinessHours,
   getSlotStepMinutes,
@@ -80,6 +81,7 @@ export default async function AgendaPage({
     todayEvents,
     dayAgenda,
     marks,
+    professionals,
   ] = await Promise.all([
     getBusinessHours(clinicId),
     getSlotStepMinutes(clinicId),
@@ -92,6 +94,7 @@ export default async function AgendaPage({
     }),
     getDayAgenda(clinicId, date, now),
     getWeekMarks(clinicId, monday, 7),
+    listActiveProfessionals(clinicId),
   ]);
   const hasServices = services.length > 0;
 
@@ -127,6 +130,7 @@ export default async function AgendaPage({
           slotStepMinutes={slotStepMinutes}
           businessHours={toBusinessHours(days)}
           canCreate={hasServices}
+          showProfessional={professionals.length > 1}
           notice={servicesNotice}
           aside={
             <AgendaSidePanel

@@ -17,6 +17,7 @@ import {
   listPaymentMethods,
 } from "@/modules/finance/sales";
 import { listActiveProducts } from "@/modules/products/products";
+import { listActiveProfessionals } from "@/modules/professionals/professionals";
 import {
   CLINIC_TIME_ZONE,
   formatLocal,
@@ -117,6 +118,24 @@ export default async function AppointmentPage({
     ? `${appointment.customLabel} (${appointment.serviceName})`
     : appointment.serviceName;
 
+  // With a team of one, nothing about professionals is shown.
+  const professionals = await listActiveProfessionals(clinicId);
+  const showProfessional =
+    professionals.length > 1 ||
+    !professionals.some((p) => p.id === appointment.professionalId);
+  // Her current professional stays selectable on edit, even if inactive.
+  const professionalChoices = professionals.some(
+    (p) => p.id === appointment.professionalId,
+  )
+    ? professionals
+    : [
+        {
+          id: appointment.professionalId,
+          name: `${appointment.professionalName} (inativa)`,
+        },
+        ...professionals,
+      ];
+
   let services: ServiceOption[] = [];
   if (appointment.editable) {
     services = (await listActiveServices(clinicId)).map(
@@ -159,6 +178,9 @@ export default async function AppointmentPage({
           </p>
           <p>Duração: {appointment.durationMinutes} min</p>
           <p>Serviço: {serviceText}</p>
+          {showProfessional ? (
+            <p>Profissional: {appointment.professionalName}</p>
+          ) : null}
           <p>
             Paciente:{" "}
             <Link
@@ -331,9 +353,14 @@ export default async function AppointmentPage({
             id={appointment.id}
             patientName={appointment.patientName}
             services={services}
+            professionals={professionalChoices}
             defaults={{
               patientId: appointment.patientId,
               serviceId: appointment.serviceId,
+              professionalId:
+                professionalChoices.length > 1
+                  ? appointment.professionalId
+                  : "",
               customLabel: appointment.customLabel ?? "",
               date: DateTime.fromJSDate(appointment.startsAt, {
                 zone: CLINIC_TIME_ZONE,

@@ -16,6 +16,7 @@ import {
   businessHours,
   clinics,
   patients,
+  professionals,
   serviceCategories,
   services,
   timeBlocks,
@@ -35,7 +36,7 @@ import {
 } from "@/modules/booking/booking";
 import { registerClientPatient } from "@/modules/clients/context";
 
-import { otherClinic } from "../helpers/clinic";
+import { defaultProfessional, otherClinic } from "../helpers/clinic";
 
 // A hook that runs, on the owner connection, right after bookOnline has read
 // the busy intervals (its last read before the insert): a way to change the
@@ -412,6 +413,46 @@ describe("online booking", () => {
     expect(await listFreeSlots(ctx("bia"), serviceId, MONDAY)).not.toContain(
       local(MONDAY, "09:00"),
     );
+  });
+
+  it("another professional's appointment leaves the default one's slot free", async () => {
+    const first = await defaultProfessional(clinicId);
+    const [second] = await db
+      .insert(professionals)
+      .values({ clinicId, name: "Segunda Profissional", sortOrder: 5 })
+      .returning({ id: professionals.id });
+    try {
+      await db.insert(appointments).values({
+        clinicId,
+        patientId: patient.bia,
+        professionalId: second!.id,
+        serviceId,
+        serviceName: "Serviço fictício",
+        serviceDurationMinutes: 60,
+        startsAt: new Date(local(MONDAY, "09:00")),
+        endsAt: new Date(local(MONDAY, "10:00")),
+        occupiedFrom: new Date(local(MONDAY, "09:00")),
+        occupiedUntil: new Date(local(MONDAY, "10:00")),
+        status: "confirmed",
+        source: "admin",
+        confirmedAt: NOW,
+      });
+      expect(await listFreeSlots(ctx("ana"), serviceId, MONDAY)).toContain(
+        local(MONDAY, "09:00"),
+      );
+      const result = await bookOnline(ctx("ana"), {
+        serviceId,
+        startsAt: local(MONDAY, "09:00"),
+      });
+      expect(result).toMatchObject({ ok: true });
+      const id = (result as { appointmentId: string }).appointmentId;
+      expect(await getAppointment(clinicId, id, NOW)).toMatchObject({
+        professionalId: first.id,
+      });
+    } finally {
+      await clearAgenda();
+      await db.delete(professionals).where(eq(professionals.id, second!.id));
+    }
   });
 
   it("the service's own buffers apply to the new booking", async () => {

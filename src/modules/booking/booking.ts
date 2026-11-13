@@ -235,14 +235,28 @@ async function readHours(tx: Tx, clinicId: string): Promise<DayHours[]> {
   return week;
 }
 
+// Online bookings go to the clinic's default professional until clients can
+// choose (migration 0032). Null when the clinic has no active one.
+async function readProfessional(
+  tx: Tx,
+  clinicId: string,
+): Promise<string | null> {
+  const result = await tx.execute<{ id: string | null }>(
+    sql`select default_professional(${clinicId}::uuid) as id`,
+  );
+  return result.rows[0]?.id ?? null;
+}
+
+// Her busy time: the professional's appointments and the clinic's blocks.
 async function readBusy(
   tx: Tx,
   clinicId: string,
+  professionalId: string,
   from: Date,
   to: Date,
 ): Promise<BusyInterval[]> {
   const result = await tx.execute<{ starts_at: string; ends_at: string }>(
-    sql`select starts_at, ends_at from client_busy_intervals(${clinicId}::uuid, ${from.toISOString()}::timestamptz, ${to.toISOString()}::timestamptz)`,
+    sql`select starts_at, ends_at from client_busy_intervals(${clinicId}::uuid, ${professionalId}::uuid, ${from.toISOString()}::timestamptz, ${to.toISOString()}::timestamptz)`,
   );
   return result.rows.map((row) => ({
     startsAt: new Date(row.starts_at),
@@ -332,9 +346,17 @@ export async function listFreeSlots(
     if (!day) return [];
     const service = await readService(tx, ctx.clinicId, serviceId);
     if (!service) return [];
+    const professionalId = await readProfessional(tx, ctx.clinicId);
+    if (!professionalId) return [];
     const window = busyWindow(day, day);
     const hours = await readHours(tx, ctx.clinicId);
-    const busy = await readBusy(tx, ctx.clinicId, window.from, window.to);
+    const busy = await readBusy(
+      tx,
+      ctx.clinicId,
+      professionalId,
+      window.from,
+      window.to,
+    );
     return freeSlots({
       date,
       ...slotInput(clinic, service, hours, busy, now),
@@ -366,9 +388,17 @@ export async function listDaysWithSlots(
 
     const service = await readService(tx, ctx.clinicId, serviceId);
     if (!service) return [];
+    const professionalId = await readProfessional(tx, ctx.clinicId);
+    if (!professionalId) return [];
     const window = busyWindow(start, end);
     const hours = await readHours(tx, ctx.clinicId);
-    const busy = await readBusy(tx, ctx.clinicId, window.from, window.to);
+    const busy = await readBusy(
+      tx,
+      ctx.clinicId,
+      professionalId,
+      window.from,
+      window.to,
+    );
     const input = slotInput(clinic, service, hours, busy, now);
 
     const days: string[] = [];
@@ -403,6 +433,8 @@ export async function bookOnline(
       if (!clinic) return { ok: false, reason: "unavailable" };
       const service = await readService(tx, ctx.clinicId, input.serviceId);
       if (!service) return { ok: false, reason: "unavailable" };
+      const professionalId = await readProfessional(tx, ctx.clinicId);
+      if (!professionalId) return { ok: false, reason: "unavailable" };
 
       if (!(await isOwnRow(tx, ctx))) {
         return { ok: false, reason: "unavailable" };
@@ -433,7 +465,13 @@ export async function bookOnline(
       if (!day) return { ok: false, reason: "taken" };
       const window = busyWindow(day, day);
       const hours = await readHours(tx, ctx.clinicId);
-      const busy = await readBusy(tx, ctx.clinicId, window.from, window.to);
+      const busy = await readBusy(
+        tx,
+        ctx.clinicId,
+        professionalId,
+        window.from,
+        window.to,
+      );
       const free = freeSlots({
         date,
         ...slotInput(clinic, service, hours, busy, now),
@@ -451,6 +489,7 @@ export async function bookOnline(
           .values({
             clinicId: ctx.clinicId,
             patientId: ctx.patientId,
+            professionalId,
             serviceId: service.id,
             serviceName: service.name,
             serviceDurationMinutes: service.durationMinutes,
@@ -479,6 +518,7 @@ export async function bookOnline(
         entityId: row!.id,
         changes: {
           patientId: ctx.patientId,
+          professionalId,
           serviceId: service.id,
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
