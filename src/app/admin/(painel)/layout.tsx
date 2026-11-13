@@ -5,11 +5,37 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { getTheme } from "@/lib/theme-server";
 import { countRequestedFrom } from "@/modules/appointments/appointments";
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
+import { getClinicBranding } from "@/modules/branding/branding";
 import { vocabulary } from "@/modules/business-type/vocabulary";
 
 import { MobileNav } from "./mobile-nav";
 import { PanelNav, type NavItem } from "./panel-nav";
 import { SignOutButton } from "./sign-out-button";
+
+// The profile photo, or the initial of whoever is signed in.
+function ProfilePhoto({
+  photoId,
+  initial,
+}: {
+  photoId: string | null;
+  initial: string;
+}) {
+  return photoId ? (
+    // eslint-disable-next-line @next/next/no-img-element -- served by the panel photo route handler
+    <img
+      src={`/admin/foto/${photoId}`}
+      alt=""
+      className="size-9 shrink-0 rounded-full bg-brand-muted object-cover"
+    />
+  ) : (
+    <span
+      aria-hidden="true"
+      className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-accent font-bold text-brand-accent-foreground"
+    >
+      {initial}
+    </span>
+  );
+}
 
 export default async function PanelLayout({
   children,
@@ -17,10 +43,12 @@ export default async function PanelLayout({
   children: React.ReactNode;
 }) {
   const session = await requireAdmin();
-  const [theme, pendingRequests] = await Promise.all([
+  const [theme, pendingRequests, branding] = await Promise.all([
     getTheme(),
     countRequestedFrom(session.clinicId, new Date()),
+    getClinicBranding(session.clinicId),
   ]);
+  const photoId = branding?.ownerPhotoMediaId ?? null;
   const initial = session.user.name.trim().charAt(0).toUpperCase();
   const navItems: NavItem[] = [
     { href: "/admin", label: "Início", icon: "home" },
@@ -79,7 +107,16 @@ export default async function PanelLayout({
             {session.clinic.name}
           </p>
         </div>
-        {switchClinic}
+        <div className="flex shrink-0 items-center gap-3">
+          {switchClinic}
+          <Link
+            href="/admin/perfil"
+            aria-label="Meu perfil"
+            className="-m-1 inline-flex size-11 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            <ProfilePhoto photoId={photoId} initial={initial} />
+          </Link>
+        </div>
       </header>
       <aside className="hidden bg-brand px-4 py-6 text-brand-foreground md:sticky md:top-0 md:flex md:h-screen md:w-60 md:shrink-0 md:flex-col md:items-stretch md:gap-y-6">
         <div className="grid min-w-0 gap-2">
@@ -93,17 +130,20 @@ export default async function PanelLayout({
           <PanelNav items={navItems} />
         </div>
         <div className="flex min-w-0 items-center gap-3 md:mt-auto md:flex-col md:items-stretch">
-          <div className="flex min-w-0 items-center gap-2.5 rounded-xl bg-brand-muted p-3">
-            <span
-              aria-hidden="true"
-              className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-accent font-bold text-brand-accent-foreground"
-            >
-              {initial}
+          <Link
+            href="/admin/perfil"
+            className="group flex min-w-0 items-center gap-2.5 rounded-xl bg-brand-muted p-3 transition-colors outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-white"
+          >
+            <ProfilePhoto photoId={photoId} initial={initial} />
+            <span className="grid min-w-0 leading-tight">
+              <span className="text-sm font-semibold break-words">
+                {session.user.name}
+              </span>
+              <span className="text-xs text-brand-foreground/70 group-hover:text-brand-foreground">
+                Meu perfil
+              </span>
             </span>
-            <span className="min-w-0 text-sm leading-tight font-semibold break-words">
-              {session.user.name}
-            </span>
-          </div>
+          </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle initialTheme={theme} />
             <SignOutButton />
