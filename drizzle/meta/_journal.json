@@ -232,6 +232,13 @@
       "when": 1794527699911,
       "tag": "0032_professionals",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1794531080581,
+      "tag": "0033_admins_without_two_factor",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_PANEL_MOBILE } from "./test-account";
 
 // The panel shell: bottom bar and "Mais" sheet on the phone, sidebar on the
@@ -14,7 +14,7 @@ test.describe("painel no celular", () => {
   test.beforeAll(async ({ browser }) => {
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_PANEL_MOBILE);
+    await signInToPanel(page, TEST_ADMIN_PANEL_MOBILE);
   });
 
   test.afterAll(async () => {

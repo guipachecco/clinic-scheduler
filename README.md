@@ -12,7 +12,7 @@ Sistema web de agendamentos para uma clínica de biomedicina: site institucional
 | 4     | Qualidade: testes dos fluxos, segurança e responsividade     | A fazer                                                                  |
 | 5     | Publicação: produção, domínio, backups e monitoramento       | A fazer                                                                  |
 
-O que já funciona: login do painel com verificação em duas etapas obrigatória, cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), expediente semanal e bloqueios de agenda no painel (horários de atendimento por dia da semana, folgas, férias e feriados, com a lista de feriados nacionais pronta para adicionar), início do painel com o resumo do dia, a próxima cliente e a lista de hoje, agenda no painel (no celular, a agenda do dia vira lista, com a faixa da semana e os horários livres; visões de dia, semana, mês e lista no fuso da clínica, novo agendamento com busca de paciente, remarcação arrastando no calendário ou pela ficha do atendimento, avisos de fora do expediente, sobre bloqueio ou no passado que pedem confirmação, recusa de horários sobrepostos, confirmação, conclusão, falta e cancelamento com motivo, e o histórico de atendimentos na ficha do paciente), financeiro no painel (orçamento, aprovação à vista, parcelada ou por sessão, agendamento do pacote de uma vez, baixa e estorno de pagamentos, despesas, caixa e valores a receber, descrito em [docs/financeiro.md](docs/financeiro.md)), várias clínicas no mesmo sistema (cada uma só enxerga os próprios dados; o root cria clínicas e escolhe qual abrir no painel, descrito em [docs/multiclinica.md](docs/multiclinica.md)), área da cliente no link de cada clínica (`/<endereço>`: cadastro com confirmação de e-mail, agendamento online nos horários livres, "Meus horários" e troca de senha, com a dona confirmando quando o cadastro bate com uma ficha que já existe, descrito em [docs/multiclinica.md](docs/multiclinica.md#área-da-cliente)), página da clínica, que a dona configura em "Minha página" no painel (dados, Instagram, comodidades, agendamento online ligado ou desligado, produtos, avaliações e fidelidade) e a cliente vê no link da clínica, descrita em [docs/decisoes-tecnicas.md](docs/decisoes-tecnicas.md#página-da-clínica), um usuário do banco para cada parte do app com row-level security, marca Zemana em todas as telas e para todas as clínicas (cores, logo e fontes Bricolage Grotesque e Figtree, descrita em [docs/identidade-visual.md](docs/identidade-visual.md)), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. A página da Zemana fica em `/` (conta o que o sistema faz, mostra os planos Agenda e Completo, com preço de lançamento até 31/12/2026 e um mês grátis, uma galeria "Olha só como fica." com fotos do sistema e botões que abrem o WhatsApp com o plano escolhido), a cliente entra em `/entrar` e vê "Suas clínicas" em `/minhas-clinicas`.
+O que já funciona: login do painel (a dona da clínica entra com e-mail e senha; o root também usa verificação em duas etapas obrigatória), cadastro de pacientes no painel (cadastro, busca por nome, apelido, telefone ou CPF, edição e anonimização, descrito em [docs/cadastro-de-pacientes.md](docs/cadastro-de-pacientes.md)), catálogo de serviços no painel (categorias e serviços com duração, preparo, intervalo e forma de exibir o preço, mais o serviço flexível "Avaliação / encaixe"; nada é apagado, só desativado), expediente semanal e bloqueios de agenda no painel (horários de atendimento por dia da semana, folgas, férias e feriados, com a lista de feriados nacionais pronta para adicionar), início do painel com o resumo do dia, a próxima cliente e a lista de hoje, agenda no painel (no celular, a agenda do dia vira lista, com a faixa da semana e os horários livres; visões de dia, semana, mês e lista no fuso da clínica, novo agendamento com busca de paciente, remarcação arrastando no calendário ou pela ficha do atendimento, avisos de fora do expediente, sobre bloqueio ou no passado que pedem confirmação, recusa de horários sobrepostos, confirmação, conclusão, falta e cancelamento com motivo, e o histórico de atendimentos na ficha do paciente), financeiro no painel (orçamento, aprovação à vista, parcelada ou por sessão, agendamento do pacote de uma vez, baixa e estorno de pagamentos, despesas, caixa e valores a receber, descrito em [docs/financeiro.md](docs/financeiro.md)), várias clínicas no mesmo sistema (cada uma só enxerga os próprios dados; o root cria clínicas e escolhe qual abrir no painel, descrito em [docs/multiclinica.md](docs/multiclinica.md)), área da cliente no link de cada clínica (`/<endereço>`: cadastro com confirmação de e-mail, agendamento online nos horários livres, "Meus horários" e troca de senha, com a dona confirmando quando o cadastro bate com uma ficha que já existe, descrito em [docs/multiclinica.md](docs/multiclinica.md#área-da-cliente)), página da clínica, que a dona configura em "Minha página" no painel (dados, Instagram, comodidades, agendamento online ligado ou desligado, produtos, avaliações e fidelidade) e a cliente vê no link da clínica, descrita em [docs/decisoes-tecnicas.md](docs/decisoes-tecnicas.md#página-da-clínica), um usuário do banco para cada parte do app com row-level security, marca Zemana em todas as telas e para todas as clínicas (cores, logo e fontes Bricolage Grotesque e Figtree, descrita em [docs/identidade-visual.md](docs/identidade-visual.md)), banco com todas as tabelas do MVP e a trava contra horários sobrepostos, testes automáticos e CI. A página da Zemana fica em `/` (conta o que o sistema faz, mostra os planos Agenda e Completo, com preço de lançamento até 31/12/2026 e um mês grátis, uma galeria "Olha só como fica." com fotos do sistema e botões que abrem o WhatsApp com o plano escolhido), a cliente entra em `/entrar` e vê "Suas clínicas" em `/minhas-clinicas`.
 
 ## Tecnologias
 
@@ -67,7 +67,7 @@ pnpm dev
 - Painel: http://localhost:3000/admin
 - Área da cliente de uma clínica: http://localhost:3000/<endereço> (por exemplo, http://localhost:3000/grais). Sem `MAILERSEND_API_KEY`, os e-mails de confirmação e de troca de senha ficam em arquivos JSON na pasta `.emails/`; abra o arquivo e copie o link.
 
-No primeiro acesso ao painel, depois da senha, o sistema pede a configuração da verificação em duas etapas. Tenha no celular um aplicativo autenticador (Google Authenticator, Microsoft Authenticator ou outro), leia o QR code e guarde os códigos de recuperação. Sem 2FA ativo, o painel não abre. Faça esse primeiro acesso logo depois de criar a conta: até lá, quem tiver a senha consegue cadastrar o próprio celular.
+A dona da clínica entra no painel só com o e-mail e a senha. Para uma conta root, no primeiro acesso ao painel, depois da senha, o sistema pede a configuração da verificação em duas etapas. Tenha no celular um aplicativo autenticador (Google Authenticator, Microsoft Authenticator ou outro), leia o QR code e guarde os códigos de recuperação. Sem 2FA ativo, o painel não abre. Faça esse primeiro acesso logo depois de criar a conta: até lá, quem tiver a senha consegue cadastrar o próprio celular.
 
 Use sempre o mesmo endereço do `BETTER_AUTH_URL` (por exemplo, `localhost` e não `127.0.0.1`), porque o login recusa pedidos vindos de outra origem.
 
@@ -101,24 +101,24 @@ Trocar o `BETTER_AUTH_SECRET` encerra todas as sessões e invalida o 2FA já con
 
 ## Comandos
 
-| Comando                             | O que faz                                                                  |
-| ----------------------------------- | -------------------------------------------------------------------------- |
-| `pnpm dev`                          | Servidor de desenvolvimento                                                |
-| `pnpm build` e `pnpm start`         | Build e servidor de produção                                               |
-| `pnpm lint`                         | ESLint                                                                     |
-| `pnpm typecheck`                    | Gera os tipos das rotas e roda o TypeScript                                |
-| `pnpm format` / `pnpm format:check` | Formata o código com Prettier / só confere                                 |
-| `pnpm test:unit`                    | Testes de unidade (não precisam de banco)                                  |
-| `pnpm test:integration`             | Testes com PostgreSQL de verdade, incluindo concorrência                   |
-| `pnpm test`                         | Testes de unidade e de integração                                          |
-| `pnpm test:e2e`                     | Testes no navegador com Playwright, sobre o build de produção              |
-| `pnpm db:migrate`                   | Aplica as migrações pendentes                                              |
-| `pnpm db:generate`                  | Gera uma migração a partir de mudanças em `src/db/schema`                  |
-| `pnpm db:studio`                    | Abre o Drizzle Studio para consultar o banco local                         |
-| `pnpm admin create`                 | Cria a conta da dona de uma clínica (pede o endereço da clínica)           |
-| `pnpm admin create-root`            | Cria uma conta root, que escolhe a clínica em `/admin/clinicas`            |
-| `pnpm admin reset-password <email>` | Define uma nova senha e encerra as sessões da conta                        |
-| `pnpm admin reset-2fa <email>`      | Remove o 2FA (celular perdido); o próximo login pede uma nova configuração |
+| Comando                             | O que faz                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| `pnpm dev`                          | Servidor de desenvolvimento                                                    |
+| `pnpm build` e `pnpm start`         | Build e servidor de produção                                                   |
+| `pnpm lint`                         | ESLint                                                                         |
+| `pnpm typecheck`                    | Gera os tipos das rotas e roda o TypeScript                                    |
+| `pnpm format` / `pnpm format:check` | Formata o código com Prettier / só confere                                     |
+| `pnpm test:unit`                    | Testes de unidade (não precisam de banco)                                      |
+| `pnpm test:integration`             | Testes com PostgreSQL de verdade, incluindo concorrência                       |
+| `pnpm test`                         | Testes de unidade e de integração                                              |
+| `pnpm test:e2e`                     | Testes no navegador com Playwright, sobre o build de produção                  |
+| `pnpm db:migrate`                   | Aplica as migrações pendentes                                                  |
+| `pnpm db:generate`                  | Gera uma migração a partir de mudanças em `src/db/schema`                      |
+| `pnpm db:studio`                    | Abre o Drizzle Studio para consultar o banco local                             |
+| `pnpm admin create`                 | Cria a conta da dona de uma clínica (pede o endereço da clínica)               |
+| `pnpm admin create-root`            | Cria uma conta root, que escolhe a clínica em `/admin/clinicas`                |
+| `pnpm admin reset-password <email>` | Define uma nova senha e encerra as sessões da conta                            |
+| `pnpm admin reset-2fa <email>`      | Remove o 2FA do root (celular perdido); o próximo login pede nova configuração |
 
 ## Testes
 
@@ -135,7 +135,7 @@ O que os testes cobrem hoje:
 
 - **Trava de horários no banco:** sobreposição recusada, encaixe exato permitido, preparo e limpeza contados como tempo ocupado, cancelados sem bloquear, remarcação para horário ocupado recusada e, entre vários pedidos simultâneos para o mesmo horário, só um gravado.
 - **Contas do painel:** criação pelo script, login pelo Better Auth, cadastro público bloqueado, troca de senha e remoção do 2FA encerrando as sessões.
-- **Navegador:** cabeçalhos de segurança e nonce da CSP em todos os scripts, painel fechado sem login, 2FA obrigatório no primeiro acesso, login com o código do aplicativo e código errado recusado.
+- **Navegador:** cabeçalhos de segurança e nonce da CSP em todos os scripts, painel fechado sem login, dona da clínica entrando só com a senha, 2FA obrigatório no primeiro acesso do root, login do root com o código do aplicativo e código errado recusado.
 - **Unidade:** validação das variáveis de ambiente, montagem da CSP, identificação de erros do banco e remoção de dados pessoais dos logs.
 
 A CI do GitHub Actions roda tudo isso em cada PR e em cada push na `main`. O Dependabot abre PRs semanais de atualização das dependências.
@@ -170,7 +170,7 @@ docs/                  planejamento e decisões técnicas
 O que a fundação já faz:
 
 - Painel sem cadastro público: contas criadas só pelo terminal.
-- Senha com hash forte (scrypt) e mínimo de 12 caracteres; 2FA obrigatório por aplicativo autenticador, com códigos de recuperação e bloqueio de 15 minutos após 10 códigos errados.
+- Senha com hash forte (scrypt) e mínimo de 12 caracteres; 2FA obrigatório para o root por aplicativo autenticador (a dona da clínica entra só com a senha), com códigos de recuperação e bloqueio de 15 minutos após 10 códigos errados.
 - Sessão encerrada 12 horas depois do login, em cookie `httpOnly`, `SameSite=Lax` e, em produção, `Secure`.
 - Em produção, no máximo 5 tentativas de login por minuto por IP, com a contagem guardada no PostgreSQL.
 - Sessão conferida no servidor em cada página e ação do painel, não só no proxy.

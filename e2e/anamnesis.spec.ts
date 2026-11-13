@@ -3,7 +3,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_ANAMNESIS, TEST_ROOT_ANAMNESIS } from "./test-account";
 
 // The anamnesis of a patient in the panel, with fictitious patients inserted
@@ -113,7 +113,7 @@ test.describe("anamnese", () => {
     });
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_ANAMNESIS);
+    await signInToPanel(page, TEST_ADMIN_ANAMNESIS);
   });
 
   test.afterAll(async () => {
@@ -457,11 +457,7 @@ test.describe("anamnese", () => {
     const rootContext = await browser.newContext();
     try {
       const root = await rootContext.newPage();
-      await signInWithFreshTwoFactor(
-        root,
-        TEST_ROOT_ANAMNESIS,
-        /\/admin\/clinicas$/,
-      );
+      await signInToPanel(root, TEST_ROOT_ANAMNESIS, /\/admin\/clinicas$/);
       await root
         .getByRole("listitem")
         .filter({ hasText: OTHER_CLINIC.name })

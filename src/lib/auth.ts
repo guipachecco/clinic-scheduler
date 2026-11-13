@@ -49,16 +49,17 @@ async function sessionSecondsFor(userId: string) {
     : PANEL_SESSION_SECONDS;
 }
 
-// Only the panel uses two-factor authentication. A client session (or any
-// other non-panel role) gets not-found on every /two-factor/* path, so a
-// client can never turn it on. Signing in to the panel with a code has no
-// session yet (only the two-factor cookie) and passes through.
-const blockTwoFactorOutsidePanel = createAuthMiddleware(async (ctx) => {
+// Only root uses two-factor authentication. Any other session (clinic owner,
+// client) gets not-found on every /two-factor/* path, so it can never turn it
+// on. Signing in with a code has no session yet (only the two-factor cookie)
+// and passes through; admins have no 2FA (migration 0033), so it never asks
+// them for one.
+const blockTwoFactorOutsideRoot = createAuthMiddleware(async (ctx) => {
   if (!ctx.path.startsWith("/two-factor/")) return;
   const session = await getSessionFromCtx(ctx);
   if (!session) return;
   const role = (session.user as { role?: unknown }).role;
-  if (role !== "admin" && role !== "root") throw new APIError("NOT_FOUND");
+  if (role !== "root") throw new APIError("NOT_FOUND");
 });
 
 // Better Auth paths for the e-mail links: 3 requests per minute per IP.
@@ -109,7 +110,7 @@ export const auth = betterAuth({
     expiresIn: CLIENT_SESSION_SECONDS,
     disableSessionRefresh: true,
   },
-  hooks: { before: blockTwoFactorOutsidePanel },
+  hooks: { before: blockTwoFactorOutsideRoot },
   databaseHooks: {
     session: {
       create: {

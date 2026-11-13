@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_SERVICES } from "./test-account";
 
 // One story with fictitious data: categories and services of the catalog.
@@ -22,7 +22,7 @@ test.describe("servicos", () => {
   test.beforeAll(async ({ browser }) => {
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_SERVICES);
+    await signInToPanel(page, TEST_ADMIN_SERVICES);
   });
 
   test.afterAll(async () => {

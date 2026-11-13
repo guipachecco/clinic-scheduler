@@ -184,3 +184,12 @@ export const TEST_ADMIN_TEAM = {
   name: "Administradora da Equipe",
   password: "senha-de-teste-equipe-bem-longa",
 };
+
+// Root account of the sign-in suite (e2e/admin-auth.spec.ts): only root has
+// 2FA, so this is the account whose 2FA setup and code sign-in it checks.
+export const TEST_ROOT_AUTH = {
+  role: "root" as const,
+  email: "root-acesso@example.test",
+  name: "Root de Acesso",
+  password: "senha-de-teste-root-acesso-bem-longa",
+};

@@ -3,7 +3,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_PRODUCTS } from "./test-account";
 
 // One story with fictitious data: a category and a product of the catalog,
@@ -45,7 +45,7 @@ test.describe("produtos", () => {
     );
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_PRODUCTS);
+    await signInToPanel(page, TEST_ADMIN_PRODUCTS);
   });
 
   // Only the rows this suite created, from the leaves up.

@@ -3,7 +3,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_TEAM } from "./test-account";
 
 // The team page: a clinic of one shows no professional anywhere in the
@@ -33,7 +33,7 @@ test.describe("equipe", () => {
     await removeSecond();
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_TEAM);
+    await signInToPanel(page, TEST_ADMIN_TEAM);
   });
 
   test.afterAll(async () => {

@@ -20,7 +20,7 @@ export function ClientLoginForm({
   panelMessage = "Essa conta entra pelo painel da clínica.",
 }: {
   next: string;
-  // Shown to a two-factor (panel) account.
+  // Shown to a two-factor (root) account.
   panelMessage?: string;
 }) {
   const router = useRouter();
@@ -38,9 +38,16 @@ export function ClientLoginForm({
       setFormError(authErrorMessage(error));
       return;
     }
-    // Panel accounts have two-factor sign-in: they belong in the panel.
+    // Root has two-factor sign-in, which only the panel offers.
     if (data && "twoFactorRedirect" in data && data.twoFactorRedirect) {
       setFormError(panelMessage);
+      return;
+    }
+    // A clinic owner signs in with the password alone: she now has a panel
+    // session, so she goes straight to the panel.
+    if (data && "user" in data && data.user.role !== "client") {
+      router.replace("/admin");
+      router.refresh();
       return;
     }
     router.replace(next as Route);

@@ -317,7 +317,7 @@ describe("two-factor authentication", () => {
     expect(user?.twoFactorEnabled).toBe(false);
   });
 
-  it("an admin still sets up 2FA", async () => {
+  it("a clinic owner cannot turn on 2FA", async () => {
     await createAdmin({
       role: "admin",
       clinicSlug: "grais",
@@ -326,6 +326,19 @@ describe("two-factor authentication", () => {
       password: PASSWORD,
     });
     const headers = await sessionHeaders(`dona-2fa${DOMAIN}`);
+    await expect(
+      auth.api.enableTwoFactor({ body: { password: PASSWORD }, headers }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it("root still sets up 2FA", async () => {
+    await createAdmin({
+      role: "root",
+      email: `root-2fa${DOMAIN}`,
+      name: "Root de Teste",
+      password: PASSWORD,
+    });
+    const headers = await sessionHeaders(`root-2fa${DOMAIN}`);
     const result = await auth.api.enableTwoFactor({
       body: { password: PASSWORD },
       headers,

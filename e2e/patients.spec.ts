@@ -2,7 +2,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
 import { ageOn, todayInClinic } from "../src/modules/patients/fields";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_PATIENTS } from "./test-account";
 
 // One story with fictitious data: register, search, edit and anonymize.
@@ -24,7 +24,7 @@ test.describe("pacientes", () => {
     context = await browser.newContext();
     page = await context.newPage();
     page.on("request", (request) => requestedUrls.push(request.url()));
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_PATIENTS);
+    await signInToPanel(page, TEST_ADMIN_PATIENTS);
   });
 
   test.afterAll(async () => {

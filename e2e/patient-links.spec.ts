@@ -4,7 +4,7 @@ import { Client } from "pg";
 import { E2E_DATABASE_URL } from "../playwright.config";
 
 import { CLIENT_AREA } from "./client-area-fixtures";
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_PATIENT_LINKS } from "./test-account";
 
 // The owner's answer to a client who signed up online with the phone of a
@@ -51,7 +51,7 @@ test("the owner confirms an online signup is the same person", async ({
     [clinic!.id, user!.id, ONLINE, PHONE, EMAIL, existing!.id],
   );
 
-  await signInWithFreshTwoFactor(page, TEST_ADMIN_PATIENT_LINKS);
+  await signInToPanel(page, TEST_ADMIN_PATIENT_LINKS);
   const notice = page.getByText(
     `${ONLINE} se cadastrou online. É a mesma pessoa desta ficha?`,
   );

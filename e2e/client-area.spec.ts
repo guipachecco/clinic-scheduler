@@ -4,11 +4,7 @@ import { Client } from "pg";
 import { E2E_DATABASE_URL } from "../playwright.config";
 
 import { CLIENT_AREA } from "./client-area-fixtures";
-import {
-  clearRateLimits,
-  signInWithFreshTwoFactor,
-  waitForEmailLink,
-} from "./helpers";
+import { clearRateLimits, signInToPanel, waitForEmailLink } from "./helpers";
 import { TEST_ADMIN_CLIENT_AREA } from "./test-account";
 
 // The client area of a clinic link (/<slug>): signup, e-mail confirmation,
@@ -152,7 +148,7 @@ test.describe("client area", () => {
 
     const ownerContext = await browser.newContext();
     const owner = await ownerContext.newPage();
-    await signInWithFreshTwoFactor(owner, TEST_ADMIN_CLIENT_AREA);
+    await signInToPanel(owner, TEST_ADMIN_CLIENT_AREA);
     await owner.goto(`/admin/agenda/${appointmentId}`);
     await expect(owner.getByText("Origem: Online")).toBeVisible();
     await expect(owner.getByText(`Serviço: ${A.service}`)).toBeVisible();
