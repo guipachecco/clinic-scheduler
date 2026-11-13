@@ -865,6 +865,7 @@ describe("client access", () => {
     );
     expect(reachable.rows).toEqual(
       [
+        "appointment_services",
         "appointments",
         "audit_logs",
         "clinics",

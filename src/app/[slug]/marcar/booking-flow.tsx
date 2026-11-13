@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 import { book, type Confirmation, loadDays, loadSlots } from "./actions";
 import { ConfirmSheet } from "./confirm-sheet";
 import { DayStrip, dayLabel, STRIP_SPAN, stripDays } from "./day-strip";
+import { Icon } from "../icons";
+import { visitPriceLabel } from "../ui";
 import { SlotGroups } from "./slot-groups";
 
-// Service → day strip → times by period → confirm sheet, then the
+// Services (one or more, done one after the other in the same visit) → day strip → times by period → confirm sheet, then the
 // confirmation. Dates are local to the clinic (yyyy-mm-dd); slots are ISO
 // strings carrying the clinic's offset, so their HH:mm is already the
 // clinic's time.
@@ -23,6 +25,8 @@ export type ServiceOption = {
   description: string | null;
   durationMinutes: number;
   price: string | null;
+  priceCents: number | null;
+  priceDisplay: "fixed" | "starting_at" | "on_request" | "hidden";
 };
 
 type Step = "service" | "day" | "done";
@@ -45,17 +49,30 @@ export function BookingFlow({
   services,
   today,
   lastDay,
+  maxServices,
   initialServiceId,
 }: {
   slug: string;
   services: ServiceOption[];
   today: string;
   lastDay: string;
+  maxServices: number;
   initialServiceId?: string;
 }) {
   const initial = services.find((item) => item.id === initialServiceId) ?? null;
   const [step, setStep] = useState<Step>(initial ? "day" : "service");
-  const [service, setService] = useState<ServiceOption | null>(initial);
+  // The ids she ticked; `chosen` keeps them in the clinic's order.
+  const [selected, setSelected] = useState<string[]>(
+    initial ? [initial.id] : [],
+  );
+  const chosen = services.filter((item) => selected.includes(item.id));
+  const minutes = chosen.reduce((sum, item) => sum + item.durationMinutes, 0);
+  const price = visitPriceLabel(
+    chosen.map((item) => ({
+      display: item.priceDisplay,
+      cents: item.priceCents,
+    })),
+  );
   const [start, setStart] = useState(today);
   // Days with free times, by month (yyyy-mm) already fetched.
   const [available, setAvailable] = useState<Record<string, string[]>>({});
@@ -80,7 +97,7 @@ export function BookingFlow({
 
   // Fetches the months a week of the strip touches that are not loaded yet.
   async function loadWeek(
-    target: ServiceOption,
+    ids: string[],
     from: string,
     known: Record<string, string[]>,
   ) {
@@ -90,21 +107,27 @@ export function BookingFlow({
     );
     const fetched = await Promise.all(
       months.map(
-        async (value) =>
-          [value, await loadDays(slug, target.id, value)] as const,
+        async (value) => [value, await loadDays(slug, ids, value)] as const,
       ),
     );
     setAvailable({ ...known, ...Object.fromEntries(fetched) });
     setStart(from);
   }
 
-  function chooseService(target: ServiceOption) {
+  function toggleService(id: string) {
+    setError(null);
+    setSelected((ids) =>
+      ids.includes(id) ? ids.filter((other) => other !== id) : [...ids, id],
+    );
+  }
+
+  function continueToDay() {
+    if (selected.length === 0) return;
     run(async () => {
-      setService(target);
       setDay(null);
       setSlot(null);
       setSlots([]);
-      await loadWeek(target, today, {});
+      await loadWeek(selected, today, {});
       setStep("day");
     });
   }
@@ -113,25 +136,25 @@ export function BookingFlow({
   useEffect(() => {
     // Fetch-on-mount: the state is set after the request, not in the effect body.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (initial) run(() => loadWeek(initial, today, {}));
+    if (initial) run(() => loadWeek([initial.id], today, {}));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function shift(delta: number) {
-    if (!service) return;
+    if (selected.length === 0) return;
     const target = DateTime.fromISO(start)
       .plus({ days: delta })
       .toFormat("yyyy-MM-dd");
     // Never before today; the strip may end past the last day (dimmed).
-    run(() => loadWeek(service, target < today ? today : target, available));
+    run(() => loadWeek(selected, target < today ? today : target, available));
   }
 
   function chooseDay(value: string) {
-    if (!service) return;
+    if (selected.length === 0) return;
     run(async () => {
       setDay(value);
       setSlot(null);
-      setSlots(await loadSlots(slug, service.id, value));
+      setSlots(await loadSlots(slug, selected, value));
     });
   }
 
@@ -148,10 +171,10 @@ export function BookingFlow({
   }
 
   function confirm() {
-    if (!service || !slot || !day) return;
+    if (selected.length === 0 || !slot || !day) return;
     run(async () => {
       const result = await book(slug, {
-        serviceId: service.id,
+        serviceIds: selected,
         startsAt: slot,
       });
       if (result.ok) {
@@ -161,9 +184,9 @@ export function BookingFlow({
       }
       if (result.reason === "taken") {
         // Back to the refreshed list of that day.
-        setSlots(await loadSlots(slug, service.id, day));
+        setSlots(await loadSlots(slug, selected, day));
         const month = monthOf(day);
-        const fresh = await loadDays(slug, service.id, month);
+        const fresh = await loadDays(slug, selected, month);
         setAvailable((known) => ({ ...known, [month]: fresh }));
         setSlot(null);
       }
@@ -171,12 +194,15 @@ export function BookingFlow({
     });
   }
 
-  if (step === "done" && confirmation && service) {
+  if (step === "done" && confirmation) {
     return (
       <Done
         slug={slug}
         confirmation={confirmation}
-        serviceName={confirmation.serviceName || service.name}
+        serviceName={
+          confirmation.serviceName ||
+          chosen.map((item) => item.name).join(" + ")
+        }
       />
     );
   }
@@ -185,38 +211,81 @@ export function BookingFlow({
 
   return (
     <div className="grid gap-6" aria-busy={pending}>
-      {step === "service" || !service ? (
+      {step === "service" || chosen.length === 0 ? (
         <section aria-labelledby="passo-servico" className="grid gap-3">
           <h2 id="passo-servico" className="font-heading text-lg font-semibold">
             Escolha o serviço
           </h2>
+          {services.length > 1 ? (
+            <p className="text-sm text-muted-foreground">
+              Quer fazer mais de um na mesma visita? Marque todos: eles ficam em
+              um horário só, um depois do outro.
+            </p>
+          ) : null}
           <ul className="grid gap-3">
-            {services.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => chooseService(item)}
-                  className="grid w-full gap-1 rounded-2xl border bg-card p-4 text-left outline-none hover:border-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
-                >
-                  <span className="font-semibold">{item.name}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {item.durationMinutes} min
-                    {item.price ? ` · ${item.price}` : ""}
-                  </span>
-                  {item.description ? (
-                    <span className="text-sm">{item.description}</span>
-                  ) : null}
-                </button>
-              </li>
-            ))}
+            {services.map((item) => {
+              const on = selected.includes(item.id);
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    disabled={
+                      pending || (!on && selected.length >= maxServices)
+                    }
+                    onClick={() => toggleService(item.id)}
+                    className={`flex w-full items-start gap-3 rounded-2xl border bg-card p-4 text-left outline-none hover:border-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60 ${on ? "border-primary-text" : ""}`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border ${on ? "border-primary bg-primary text-primary-foreground" : "bg-background"}`}
+                    >
+                      {on ? <Icon name="check" className="size-4" /> : null}
+                    </span>
+                    <span className="grid min-w-0 gap-1">
+                      <span className="font-semibold">{item.name}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {item.durationMinutes} min
+                        {item.price ? ` · ${item.price}` : ""}
+                      </span>
+                      {item.description ? (
+                        <span className="text-sm">{item.description}</span>
+                      ) : null}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
+          {selected.length >= maxServices ? (
+            <p className="text-sm text-muted-foreground">
+              Dá para marcar até {maxServices} serviços por visita.
+            </p>
+          ) : null}
           <FormError message={error} />
+          <div className="sticky bottom-24 grid gap-2 rounded-2xl border bg-card p-3 shadow-lg lg:bottom-4">
+            <p className="text-sm" aria-live="polite">
+              {chosen.length === 0
+                ? "Nenhum serviço escolhido"
+                : `${chosen.length} ${chosen.length === 1 ? "serviço" : "serviços"} · ${minutes} min${price ? ` · ${price}` : ""}`}
+            </p>
+            <Button
+              type="button"
+              size="lg"
+              disabled={pending || chosen.length === 0}
+              onClick={continueToDay}
+            >
+              {pending ? "Carregando..." : "Continuar"}
+            </Button>
+          </div>
         </section>
       ) : (
         <>
-          <Summary label="Serviço" onChange={() => setStep("service")}>
-            {service.name}
+          <Summary
+            label={chosen.length > 1 ? "Serviços" : "Serviço"}
+            onChange={() => setStep("service")}
+          >
+            {chosen.map((item) => item.name).join(" + ")}
           </Summary>
           <section aria-labelledby="passo-dia" className="grid gap-3">
             <h2 id="passo-dia" className="font-heading text-lg font-semibold">
@@ -264,11 +333,11 @@ export function BookingFlow({
           ) : null}
           {slot && day ? (
             <ConfirmSheet
-              serviceName={service.name}
+              serviceNames={chosen.map((item) => item.name)}
               dayText={dayLabel(day)}
               slot={slot}
-              minutes={service.durationMinutes}
-              price={service.price}
+              minutes={minutes}
+              price={price}
               error={error}
               pending={pending}
               onConfirm={confirm}

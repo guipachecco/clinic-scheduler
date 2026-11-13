@@ -18,6 +18,7 @@ import { asClient, type Tx } from "@/db/client";
 import { findPgError, isAppointmentOverlapError } from "@/db/errors";
 import {
   ACTIVE_APPOINTMENT_STATUSES,
+  appointmentServices,
   appointments,
   auditLogs,
   clinics,
@@ -78,6 +79,8 @@ const UUID_PATTERN =
 const MONTH_PATTERN = /^\d{4}-\d{2}$/;
 const MINUTE = 60_000;
 const PAST_LIST_LIMIT = 50;
+// How many services one visit may have.
+export const MAX_SERVICES_PER_VISIT = 5;
 
 type BookingClinic = {
   timezone: string;
@@ -91,6 +94,19 @@ type BookingService = {
   id: string;
   name: string;
   durationMinutes: number;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
+};
+
+// What she books in one go: one service or more, back to back, as a single
+// appointment. The services come in the clinic's order; the first one is the
+// appointment's own service (appointments.service_id).
+type BookingVisit = {
+  services: BookingService[];
+  // Every name, joined: "Esmaltação em gel + Detox dos pés".
+  name: string;
+  durationMinutes: number;
+  // The widest buffer of its services on each side.
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
 };
@@ -135,18 +151,28 @@ async function readClinic(
   return row;
 }
 
-// The service, when it is open to online booking. Policy services_client
-// hides every other one (inactive, offline, flexible, inactive category).
-// The WHERE repeats the service-level conditions (active, online, not
-// flexible); the category check is left to the policy, and the insert policy
-// of 0014 checks all of them again.
-async function readService(
+// The visit, when every service asked for is open to online booking. Policy
+// services_client hides every other one (inactive, offline, flexible,
+// inactive category). The WHERE repeats the service-level conditions (active,
+// online, not flexible); the category check is left to the policy, and the
+// insert policies of 0014 and 0034 check all of them again. Null when a
+// service is not open, or the list is empty, too long or repeats one.
+async function readVisit(
   tx: Tx,
   clinicId: string,
-  serviceId: string,
-): Promise<BookingService | null> {
-  if (!UUID_PATTERN.test(serviceId)) return null;
-  const [row] = await tx
+  serviceIds: readonly string[],
+): Promise<BookingVisit | null> {
+  if (
+    !Array.isArray(serviceIds) ||
+    serviceIds.length < 1 ||
+    serviceIds.length > MAX_SERVICES_PER_VISIT ||
+    !serviceIds.every((id) => typeof id === "string" && UUID_PATTERN.test(id))
+  ) {
+    return null;
+  }
+  const ids = [...new Set(serviceIds.map((id) => id.toLowerCase()))];
+  if (ids.length !== serviceIds.length) return null;
+  const rows = await tx
     .select({
       id: services.id,
       name: services.name,
@@ -157,15 +183,24 @@ async function readService(
     .from(services)
     .where(
       and(
-        eq(services.id, serviceId),
+        inArray(services.id, ids),
         eq(services.clinicId, clinicId),
         eq(services.isActive, true),
         eq(services.onlineBookingEnabled, true),
         eq(services.isFlexible, false),
       ),
     )
-    .limit(1);
-  return row ?? null;
+    .orderBy(asc(services.sortOrder), asc(services.name), asc(services.id));
+  if (rows.length !== ids.length) return null;
+  return {
+    services: rows,
+    name: rows.map((row) => row.name).join(" + "),
+    durationMinutes: rows.reduce((sum, row) => sum + row.durationMinutes, 0),
+    bufferBeforeMinutes: Math.max(
+      ...rows.map((row) => row.bufferBeforeMinutes),
+    ),
+    bufferAfterMinutes: Math.max(...rows.map((row) => row.bufferAfterMinutes)),
+  };
 }
 
 // Her patients row in this clinic is still hers and not anonymized.
@@ -194,6 +229,7 @@ class RowNoLongerHers extends Error {}
 class InsertRefused extends Error {}
 
 const REFUSED_FOREIGN_KEYS = new Set([
+  "appointment_services_service_fk",
   "appointments_service_fk",
   "appointments_patient_fk",
 ]);
@@ -275,7 +311,7 @@ function busyWindow(first: DateTime, last: DateTime) {
 
 function slotInput(
   clinic: BookingClinic,
-  service: BookingService,
+  visit: BookingVisit,
   hours: DayHours[],
   busy: BusyInterval[],
   now: Date,
@@ -284,9 +320,9 @@ function slotInput(
     zone: clinic.timezone,
     hours,
     busy,
-    durationMinutes: service.durationMinutes,
-    bufferBeforeMinutes: service.bufferBeforeMinutes,
-    bufferAfterMinutes: service.bufferAfterMinutes,
+    durationMinutes: visit.durationMinutes,
+    bufferBeforeMinutes: visit.bufferBeforeMinutes,
+    bufferAfterMinutes: visit.bufferAfterMinutes,
     stepMinutes: clinic.slotStepMinutes,
     now,
     minAdvanceMinutes: clinic.minAdvanceMinutes,
@@ -329,12 +365,13 @@ export async function listBookableServices(
   });
 }
 
-// Free slot starts of one local day (yyyy-mm-dd), as ISO strings with the
-// clinic's offset. Empty when the clinic or the service is not open to online
+// Free slot starts of one local day (yyyy-mm-dd) for a visit with these
+// services, one after the other, as ISO strings with the clinic's offset.
+// Empty when the clinic or one of the services is not open to online
 // booking, or the date is invalid.
 export async function listFreeSlots(
   ctx: BookingContext,
-  serviceId: string,
+  serviceIds: readonly string[],
   date: string,
 ): Promise<string[]> {
   if (!validContext(ctx)) return [];
@@ -344,8 +381,8 @@ export async function listFreeSlots(
     if (!clinic) return [];
     const day = parseLocalDate(date, clinic.timezone);
     if (!day) return [];
-    const service = await readService(tx, ctx.clinicId, serviceId);
-    if (!service) return [];
+    const visit = await readVisit(tx, ctx.clinicId, serviceIds);
+    if (!visit) return [];
     const professionalId = await readProfessional(tx, ctx.clinicId);
     if (!professionalId) return [];
     const window = busyWindow(day, day);
@@ -359,15 +396,16 @@ export async function listFreeSlots(
     );
     return freeSlots({
       date,
-      ...slotInput(clinic, service, hours, busy, now),
+      ...slotInput(clinic, visit, hours, busy, now),
     });
   });
 }
 
-// The days of a month (yyyy-mm) with at least one free slot, as yyyy-mm-dd.
+// The days of a month (yyyy-mm) with at least one free slot for a visit with
+// these services, as yyyy-mm-dd.
 export async function listDaysWithSlots(
   ctx: BookingContext,
-  serviceId: string,
+  serviceIds: readonly string[],
   month: string,
 ): Promise<string[]> {
   if (!validContext(ctx) || !MONTH_PATTERN.test(month)) return [];
@@ -386,8 +424,8 @@ export async function listDaysWithSlots(
     const end = monthEnd > lastOpen ? lastOpen : monthEnd;
     if (start > end) return [];
 
-    const service = await readService(tx, ctx.clinicId, serviceId);
-    if (!service) return [];
+    const visit = await readVisit(tx, ctx.clinicId, serviceIds);
+    if (!visit) return [];
     const professionalId = await readProfessional(tx, ctx.clinicId);
     if (!professionalId) return [];
     const window = busyWindow(start, end);
@@ -399,7 +437,7 @@ export async function listDaysWithSlots(
       window.from,
       window.to,
     );
-    const input = slotInput(clinic, service, hours, busy, now);
+    const input = slotInput(clinic, visit, hours, busy, now);
 
     const days: string[] = [];
     for (let day = start; day <= end; day = day.plus({ days: 1 })) {
@@ -411,15 +449,16 @@ export async function listDaysWithSlots(
 }
 
 // Books a free slot for her, confirmed and online (services.requiresApproval
-// does not apply online). Under the clinic's agenda lock it checks again that
-// the clinic and the service take online bookings, that her row is hers,
+// does not apply online): one appointment for the whole visit, as long as its
+// services together. Under the clinic's agenda lock it checks again that
+// the clinic and every service take online bookings, that her row is hers,
 // her limit of active appointments (upcoming requested or confirmed ones of
 // her own patients row) and that the start is still a free slot: hours,
 // blocks, other appointments with buffers, step, minimum and maximum
 // advance. appointments_no_overlap backs this up: its violation is "taken".
 export async function bookOnline(
   ctx: BookingContext,
-  input: { serviceId: string; startsAt: string | Date },
+  input: { serviceIds: readonly string[]; startsAt: string | Date },
 ): Promise<BookingResult> {
   if (!ctx.emailVerified) return { ok: false, reason: "unverified" };
   if (!validContext(ctx)) return { ok: false, reason: "unavailable" };
@@ -431,8 +470,9 @@ export async function bookOnline(
 
       const clinic = await readClinic(tx, ctx.clinicId);
       if (!clinic) return { ok: false, reason: "unavailable" };
-      const service = await readService(tx, ctx.clinicId, input.serviceId);
-      if (!service) return { ok: false, reason: "unavailable" };
+      const visit = await readVisit(tx, ctx.clinicId, input.serviceIds);
+      if (!visit) return { ok: false, reason: "unavailable" };
+      const service = visit.services[0]!;
       const professionalId = await readProfessional(tx, ctx.clinicId);
       if (!professionalId) return { ok: false, reason: "unavailable" };
 
@@ -474,14 +514,14 @@ export async function bookOnline(
       );
       const free = freeSlots({
         date,
-        ...slotInput(clinic, service, hours, busy, now),
+        ...slotInput(clinic, visit, hours, busy, now),
       });
       if (!free.some((slot) => Date.parse(slot) === startsAt.getTime())) {
         return { ok: false, reason: "taken" };
       }
 
       const endsAt = new Date(
-        startsAt.getTime() + service.durationMinutes * MINUTE,
+        startsAt.getTime() + visit.durationMinutes * MINUTE,
       );
       const [row] = await insertBooking(() =>
         tx
@@ -491,16 +531,16 @@ export async function bookOnline(
             patientId: ctx.patientId,
             professionalId,
             serviceId: service.id,
-            serviceName: service.name,
-            serviceDurationMinutes: service.durationMinutes,
+            serviceName: visit.name,
+            serviceDurationMinutes: visit.durationMinutes,
             customLabel: null,
             startsAt,
             endsAt,
             occupiedFrom: new Date(
-              startsAt.getTime() - service.bufferBeforeMinutes * MINUTE,
+              startsAt.getTime() - visit.bufferBeforeMinutes * MINUTE,
             ),
             occupiedUntil: new Date(
-              endsAt.getTime() + service.bufferAfterMinutes * MINUTE,
+              endsAt.getTime() + visit.bufferAfterMinutes * MINUTE,
             ),
             status: "confirmed",
             source: "online",
@@ -508,6 +548,20 @@ export async function bookOnline(
           })
           .returning({ id: appointments.id }),
       );
+      if (visit.services.length > 1) {
+        await insertBooking(() =>
+          tx.insert(appointmentServices).values(
+            visit.services.map((item, position) => ({
+              clinicId: ctx.clinicId,
+              appointmentId: row!.id,
+              serviceId: item.id,
+              serviceName: item.name,
+              durationMinutes: item.durationMinutes,
+              position,
+            })),
+          ),
+        );
+      }
 
       await tx.insert(auditLogs).values({
         clinicId: ctx.clinicId,
@@ -520,9 +574,12 @@ export async function bookOnline(
           patientId: ctx.patientId,
           professionalId,
           serviceId: service.id,
+          ...(visit.services.length > 1
+            ? { serviceIds: visit.services.map((item) => item.id) }
+            : {}),
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
-          durationMinutes: service.durationMinutes,
+          durationMinutes: visit.durationMinutes,
           status: "confirmed",
           source: "online",
         },

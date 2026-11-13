@@ -11,7 +11,7 @@ import { Icon, type IconName } from "../icons";
 const FOCUSABLE = "button:not([disabled]), [href], input:not([disabled])";
 
 // "HH:mm – HH:mm": the slot's own clock (it carries the clinic's offset) plus
-// the service's duration.
+// the visit's duration.
 function range(slot: string, minutes: number) {
   const start = DateTime.fromISO(slot, { setZone: true });
   return `${start.toFormat("HH:mm")} – ${start
@@ -42,7 +42,7 @@ function Row({
 // A bottom sheet above the bottom navigation: traps focus, closes on Escape
 // and on the close icon, and gives focus back to the slot that opened it.
 export function ConfirmSheet({
-  serviceName,
+  serviceNames,
   dayText,
   slot,
   minutes,
@@ -53,7 +53,7 @@ export function ConfirmSheet({
   onClose,
   returnFocus,
 }: {
-  serviceName: string;
+  serviceNames: string[];
   dayText: string;
   slot: string;
   minutes: number;
@@ -136,8 +136,15 @@ export function ConfirmSheet({
           </button>
         </div>
         <dl className="grid gap-3 rounded-2xl bg-muted p-4">
-          <Row icon="check" label="Serviço">
-            {serviceName}
+          <Row
+            icon="check"
+            label={serviceNames.length > 1 ? "Serviços" : "Serviço"}
+          >
+            {serviceNames.map((name) => (
+              <span key={name} className="block">
+                {name}
+              </span>
+            ))}
           </Row>
           <Row icon="calendar" label="Dia">
             <span className="capitalize">{dayText}</span>

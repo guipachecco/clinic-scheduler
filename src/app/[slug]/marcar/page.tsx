@@ -1,7 +1,10 @@
 import { DateTime } from "luxon";
 import type { Metadata } from "next";
 
-import { listBookableServices } from "@/modules/booking/booking";
+import {
+  listBookableServices,
+  MAX_SERVICES_PER_VISIT,
+} from "@/modules/booking/booking";
 import { requireClient, requireClinic } from "@/modules/clients/session";
 
 import { ResendVerification } from "../resend-verification";
@@ -53,6 +56,8 @@ export default async function BookPage({
       description: service.description,
       durationMinutes: service.durationMinutes,
       price: priceLabel(service.priceDisplay, service.priceCents),
+      priceCents: service.priceCents,
+      priceDisplay: service.priceDisplay,
     }),
   );
   if (services.length === 0) {
@@ -73,6 +78,7 @@ export default async function BookPage({
       <BookingFlow
         slug={clinic.slug}
         services={services}
+        maxServices={MAX_SERVICES_PER_VISIT}
         initialServiceId={wanted}
         today={today.toFormat("yyyy-MM-dd")}
         lastDay={today
