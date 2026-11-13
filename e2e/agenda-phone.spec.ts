@@ -4,7 +4,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import {
   PANEL_HOME_CLINIC_SLUG,
   TEST_ADMIN_AGENDA_PHONE,
@@ -135,7 +135,7 @@ test.describe("agenda do celular", () => {
     });
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_AGENDA_PHONE);
+    await signInToPanel(page, TEST_ADMIN_AGENDA_PHONE);
   });
 
   test.afterAll(async () => {

@@ -6,7 +6,7 @@ import { E2E_DATABASE_URL } from "../playwright.config";
 import {
   clearRateLimits,
   readOutbox,
-  signInWithFreshTwoFactor,
+  signInToPanel,
   waitForEmailLink,
 } from "./helpers";
 import { TEST_ADMIN } from "./test-account";
@@ -29,8 +29,9 @@ const people = {
   neighbour: { name: "Outra Cliente", email: `outra${DOMAIN}` },
   // Client of the four "many" clinics, for the search and the order.
   many: { name: "Cliente Muitas", email: `muitas${DOMAIN}` },
-  panel: { name: "Dona do Painel Zemana", email: `painel${DOMAIN}` },
-  // Panel owner without 2FA yet, for the signed-in redirect test.
+  // Root with 2FA: the client sign-in can't finish it, so it shows a message.
+  panel: { name: "Root do Painel Zemana", email: `painel${DOMAIN}` },
+  // Clinic owner: signs in with the password alone (no 2FA).
   owner: { name: "Dona Logada Zemana", email: `dona-logada${DOMAIN}` },
 };
 
@@ -136,7 +137,8 @@ test.beforeAll(async () => {
     }
     const userIds: Record<string, string> = {};
     for (const [key, person] of Object.entries(people)) {
-      const panel = key === "panel" || key === "owner";
+      const root = key === "panel";
+      const owner = key === "owner";
       const {
         rows: [user],
       } = await db.query<{ id: string }>(
@@ -146,9 +148,9 @@ test.beforeAll(async () => {
         [
           person.name,
           person.email,
-          panel ? "admin" : "client",
-          panel ? clinicIds.a : null,
-          key === "panel",
+          root ? "root" : owner ? "admin" : "client",
+          owner ? clinicIds.a : null,
+          root,
         ],
       );
       userIds[key] = user!.id;
@@ -365,7 +367,16 @@ test("a new client signs up from /entrar through the clinic list", async ({
   ).toHaveCount(0);
 });
 
-test("panel account is sent to the panel", async ({ page }) => {
+test("clinic owner signing in at /entrar lands in the panel", async ({
+  page,
+}) => {
+  await clearRateLimits();
+  await signInAt(page, people.owner.email, PASSWORD);
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.context().clearCookies();
+});
+
+test("two-factor panel account is sent to the panel", async ({ page }) => {
   await signInAt(page, people.panel.email, PASSWORD);
   await expect(page.getByText("Essa conta entra pelo painel.")).toBeVisible();
   await expect(
@@ -419,7 +430,11 @@ test("reserved paths are not clinics", async ({ page }) => {
 test("signed-in panel owner is sent to the panel from /entrar and /minhas-clinicas", async ({
   page,
 }) => {
-  await signInWithFreshTwoFactor(page, { ...people.owner, password: PASSWORD });
+  await signInToPanel(page, {
+    ...people.owner,
+    role: "admin",
+    password: PASSWORD,
+  });
   await page.goto("/entrar");
   await expect(page).toHaveURL(/\/admin$/);
   await page.goto("/minhas-clinicas");

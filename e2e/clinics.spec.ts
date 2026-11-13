@@ -3,7 +3,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ROOT } from "./test-account";
 
 // Root picks the clinic the panel shows, and creates a new one that starts
@@ -20,7 +20,7 @@ test.describe("clinicas", () => {
   test.beforeAll(async ({ browser }) => {
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ROOT, /\/admin\/clinicas$/);
+    await signInToPanel(page, TEST_ROOT, /\/admin\/clinicas$/);
   });
 
   test.afterAll(async () => {

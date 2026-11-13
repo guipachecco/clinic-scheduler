@@ -10,11 +10,11 @@ Escolhas feitas durante a implementação que não estavam detalhadas no [planej
 - **Motivo:** com o nonce, o navegador só executa os scripts que o próprio servidor marcou, o que barra scripts injetados. Isso importa num painel com dados de pacientes. O Cache Components pré-gera parte das páginas no build, e uma página pré-gerada não tem como carregar o nonce de cada acesso.
 - **Consequência:** nenhuma página fica em cache estático. Para o volume de uma clínica o custo é desprezível, e a agenda precisa estar sempre atualizada de qualquer forma. Religar o Cache Components exigiria trocar a CSP por uma sem nonce (`'unsafe-inline'`) ou pela opção experimental de hashes (SRI).
 
-### Verificação em duas etapas obrigatória
+### Verificação em duas etapas obrigatória só para o root
 
-- **Decisão:** toda conta do painel precisa de 2FA por aplicativo autenticador (TOTP). Depois da senha, uma conta sem 2FA só consegue abrir a tela de configuração (`requireAdmin` em `src/modules/auth/session.ts`). São gerados 10 códigos de recuperação de uso único.
-- **Motivo:** o Better Auth oferece 2FA, mas não obriga. Uma senha vazada não deve bastar para ver dados de pacientes.
-- **Consequência:** desativar o 2FA pelo site está bloqueado; a remoção, para o caso de celular perdido, é feita no terminal com `pnpm admin reset-2fa <email>`. A opção "confiar neste dispositivo" não foi oferecida, então todo login pede o código. Ela pode ser ligada depois, se o uso diário pedir.
+- **Decisão:** a conta root precisa de 2FA por aplicativo autenticador (TOTP). Depois da senha, um root sem 2FA só consegue abrir a tela de configuração (`requireAdmin` em `src/modules/auth/session.ts`). São gerados 10 códigos de recuperação de uso único. A dona da clínica (`admin`) entra só com e-mail e senha e não consegue ligar o 2FA (as rotas `/two-factor/*` respondem 404 para ela, como para a cliente). A migração `0033_admins_without_two_factor` removeu o 2FA das donas que já tinham configurado.
+- **Motivo:** o Better Auth oferece 2FA, mas não obriga. O root vê todas as clínicas, então uma senha vazada dele não deve bastar. Para as donas, o aplicativo autenticador atrapalhava o primeiro acesso e o uso diário; a proteção da conta delas fica na senha forte (mínimo de 12 caracteres), no limite de tentativas de login e na sessão de 12 horas.
+- **Consequência:** uma senha vazada de uma dona abre o painel da clínica dela. Desativar o 2FA do root pelo site está bloqueado; a remoção, para o caso de celular perdido, é feita no terminal com `pnpm admin reset-2fa <email>`. A opção "confiar neste dispositivo" não foi oferecida, então todo login do root pede o código. Nas telas de login da cliente (`/entrar` e `/<endereço>/entrar`), a dona que entra é levada para o painel; o root vê a mensagem de que a conta entra pelo painel.
 
 ### Sessões e rotas de autenticação
 

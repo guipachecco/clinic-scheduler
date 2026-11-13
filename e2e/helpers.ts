@@ -7,7 +7,12 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL, E2E_EMAIL_OUTBOX_DIR } from "../playwright.config";
 
-type Account = { email: string; name: string; password: string };
+type Account = {
+  role: "admin" | "root";
+  email: string;
+  name: string;
+  password: string;
+};
 
 // The sign-in and 2FA endpoints are rate limited by design. The specs share one
 // server, so a suite that starts right after another could hit the limits.
@@ -44,21 +49,25 @@ async function resetTwoFactor(email: string) {
   }
 }
 
-// Signs in with a fresh account, sets up its 2FA and lands in the panel.
-// Used by suites that need a logged-in admin without relying on other specs.
-// `landing` is where the panel opens: root without a chosen clinic goes to
-// the clinic list.
-export async function signInWithFreshTwoFactor(
+// Signs in to the panel and lands there. A clinic owner (admin) needs only the
+// password; root sets up a fresh 2FA first. Used by suites that need a
+// logged-in account without relying on other specs. `landing` is where the
+// panel opens: root without a chosen clinic goes to the clinic list.
+export async function signInToPanel(
   page: Page,
   account: Account,
   landing: RegExp = /\/admin$/,
 ) {
   await clearRateLimits();
-  await resetTwoFactor(account.email);
+  if (account.role === "root") await resetTwoFactor(account.email);
   await page.goto("/admin/entrar");
   await page.getByLabel("E-mail").fill(account.email);
   await page.getByLabel("Senha").fill(account.password);
   await page.getByRole("button", { name: "Entrar" }).click();
+  if (account.role === "admin") {
+    await expect(page).toHaveURL(landing);
+    return;
+  }
   await expect(page).toHaveURL(/\/admin\/configurar-2fa$/);
 
   await page.getByLabel("Confirme sua senha").fill(account.password);

@@ -3,7 +3,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ROOT_BRANDING } from "./test-account";
 
 // Every screen wears the Zemana brand, whichever clinic is open.
@@ -43,11 +43,7 @@ test.describe("branding", () => {
   test.beforeAll(async ({ browser }) => {
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(
-      page,
-      TEST_ROOT_BRANDING,
-      /\/admin\/clinicas$/,
-    );
+    await signInToPanel(page, TEST_ROOT_BRANDING, /\/admin\/clinicas$/);
     for (const clinic of CLINICS) {
       await page.getByLabel("Nome da clínica").fill(clinic.name);
       await expect(page.getByLabel("Endereço da página")).toHaveValue(

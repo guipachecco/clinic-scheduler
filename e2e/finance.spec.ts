@@ -4,7 +4,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_FINANCE } from "./test-account";
 
 // One story with fictitious data: quote, approval paid per session, the
@@ -64,7 +64,7 @@ test.describe("financeiro", () => {
     );
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_FINANCE);
+    await signInToPanel(page, TEST_ADMIN_FINANCE);
   });
 
   // Leaves the shared e2e database as the other suites expect it.

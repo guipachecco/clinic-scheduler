@@ -4,7 +4,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { PANEL_HOME_CLINIC_SLUG, TEST_ADMIN_PANEL_HOME } from "./test-account";
 
 // The owner's Início: today's numbers, the next client and the day's list, in
@@ -143,7 +143,7 @@ test.describe("início do painel", () => {
     }
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_PANEL_HOME);
+    await signInToPanel(page, TEST_ADMIN_PANEL_HOME);
   });
 
   test.afterAll(async () => {

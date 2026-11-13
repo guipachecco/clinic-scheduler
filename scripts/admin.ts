@@ -14,7 +14,7 @@ const USAGE = `Uso:
   pnpm admin create                  cria a conta da dona de uma clínica
   pnpm admin create-root             cria uma conta root, que vê todas as clínicas
   pnpm admin reset-password <email>  define uma nova senha e encerra as sessões
-  pnpm admin reset-2fa <email>       remove o 2FA; o próximo login pede nova configuração`;
+  pnpm admin reset-2fa <email>       remove o 2FA do root; o próximo login pede nova configuração`;
 
 async function ask(question: string) {
   const readline = createInterface({ input: stdin, output: stdout });
@@ -97,7 +97,9 @@ async function main() {
       const password = await askNewPassword();
       await createAdmin({ role, clinicSlug, email, name, password });
       console.log(
-        "Conta criada. No primeiro acesso a /admin, o painel pede a configuração do 2FA.",
+        role === "root"
+          ? "Conta criada. No primeiro acesso a /admin, o painel pede a configuração do 2FA."
+          : "Conta criada. A dona entra em /admin só com o e-mail e a senha.",
       );
       break;
     }

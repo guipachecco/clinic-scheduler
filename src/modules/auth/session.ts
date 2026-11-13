@@ -28,11 +28,16 @@ export type PanelContext = PanelSession & {
 
 const isPanelRole = (role: unknown) => role === "admin" || role === "root";
 
+// Only root needs two-factor authentication. Clinic owners (admin) sign in
+// with the password alone.
+const missingTwoFactor = (session: PanelSession) =>
+  session.user.role === "root" && !session.user.twoFactorEnabled;
+
 async function requireSignedIn(): Promise<PanelSession> {
   const session = await getSession();
   if (!session) redirect("/admin/entrar");
   if (!isPanelRole(session.user.role)) notFound();
-  if (!session.user.twoFactorEnabled) redirect("/admin/configurar-2fa");
+  if (missingTwoFactor(session)) redirect("/admin/configurar-2fa");
   return session;
 }
 
@@ -69,13 +74,13 @@ export const requireAdmin = cache(async (): Promise<PanelContext> => {
 });
 
 // Like requireAdmin, but never redirects nor answers 404: null when there is
-// no valid panel session (signed out, not admin or root, 2FA not set up, no
+// no valid panel session (signed out, not admin or root, root without 2FA, no
 // open clinic). For Server Actions that must answer instead of navigating
 // away, such as the anamnesis autosave, which would lose the typed text.
 export const getPanelContext = cache(async (): Promise<PanelContext | null> => {
   const session = await getSession();
   if (!session || !isPanelRole(session.user.role)) return null;
-  if (!session.user.twoFactorEnabled) return null;
+  if (missingTwoFactor(session)) return null;
   const clinic = await panelClinic(session);
   if (!clinic) return null;
   return {
@@ -108,11 +113,12 @@ export async function requireRoot(): Promise<PanelSession> {
   return session;
 }
 
-// Only for the 2FA setup page: signed in with the password, 2FA not yet set up.
+// Only for the 2FA setup page: root signed in with the password, 2FA not yet
+// set up. Admins have no 2FA and go straight to the panel.
 export async function requireSessionPendingTwoFactor() {
   const session = await getSession();
   if (!session) redirect("/admin/entrar");
   if (!isPanelRole(session.user.role)) notFound();
-  if (session.user.twoFactorEnabled) redirect("/admin");
+  if (!missingTwoFactor(session)) redirect("/admin");
   return session;
 }

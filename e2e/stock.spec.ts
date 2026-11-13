@@ -3,7 +3,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_STOCK } from "./test-account";
 
 // One story with fictitious data: a product gets stock, is used in an
@@ -62,7 +62,7 @@ test.describe("estoque", () => {
     );
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_STOCK);
+    await signInToPanel(page, TEST_ADMIN_STOCK);
   });
 
   // Only the rows this suite created, from the leaves up.

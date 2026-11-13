@@ -3,7 +3,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_CLINIC_PAGE } from "./test-account";
 
 // The owner sets up "Minha página": data, amenities, online booking, products,
@@ -50,7 +50,7 @@ test.describe("minha página", () => {
   test.beforeAll(async ({ browser }) => {
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_CLINIC_PAGE);
+    await signInToPanel(page, TEST_ADMIN_CLINIC_PAGE);
     originalOnline = await withDb(async (client) => {
       const { rows } = await client.query<{ on: boolean }>(
         "SELECT online_booking_choice AS on FROM clinics WHERE id = $1",

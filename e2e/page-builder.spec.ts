@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import sharp from "sharp";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import {
   PAGE_BUILDER_CLINIC_SLUG,
   TEST_ADMIN_PAGE_BUILDER,
@@ -29,7 +29,7 @@ async function solidImage(
 }
 
 test("owner builds and publishes her page", async ({ page, context }) => {
-  await signInWithFreshTwoFactor(page, TEST_ADMIN_PAGE_BUILDER);
+  await signInToPanel(page, TEST_ADMIN_PAGE_BUILDER);
   const slug = PAGE_BUILDER_CLINIC_SLUG;
 
   await page.goto("/admin/pagina");

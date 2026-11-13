@@ -10,7 +10,7 @@ import { Client } from "pg";
 
 import { E2E_DATABASE_URL } from "../playwright.config";
 
-import { signInWithFreshTwoFactor } from "./helpers";
+import { signInToPanel } from "./helpers";
 import { TEST_ADMIN_AGENDA } from "./test-account";
 
 // The calendar page (views, the mobile default and the empty state), then one
@@ -93,7 +93,7 @@ test.describe("agenda", () => {
   test.beforeAll(async ({ browser }) => {
     context = await browser.newContext();
     page = await context.newPage();
-    await signInWithFreshTwoFactor(page, TEST_ADMIN_AGENDA);
+    await signInToPanel(page, TEST_ADMIN_AGENDA);
   });
 
   test.afterAll(async () => {
