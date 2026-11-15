@@ -1,4 +1,4 @@
-import { and, eq, inArray, like, sql } from "drizzle-orm";
+﻿import { and, eq, inArray, like, sql } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -92,7 +92,7 @@ vi.mock("@/db/client", async (importOriginal) => {
 const DOMAIN = "@agendamento-online.example.test";
 const SLUG = "clinica-agendamento-online";
 // 2033-03-01 is a Tuesday. The clinic opens Monday to Friday, 09:00-12:00
-// (São Paulo, -03:00).
+// (SÃ£o Paulo, -03:00).
 const NOW = new Date("2033-03-01T12:00:00Z");
 const MONDAY = "2033-03-07";
 const TUESDAY = "2033-03-08";
@@ -230,7 +230,7 @@ beforeAll(async () => {
     .values({
       clinicId,
       categoryId,
-      name: "Serviço fictício agendável",
+      name: "ServiÃ§o fictÃ­cio agendÃ¡vel",
       slug: "servico-agendavel",
       durationMinutes: 60,
       bufferBeforeMinutes: 0,
@@ -249,7 +249,7 @@ beforeAll(async () => {
     .values({
       clinicId,
       categoryId,
-      name: "Atendimento flexível fictício",
+      name: "Atendimento flexÃ­vel fictÃ­cio",
       slug: "servico-flexivel",
       durationMinutes: 60,
       isActive: true,
@@ -330,7 +330,7 @@ describe("online booking", () => {
     expect(list).toEqual([
       {
         id: serviceId,
-        name: "Serviço fictício agendável",
+        name: "ServiÃ§o fictÃ­cio agendÃ¡vel",
         description: null,
         durationMinutes: 60,
         priceCents: 12_000,
@@ -431,7 +431,7 @@ describe("online booking", () => {
         patientId: patient.bia,
         professionalId: second!.id,
         serviceId,
-        serviceName: "Serviço fictício",
+        serviceName: "ServiÃ§o fictÃ­cio",
         serviceDurationMinutes: 60,
         startsAt: new Date(local(MONDAY, "09:00")),
         endsAt: new Date(local(MONDAY, "10:00")),
@@ -501,54 +501,22 @@ describe("online booking", () => {
     expect(rows).toHaveLength(1);
   });
 
-  it("limit of active appointments", async () => {
+  it("no limit of active appointments", async () => {
+    // The column stays in the schema, but booking no longer reads it.
     await setClinic({ maxActiveAppointmentsPerPhone: 2 });
-    for (const time of ["09:00", "10:00"]) {
+    // The clinic opens 09:00-12:00: three in one day, a fourth on another.
+    for (const startsAt of [
+      local(WEDNESDAY, "09:00"),
+      local(WEDNESDAY, "10:00"),
+      local(WEDNESDAY, "11:00"),
+      local(TUESDAY, "09:00"),
+    ]) {
       const result = await bookOnline(ctx("cris"), {
         serviceIds: [serviceId],
-        startsAt: local(WEDNESDAY, time),
+        startsAt,
       });
       expect(result.ok).toBe(true);
     }
-    expect(
-      await bookOnline(ctx("cris"), {
-        serviceIds: [serviceId],
-        startsAt: local(WEDNESDAY, "11:00"),
-      }),
-    ).toEqual({ ok: false, reason: "limit" });
-
-    // Another client is counted on her own record.
-    expect(
-      (
-        await bookOnline(ctx("ana"), {
-          serviceIds: [serviceId],
-          startsAt: local(WEDNESDAY, "11:00"),
-        })
-      ).ok,
-    ).toBe(true);
-
-    // A cancelled appointment no longer counts.
-    await db
-      .update(appointments)
-      .set({
-        status: "cancelled",
-        cancelledAt: NOW,
-        cancelledBy: "clinic",
-      })
-      .where(
-        and(
-          eq(appointments.patientId, patient.cris),
-          eq(appointments.startsAt, new Date(local(WEDNESDAY, "09:00"))),
-        ),
-      );
-    expect(
-      (
-        await bookOnline(ctx("cris"), {
-          serviceIds: [serviceId],
-          startsAt: local(TUESDAY, "09:00"),
-        })
-      ).ok,
-    ).toBe(true);
   });
 
   it("online off for clinic or service", async () => {
@@ -698,7 +666,7 @@ describe("online booking", () => {
       local(MONDAY, "08:00"),
       local("2033-03-01", "10:00"),
       local("2033-05-02", "09:00"),
-      "não é uma data",
+      "nÃ£o Ã© uma data",
     ]) {
       expect(
         await bookOnline(ctx("ana"), { serviceIds: [serviceId], startsAt }),
@@ -793,15 +761,15 @@ describe("online booking", () => {
       ["endsAt", "id", "serviceName", "startsAt", "status"].sort(),
     );
     expect(mine.upcoming[0]).toMatchObject({
-      serviceName: "Serviço fictício agendável",
+      serviceName: "ServiÃ§o fictÃ­cio agendÃ¡vel",
       status: "confirmed",
     });
   });
 
   describe("several services in one visit", () => {
     let secondId: string;
-    const SECOND = "Segundo serviço fictício";
-    const BOTH = `Serviço fictício agendável + ${SECOND}`;
+    const SECOND = "Segundo serviÃ§o fictÃ­cio";
+    const BOTH = `ServiÃ§o fictÃ­cio agendÃ¡vel + ${SECOND}`;
 
     beforeAll(async () => {
       const [second] = await db
@@ -890,7 +858,7 @@ describe("online booking", () => {
       expect(await visitRows(id)).toEqual([
         {
           serviceId,
-          serviceName: "Serviço fictício agendável",
+          serviceName: "ServiÃ§o fictÃ­cio agendÃ¡vel",
           durationMinutes: 60,
           position: 0,
         },
@@ -912,7 +880,7 @@ describe("online booking", () => {
         durationMinutes: 90,
       });
 
-      // It counts once towards her limit and shows as one appointment.
+      // It shows as one appointment.
       const mine = await listMyAppointments(ctx("ana"));
       expect(mine.upcoming).toHaveLength(1);
       expect(mine.upcoming[0]).toMatchObject({ serviceName: BOTH });

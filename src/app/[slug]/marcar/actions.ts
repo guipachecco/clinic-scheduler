@@ -30,7 +30,7 @@ export type Confirmation = {
 
 export type BookResult =
   | { ok: true; confirmation: Confirmation }
-  | { ok: false; reason: "taken" | "limit" | "unavailable" | "unverified" };
+  | { ok: false; reason: "taken" | "unavailable" | "unverified" };
 
 // The services of one visit: at least one, none twice.
 const serviceIds = z

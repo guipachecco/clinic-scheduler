@@ -186,7 +186,7 @@ export const clinics = pgTable(
     theme: jsonb("theme").$type<ClinicTheme>().notNull().default({}),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     minAdvanceMinutes: integer("min_advance_minutes").notNull().default(120),
-    maxAdvanceDays: integer("max_advance_days").notNull().default(60),
+    maxAdvanceDays: integer("max_advance_days").notNull().default(365),
     slotStepMinutes: integer("slot_step_minutes").notNull().default(30),
     cancellationDeadlineMinutes: integer("cancellation_deadline_minutes")
       .notNull()
@@ -843,7 +843,7 @@ export const appointments = pgTable(
   ],
 );
 
-// The services of a visit that has more than one (migration 0034), in the
+// The services of a visit that has more than one (migration 0035), in the
 // order they are named. Such an appointment keeps the first one in
 // appointments.service_id, every name joined in service_name and the total
 // in service_duration_minutes; an appointment with a single service has no

@@ -1,5 +1,5 @@
 {
-  "id": "8d0a61a1-9a55-44fd-af77-81649c107bd0",
+  "id": "adb69b69-6e93-481d-aa70-43e7cf89c97b",
   "prevId": "3c0447d6-8ad9-43c6-982a-3d3329177514",
   "version": "7",
   "dialect": "postgresql",
@@ -568,148 +568,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.appointment_services": {
-      "name": "appointment_services",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "clinic_id": {
-          "name": "clinic_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "appointment_id": {
-          "name": "appointment_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "service_id": {
-          "name": "service_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "service_name": {
-          "name": "service_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "duration_minutes": {
-          "name": "duration_minutes",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "appointment_services_service_idx": {
-          "name": "appointment_services_service_idx",
-          "columns": [
-            {
-              "expression": "clinic_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "service_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "appointment_services_appointment_fk": {
-          "name": "appointment_services_appointment_fk",
-          "tableFrom": "appointment_services",
-          "tableTo": "appointments",
-          "columnsFrom": [
-            "clinic_id",
-            "appointment_id"
-          ],
-          "columnsTo": [
-            "clinic_id",
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "appointment_services_service_fk": {
-          "name": "appointment_services_service_fk",
-          "tableFrom": "appointment_services",
-          "tableTo": "services",
-          "columnsFrom": [
-            "clinic_id",
-            "service_id"
-          ],
-          "columnsTo": [
-            "clinic_id",
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "appointment_services_service_unique": {
-          "name": "appointment_services_service_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "appointment_id",
-            "service_id"
-          ]
-        },
-        "appointment_services_position_unique": {
-          "name": "appointment_services_position_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "appointment_id",
-            "position"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "appointment_services_duration_check": {
-          "name": "appointment_services_duration_check",
-          "value": "\"appointment_services\".\"duration_minutes\" > 0"
-        },
-        "appointment_services_position_check": {
-          "name": "appointment_services_position_check",
-          "value": "\"appointment_services\".\"position\" between 0 and 9"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.appointments": {
@@ -1541,7 +1399,7 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": 60
+          "default": 365
         },
         "slot_step_minutes": {
           "name": "slot_step_minutes",
