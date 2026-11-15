@@ -500,11 +500,14 @@ describe("online booking", () => {
   it("no limit of active appointments", async () => {
     // The column stays in the schema, but booking no longer reads it.
     await setClinic({ maxActiveAppointmentsPerPhone: 2 });
-    for (const time of ["09:00", "10:00", "11:00", "14:00"]) {
-      const result = await bookOnline(ctx("cris"), {
-        serviceId,
-        startsAt: local(WEDNESDAY, time),
-      });
+    // The clinic opens 09:00-12:00: three in one day, a fourth on another.
+    for (const startsAt of [
+      local(WEDNESDAY, "09:00"),
+      local(WEDNESDAY, "10:00"),
+      local(WEDNESDAY, "11:00"),
+      local(TUESDAY, "09:00"),
+    ]) {
+      const result = await bookOnline(ctx("cris"), { serviceId, startsAt });
       expect(result.ok).toBe(true);
     }
   });
