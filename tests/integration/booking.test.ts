@@ -497,54 +497,16 @@ describe("online booking", () => {
     expect(rows).toHaveLength(1);
   });
 
-  it("limit of active appointments", async () => {
+  it("no limit of active appointments", async () => {
+    // The column stays in the schema, but booking no longer reads it.
     await setClinic({ maxActiveAppointmentsPerPhone: 2 });
-    for (const time of ["09:00", "10:00"]) {
+    for (const time of ["09:00", "10:00", "11:00", "14:00"]) {
       const result = await bookOnline(ctx("cris"), {
         serviceId,
         startsAt: local(WEDNESDAY, time),
       });
       expect(result.ok).toBe(true);
     }
-    expect(
-      await bookOnline(ctx("cris"), {
-        serviceId,
-        startsAt: local(WEDNESDAY, "11:00"),
-      }),
-    ).toEqual({ ok: false, reason: "limit" });
-
-    // Another client is counted on her own record.
-    expect(
-      (
-        await bookOnline(ctx("ana"), {
-          serviceId,
-          startsAt: local(WEDNESDAY, "11:00"),
-        })
-      ).ok,
-    ).toBe(true);
-
-    // A cancelled appointment no longer counts.
-    await db
-      .update(appointments)
-      .set({
-        status: "cancelled",
-        cancelledAt: NOW,
-        cancelledBy: "clinic",
-      })
-      .where(
-        and(
-          eq(appointments.patientId, patient.cris),
-          eq(appointments.startsAt, new Date(local(WEDNESDAY, "09:00"))),
-        ),
-      );
-    expect(
-      (
-        await bookOnline(ctx("cris"), {
-          serviceId,
-          startsAt: local(TUESDAY, "09:00"),
-        })
-      ).ok,
-    ).toBe(true);
   });
 
   it("online off for clinic or service", async () => {
