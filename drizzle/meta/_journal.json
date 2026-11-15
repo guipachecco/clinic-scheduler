@@ -239,6 +239,13 @@
       "when": 1794531080581,
       "tag": "0033_admins_without_two_factor",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1794768561231,
+      "tag": "0034_booking_window_one_year",
+      "breakpoints": true
     }
   ]
 }
