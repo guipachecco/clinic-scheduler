@@ -186,7 +186,7 @@ export const clinics = pgTable(
     theme: jsonb("theme").$type<ClinicTheme>().notNull().default({}),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     minAdvanceMinutes: integer("min_advance_minutes").notNull().default(120),
-    maxAdvanceDays: integer("max_advance_days").notNull().default(60),
+    maxAdvanceDays: integer("max_advance_days").notNull().default(365),
     slotStepMinutes: integer("slot_step_minutes").notNull().default(30),
     cancellationDeadlineMinutes: integer("cancellation_deadline_minutes")
       .notNull()

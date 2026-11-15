@@ -30,8 +30,6 @@ type Step = "service" | "day" | "done";
 const TAKEN = "Esse horário acabou de ser preenchido";
 const FAILURES = {
   taken: TAKEN,
-  limit:
-    "Você já tem o número máximo de horários marcados nesta clínica. Para marcar outro, fale com a clínica.",
   unavailable:
     "Não foi possível marcar esse horário. Escolha outro ou tente mais tarde.",
   unverified: "Confirme seu e-mail para marcar horários.",

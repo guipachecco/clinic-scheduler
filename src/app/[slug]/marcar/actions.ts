@@ -28,7 +28,7 @@ export type Confirmation = {
 
 export type BookResult =
   | { ok: true; confirmation: Confirmation }
-  | { ok: false; reason: "taken" | "limit" | "unavailable" | "unverified" };
+  | { ok: false; reason: "taken" | "unavailable" | "unverified" };
 
 const serviceId = z.uuid();
 const month = z.string().regex(/^\d{4}-\d{2}$/);

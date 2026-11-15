@@ -1,23 +1,11 @@
 import "server-only";
 
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  gt,
-  gte,
-  inArray,
-  isNull,
-  lt,
-  sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { DateTime } from "luxon";
 
 import { asClient, type Tx } from "@/db/client";
 import { findPgError, isAppointmentOverlapError } from "@/db/errors";
 import {
-  ACTIVE_APPOINTMENT_STATUSES,
   appointments,
   auditLogs,
   clinics,
@@ -36,8 +24,8 @@ import { type BusyInterval, freeSlots, parseLocalDate } from "./slots";
 // the definer functions of migrations 0013 and 0014, without names or ids.
 // Nothing here returns another patient's data, nor pending_link_patient_id.
 // Errors never carry patient data. The clock is always the server's own
-// (new Date() inside each function): min advance, past slots and the active
-// limit must never depend on a caller-supplied time.
+// (new Date() inside each function): min advance and past slots must never
+// depend on a caller-supplied time.
 
 // Who is booking. Every field comes from the server: clinicId and patientId
 // from getClientContext, userId and emailVerified from the Better Auth
@@ -63,7 +51,7 @@ export type BookableService = {
 
 export type BookingResult =
   | { ok: true; appointmentId: string }
-  | { ok: false; reason: "taken" | "limit" | "unavailable" | "unverified" };
+  | { ok: false; reason: "taken" | "unavailable" | "unverified" };
 
 export type MyAppointment = {
   id: string;
@@ -84,7 +72,6 @@ type BookingClinic = {
   minAdvanceMinutes: number;
   maxAdvanceDays: number;
   slotStepMinutes: number;
-  maxActiveAppointmentsPerPhone: number;
 };
 
 type BookingService = {
@@ -126,7 +113,6 @@ async function readClinic(
       minAdvanceMinutes: clinics.minAdvanceMinutes,
       maxAdvanceDays: clinics.maxAdvanceDays,
       slotStepMinutes: clinics.slotStepMinutes,
-      maxActiveAppointmentsPerPhone: clinics.maxActiveAppointmentsPerPhone,
     })
     .from(clinics)
     .where(eq(clinics.id, clinicId))
@@ -412,9 +398,8 @@ export async function listDaysWithSlots(
 
 // Books a free slot for her, confirmed and online (services.requiresApproval
 // does not apply online). Under the clinic's agenda lock it checks again that
-// the clinic and the service take online bookings, that her row is hers,
-// her limit of active appointments (upcoming requested or confirmed ones of
-// her own patients row) and that the start is still a free slot: hours,
+// the clinic and the service take online bookings, that her row is hers
+// and that the start is still a free slot: hours,
 // blocks, other appointments with buffers, step, minimum and maximum
 // advance. appointments_no_overlap backs this up: its violation is "taken".
 export async function bookOnline(
@@ -438,21 +423,6 @@ export async function bookOnline(
 
       if (!(await isOwnRow(tx, ctx))) {
         return { ok: false, reason: "unavailable" };
-      }
-
-      const [active] = await tx
-        .select({ count: sql<number>`count(*)::int` })
-        .from(appointments)
-        .where(
-          and(
-            eq(appointments.clinicId, ctx.clinicId),
-            eq(appointments.patientId, ctx.patientId),
-            inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
-            gt(appointments.endsAt, now),
-          ),
-        );
-      if ((active?.count ?? 0) >= clinic.maxActiveAppointmentsPerPhone) {
-        return { ok: false, reason: "limit" };
       }
 
       if (Number.isNaN(startsAt.getTime())) {
