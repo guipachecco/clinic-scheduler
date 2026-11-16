@@ -110,6 +110,14 @@ Decisões minhas (Claude), tomadas para responder às dúvidas de um revisor; po
 - **Histórico de ações:** grava o id de quem fez a ação. Na edição, os campos alterados aparecem pelo nome usado no código (`birthDate`, `cpf`…), nunca os valores.
 - **Datas:** idade, "menor de idade" e o limite de 120 anos são calculados no fuso da clínica (America/Sao_Paulo).
 
+## Aniversariantes do dia
+
+A tela `/admin/pacientes/aniversariantes` lista os pacientes que fazem aniversário hoje. Há um link para ela na página Clientes e um aviso na página inicial.
+
+- **Dia:** "hoje" é calculado no fuso da clínica.
+- **Quem fica de fora:** pacientes anonimizados e cadastros provisórios.
+- **29 de fevereiro:** em anos não bissextos, quem nasceu nesse dia aparece em 28 de fevereiro.
+
 ## Deixado para quem constrói
 
 - Nomes internos de funções e arquivos, seguindo `src/modules/<domínio>`.
