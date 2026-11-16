@@ -63,6 +63,9 @@ export type AppointmentRecord = {
   startsAt: Date;
   endsAt: Date;
   durationMinutes: number;
+  // The main service's own duration, copied when booked (the total above may
+  // have been edited since).
+  serviceDurationMinutes: number;
   status: Status;
   source: "online" | "admin";
   cancellationReason: CancellationReason | null;
@@ -1154,6 +1157,7 @@ export async function getAppointment(
         anonymizedAt: patients.anonymizedAt,
         serviceId: appointments.serviceId,
         serviceName: appointments.serviceName,
+        serviceDurationMinutes: appointments.serviceDurationMinutes,
         isFlexible: services.isFlexible,
         professionalId: appointments.professionalId,
         professionalName: professionals.name,
@@ -1228,6 +1232,7 @@ export async function getAppointment(
     startsAt: row.startsAt,
     endsAt: row.endsAt,
     durationMinutes: minutesBetween(row.startsAt, row.endsAt),
+    serviceDurationMinutes: row.serviceDurationMinutes,
     status: row.status,
     source: row.source,
     cancellationReason: isReason(row.cancellationReason)

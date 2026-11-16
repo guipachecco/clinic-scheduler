@@ -950,6 +950,7 @@ describe("getAppointment", () => {
       startsAt: new Date("2026-11-10T13:00:00Z"),
       endsAt: new Date("2026-11-10T13:45:00Z"),
       durationMinutes: 45,
+      serviceDurationMinutes: 60,
       status: "confirmed",
       source: "admin",
       cancellationReason: null,

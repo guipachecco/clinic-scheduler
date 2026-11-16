@@ -124,10 +124,6 @@ export default async function AppointmentPage({
       : appointment.serviceName,
     extraNames,
   );
-  // The block's duration is the main service's plus the extras'.
-  const mainMinutes =
-    appointment.durationMinutes -
-    appointment.extras.reduce((sum, extra) => sum + extra.durationMinutes, 0);
 
   // With a team of one, nothing about professionals is shown.
   const professionals = await listActiveProfessionals(clinicId);
@@ -208,7 +204,8 @@ export default async function AppointmentPage({
               </h2>
               <ul aria-labelledby="procedimentos" className="list-disc pl-5">
                 <li>
-                  {appointment.serviceName} · {mainMinutes} min
+                  {appointment.serviceName} ·{" "}
+                  {appointment.serviceDurationMinutes} min
                 </li>
                 {appointment.extras.map((extra) => (
                   <li key={extra.serviceId}>
