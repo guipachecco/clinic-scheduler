@@ -7,7 +7,7 @@ import { inClinic } from "@/db/client";
 import { appointments, patients, services } from "@/db/schema";
 import { countRequestedFrom } from "@/modules/appointments/appointments";
 import { getClinicTimezone } from "@/modules/clinic-page/panel";
-import { ANONYMIZED_NAME } from "@/modules/patients/patients";
+import { ANONYMIZED_NAME, listBirthdays } from "@/modules/patients/patients";
 import { listPendingLinks } from "@/modules/patients/links";
 import {
   findBlocksAndHours,
@@ -203,6 +203,7 @@ export async function getPanelHome(
   next: DayItem | null;
   nextDayFirst: DayItem | null;
   alerts: number;
+  birthdays: number;
   pendingLinks: Awaited<ReturnType<typeof listPendingLinks>>;
 }> {
   const zone = await getClinicTimezone(clinicId);
@@ -225,9 +226,10 @@ export async function getPanelHome(
     nextDayFirst = row ? toItem(row) : null;
   }
 
-  const [links, requested] = await Promise.all([
+  const [links, requested, birthdays] = await Promise.all([
     listPendingLinks(clinicId),
     countRequestedFrom(clinicId, now),
+    listBirthdays(clinicId, now),
   ]);
 
   return {
@@ -236,6 +238,7 @@ export async function getPanelHome(
     next,
     nextDayFirst,
     alerts: links.length + requested,
+    birthdays: birthdays.items.length,
     pendingLinks: links,
   };
 }

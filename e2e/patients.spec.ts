@@ -142,6 +142,34 @@ test.describe("pacientes", () => {
     await expect(page.getByLabel("WhatsApp")).toHaveValue(PATIENT.phone);
   });
 
+  test("a birthday today shows on the home notice and the birthdays page", async () => {
+    // Born on today's day and month in the clinic zone (1992 is a leap year,
+    // so Feb 29 stays valid).
+    const name = "Aniversariante Teste Hoje";
+    const birthDate = `1992${todayInClinic().slice(4)}`;
+    await page.goto("/admin/pacientes/novo");
+    await page.getByLabel("Nome completo").fill(name);
+    await page.getByLabel("WhatsApp").fill("(48) 99999-0002");
+    await page.getByLabel("Data de nascimento").fill(birthDate);
+    await page.getByRole("button", { name: "Cadastrar paciente" }).click();
+    await expect(page).toHaveURL(/\/admin\/pacientes\/[0-9a-f-]{36}$/);
+
+    await page.goto("/admin");
+    const notice = page.getByTestId("aviso-aniversariantes");
+    await expect(notice).toHaveText("1 aniversariante hoje");
+    await notice.click();
+
+    await expect(page).toHaveURL(/\/admin\/pacientes\/aniversariantes$/);
+    await expect(
+      page.getByRole("heading", { name: "Aniversariantes de hoje" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name })).toBeVisible();
+    await expect(page.getByRole("link", { name: "WhatsApp" })).toHaveAttribute(
+      "href",
+      "https://wa.me/5548999990002",
+    );
+  });
+
   test("anonymizing is optional, tucked in a closed section", async () => {
     await page.goto(patientUrl);
     const summary = page.getByText("Anonimizar paciente (LGPD)");

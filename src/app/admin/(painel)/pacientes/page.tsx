@@ -37,6 +37,9 @@ export default async function PatientsPage() {
           items.length > 0 ? countLabel(items.length, !!next, words) : null
         }
       >
+        <Button asChild variant="outline">
+          <Link href="/admin/pacientes/aniversariantes">Aniversariantes</Link>
+        </Button>
         <Button asChild>
           <Link href="/admin/pacientes/novo">
             <Icon name="plus" />

@@ -358,6 +358,41 @@ describe("getPanelHome", () => {
     expect(requested.alerts).toBe(1);
   });
 
+  it("counts today's birthdays in the clinic's own time zone", async () => {
+    const maria = and(
+      eq(patients.clinicId, clinicId),
+      eq(patients.name, "Maria Painel"),
+    );
+    // Maria's birthday is Nov 10.
+    await db.update(patients).set({ birthDate: "1990-11-10" }).where(maria);
+    try {
+      const onBirthday = await getPanelHome(
+        clinicId,
+        new Date("2026-11-10T12:00:00Z"),
+      );
+      expect(onBirthday.birthdays).toBe(1);
+      // Nov 11 01:00 UTC is still Nov 10 22:00 local: counts.
+      const lateUtc = await getPanelHome(
+        clinicId,
+        new Date("2026-11-11T01:00:00Z"),
+      );
+      expect(lateUtc.birthdays).toBe(1);
+      const nextDay = await getPanelHome(
+        clinicId,
+        new Date("2026-11-11T12:00:00Z"),
+      );
+      expect(nextDay.birthdays).toBe(0);
+      // Another clinic never sees it.
+      const other = await getPanelHome(
+        otherId,
+        new Date("2026-11-10T12:00:00Z"),
+      );
+      expect(other.birthdays).toBe(0);
+    } finally {
+      await db.update(patients).set({ birthDate: null }).where(maria);
+    }
+  });
+
   it("skips a day with only cancelled appointments", async () => {
     // Wednesday 17:00 local: nothing left today; Thursday has only a cancelled one.
     const home = await getPanelHome(clinicId, new Date("2026-11-11T20:00:00Z"));
