@@ -11,7 +11,10 @@ export type DayItem = {
   endsAt: Date;
   status: "requested" | "confirmed" | "cancelled" | "completed" | "no_show";
   online: boolean;
+  // The sum of the known prices of every procedure; null when none has one.
   priceCents: number | null;
+  // Some procedure of the block has no price, so the sum is incomplete.
+  pricePartial: boolean;
   patientId: string;
   patientName: string;
   patientPhone: string | null;
@@ -122,7 +125,9 @@ export function daySummary(items: DayItem[]): {
         ? null
         : {
             cents: priced.reduce((sum, i) => sum + (i.priceCents ?? 0), 0),
-            partial: priced.length < counted.length,
+            partial:
+              priced.length < counted.length ||
+              counted.some((i) => i.pricePartial),
           },
   };
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as z from "zod";
 
 import {
   APPOINTMENT_STATUSES,
@@ -6,7 +7,9 @@ import {
   CANCELLATION_REASON_LABELS,
   canTransition,
   isEditableStatus,
+  MAX_EXTRA_SERVICES,
   rescheduleSchema,
+  serviceLabel,
   type Status,
   STATUS_LABELS,
   statusChangeSchema,
@@ -188,6 +191,72 @@ describe("appointmentFormSchema", () => {
     expect(
       appointmentFormSchema.safeParse({ ...base, idempotencyKey: "1" }).success,
     ).toBe(false);
+  });
+
+  describe("extra procedures", () => {
+    const A = "a1b2c3d4-0000-4000-8000-000000000001";
+    const B = "a1b2c3d4-0000-4000-8000-000000000002";
+    const extraErrors = (input: object) => {
+      const result = appointmentFormSchema.safeParse({ ...base, ...input });
+      if (result.success) return undefined;
+      return z.flattenError(result.error).fieldErrors.extraServiceIds;
+    };
+
+    it("defaults to an empty list", () => {
+      expect(appointmentFormSchema.parse(base).extraServiceIds).toEqual([]);
+    });
+
+    it("keeps the order of the chosen extras", () => {
+      expect(
+        appointmentFormSchema.parse({ ...base, extraServiceIds: [B, A] })
+          .extraServiceIds,
+      ).toEqual([B, A]);
+    });
+
+    it("rejects a repeated extra", () => {
+      expect(extraErrors({ extraServiceIds: [A, A] })).toEqual([
+        "Não repita o mesmo procedimento.",
+      ]);
+    });
+
+    it("rejects an extra equal to the main service", () => {
+      expect(extraErrors({ extraServiceIds: [base.serviceId] })).toEqual([
+        "Não repita o mesmo procedimento.",
+      ]);
+    });
+
+    it("accepts 9 extras and rejects 10", () => {
+      const ids = (n: number) =>
+        Array.from(
+          { length: n },
+          (_, i) =>
+            `b1b2c3d4-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+        );
+      expect(
+        appointmentFormSchema.safeParse({
+          ...base,
+          extraServiceIds: ids(MAX_EXTRA_SERVICES),
+        }).success,
+      ).toBe(true);
+      expect(extraErrors({ extraServiceIds: ids(10) })).toEqual([
+        "No máximo 9 procedimentos extras.",
+      ]);
+    });
+
+    it("rejects an extra that is not an id", () => {
+      expect(extraErrors({ extraServiceIds: ["x"] })).toEqual([
+        "Escolha o serviço.",
+      ]);
+    });
+  });
+});
+
+describe("serviceLabel", () => {
+  it("joins the main service and the extras with ' + '", () => {
+    expect(serviceLabel("Manicure", [])).toBe("Manicure");
+    expect(serviceLabel("Manicure", ["Pedicure", "Spa"])).toBe(
+      "Manicure + Pedicure + Spa",
+    );
   });
 });
 

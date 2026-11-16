@@ -186,6 +186,18 @@ Decisões minhas (Claude), registradas a partir da leitura de um revisor; podem 
 - **Encaixe na grade:** arrastar e clicar usam o passo de `clinic_settings.slot_step_minutes` (30 min). A duração continua livre, de 5 a 720 min.
 - **`service_duration_minutes`:** guarda a duração padrão do serviço no momento do agendamento. A duração real é a diferença entre o fim e o início.
 
+## Vários procedimentos no mesmo agendamento
+
+No painel, um agendamento pode ter o procedimento principal e até 9 procedimentos extras. O resultado é um só bloco na agenda, com um só status.
+
+- **Onde ficam:** o principal continua em `appointments.service_id`. Os extras ficam na tabela `appointment_services` (migração `0035_appointment_services.sql`), na ordem em que foram escolhidos.
+- **Duração:** o formulário preenche a duração com a soma dos procedimentos, e ela pode ser ajustada à mão. O intervalo de limpeza é o do último procedimento.
+- **Encaixe:** o serviço flexível só pode ser o principal, nunca um extra.
+- **Sessões de pacote:** não aceitam procedimentos extras.
+- **Agendamento online:** não mudou, continua marcando um só serviço.
+- **Onde aparece:** o texto "A + B" aparece na agenda, no detalhe do agendamento, na lista do dia da página inicial, no histórico do paciente e em "Meus horários" da cliente.
+- **Valores:** o "previsto" da página inicial e o valor sugerido ao receber somam todos os procedimentos.
+
 ## Deixado para quem constrói
 
 - Nomes internos, desde que sigam `src/modules/<domínio>`.

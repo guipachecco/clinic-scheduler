@@ -105,6 +105,7 @@ export default async function NewAppointmentPage({
           mode="create"
           services={services.map(toOption)}
           professionals={professionals}
+          allowExtras
           {...startDefaults(inicio)}
           initialPatient={patient}
         />

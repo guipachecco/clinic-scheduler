@@ -843,6 +843,53 @@ export const appointments = pgTable(
   ],
 );
 
+// The extra procedures of an appointment (migration 0035). The appointment
+// keeps its main service in its own columns; each row here is one more
+// procedure done in the same block, in order (position 1 to 9). Name and
+// duration are copied when booked, like on appointments, so later edits to
+// the service do not change the history. Deleting the appointment deletes its
+// extras; a service in use is never deleted.
+export const appointmentServices = pgTable(
+  "appointment_services",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    appointmentId: uuid("appointment_id").notNull(),
+    serviceId: uuid("service_id").notNull(),
+    serviceName: text("service_name").notNull(),
+    serviceDurationMinutes: integer("service_duration_minutes").notNull(),
+    position: integer("position").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "appointment_services_appointment_fk",
+      columns: [t.clinicId, t.appointmentId],
+      foreignColumns: [appointments.clinicId, appointments.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "appointment_services_service_fk",
+      columns: [t.clinicId, t.serviceId],
+      foreignColumns: [services.clinicId, services.id],
+    }).onDelete("restrict"),
+    unique("appointment_services_service_unique").on(
+      t.appointmentId,
+      t.serviceId,
+    ),
+    unique("appointment_services_position_unique").on(
+      t.appointmentId,
+      t.position,
+    ),
+    index("appointment_services_service_id_idx").on(t.serviceId),
+    check(
+      "appointment_services_position_check",
+      sql`${t.position} between 1 and 9`,
+    ),
+  ],
+);
+
 // Who changed what and when. `changes` must never contain personal data:
 // store ids, statuses and times only.
 export const auditLogs = pgTable(

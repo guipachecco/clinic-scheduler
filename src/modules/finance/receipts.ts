@@ -15,6 +15,9 @@ import {
   services,
 } from "@/db/schema";
 
+import { extraNamesSql, extraPricesSql } from "@/modules/appointments/extras";
+import { serviceLabel } from "@/modules/appointments/fields";
+
 import type { ReceiptValues } from "./fields";
 import type { SaleResult } from "./sales";
 
@@ -106,10 +109,25 @@ export async function getAppointmentBilling(
           eq(services.clinicId, clinicId),
         ),
       );
+    // The extra procedures add their prices; those without one add nothing.
+    const [extras] = await tx
+      .select({ prices: extraPricesSql })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.id, appointmentId),
+          eq(appointments.clinicId, clinicId),
+        ),
+      );
+    const extraCents = extras?.prices.cents ?? 0;
+    const mainCents = service?.priceCents ?? null;
     return {
       inPackage: Boolean(session),
       receipt: receipt ?? null,
-      servicePriceCents: service?.priceCents ?? null,
+      servicePriceCents:
+        mainCents === null && extraCents === 0
+          ? null
+          : (mainCents ?? 0) + extraCents,
     };
   });
 }
@@ -150,6 +168,7 @@ export async function createReceipt(
             patientId: appointments.patientId,
             serviceName: appointments.serviceName,
             customLabel: appointments.customLabel,
+            extraNames: extraNamesSql,
             status: appointments.status,
           })
           .from(appointments)
@@ -172,7 +191,10 @@ export async function createReceipt(
         }
         // The appointment decides who and what was paid.
         patientId = appointment.patientId;
-        description = (appointment.customLabel ?? appointment.serviceName)
+        description = serviceLabel(
+          appointment.customLabel ?? appointment.serviceName,
+          appointment.extraNames,
+        )
           .trim()
           .slice(0, 80);
       } else if (!description) {

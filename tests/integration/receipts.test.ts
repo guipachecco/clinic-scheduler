@@ -5,6 +5,7 @@ import { inClinic } from "@/db/client";
 import { db, endPools } from "@/db/owner";
 import {
   appointments,
+  appointmentServices,
   auditLogs,
   businessHours,
   patients,
@@ -399,5 +400,69 @@ describe("receipts", () => {
         tx.delete(receipts).where(eq(receipts.id, result.id)),
       ),
     ).rejects.toThrow();
+  });
+});
+
+describe("receipts with several procedures", () => {
+  async function extraService(name: string, priceCents: number | null) {
+    const [category] = await db.select().from(serviceCategories);
+    const [row] = await db
+      .insert(services)
+      .values({
+        clinicId: CLINIC,
+        categoryId: category!.id,
+        name,
+        slug: name.toLowerCase(),
+        durationMinutes: 30,
+        priceCents,
+        isActive: true,
+      })
+      .returning({ id: services.id });
+    return row!.id;
+  }
+
+  async function addExtra(appointmentId: string, id: string, name: string) {
+    await db.insert(appointmentServices).values({
+      clinicId: CLINIC,
+      appointmentId,
+      serviceId: id,
+      serviceName: name,
+      serviceDurationMinutes: 30,
+      position: 1,
+    });
+  }
+
+  it("suggests the main price plus the extras' prices", async () => {
+    const id = await appointment("confirmed");
+    await addExtra(id, await extraService("Pedicure", 4500), "Pedicure");
+    const billing = await getAppointmentBilling(CLINIC, id);
+    expect(billing?.servicePriceCents).toBe(8000);
+  });
+
+  it("sums only the known prices when an extra has none", async () => {
+    const id = await appointment("confirmed");
+    await addExtra(id, await extraService("Spa", null), "Spa");
+    const billing = await getAppointmentBilling(CLINIC, id);
+    expect(billing?.servicePriceCents).toBe(3500);
+  });
+
+  it("stores every procedure in the receipt description", async () => {
+    const id = await appointment("confirmed");
+    await addExtra(id, await extraService("Pedicure", 4500), "Pedicure");
+    const result = await createReceipt(
+      CLINIC,
+      values({ appointmentId: id }),
+      actorId,
+    );
+    expect(result.ok).toBe(true);
+    const [row] = await db.select().from(receipts);
+    expect(row?.description).toBe("Manicure Tradicional + Pedicure");
+  });
+
+  it("keeps the main service name when there are no extras", async () => {
+    const id = await appointment("confirmed");
+    await createReceipt(CLINIC, values({ appointmentId: id }), actorId);
+    const [row] = await db.select().from(receipts);
+    expect(row?.description).toBe("Manicure Tradicional");
   });
 });

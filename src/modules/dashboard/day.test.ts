@@ -109,6 +109,7 @@ const full = (over: Partial<DayItem>): DayItem => ({
   status: "confirmed",
   online: false,
   priceCents: null,
+  pricePartial: false,
   patientId: "p",
   patientName: "Ana",
   patientPhone: null,
@@ -136,6 +137,22 @@ describe("daySummary", () => {
 
   it("hides previsto when nothing has a price", () => {
     expect(daySummary([full({}), full({})]).previsto).toBeNull();
+  });
+
+  it("is partial when a counted item has a procedure without price", () => {
+    expect(
+      daySummary([
+        full({ priceCents: 5000, pricePartial: true }),
+        full({ priceCents: 8000 }),
+      ]).previsto,
+    ).toEqual({ cents: 13000, partial: true });
+    // An item that does not count never makes the day partial.
+    expect(
+      daySummary([
+        full({ priceCents: 8000 }),
+        full({ priceCents: 5000, pricePartial: true, status: "cancelled" }),
+      ]).previsto,
+    ).toEqual({ cents: 8000, partial: false });
   });
 
   it("is complete when every counted item has a price", () => {

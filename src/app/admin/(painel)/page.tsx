@@ -45,7 +45,15 @@ export default async function PanelHomePage() {
     getPanelHome(session.clinicId, now),
     getClinicBranding(session.clinicId),
   ]);
-  const { today, summary, next, nextDayFirst, alerts, pendingLinks } = home;
+  const {
+    today,
+    summary,
+    next,
+    nextDayFirst,
+    alerts,
+    birthdays,
+    pendingLinks,
+  } = home;
 
   const firstName = session.user.name.trim().split(/\s+/)[0] ?? "";
   const dateLabel = new Intl.DateTimeFormat("pt-BR", {
@@ -102,6 +110,18 @@ export default async function PanelHomePage() {
         now={now}
         zone={today.zone}
       />
+
+      {birthdays > 0 ? (
+        <Link
+          href="/admin/pacientes/aniversariantes"
+          data-testid="aviso-aniversariantes"
+          className="inline-flex min-h-11 items-center rounded-2xl border bg-card px-4 text-sm font-semibold text-brand underline-offset-4 hover:underline dark:text-foreground"
+        >
+          {birthdays === 1
+            ? "1 aniversariante hoje"
+            : `${birthdays} aniversariantes hoje`}
+        </Link>
+      ) : null}
 
       <section aria-labelledby="hoje-titulo" className="grid gap-2">
         <div className="flex items-center justify-between">

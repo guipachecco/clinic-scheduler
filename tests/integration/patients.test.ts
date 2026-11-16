@@ -20,12 +20,13 @@ import {
   anonymizePatient,
   createPatient,
   getPatient,
+  listBirthdays,
   type PatientCursor,
   searchPatients,
   updatePatient,
 } from "@/modules/patients/patients";
 
-import { CLINIC } from "../helpers/clinic";
+import { CLINIC, otherClinic } from "../helpers/clinic";
 
 // Every record here is fictitious and exists only during the test.
 
@@ -667,5 +668,103 @@ describe("anonymizePatient", () => {
         actorId,
       ),
     ).toEqual({ ok: false, reason: "not_found" });
+  });
+});
+
+describe("listBirthdays", () => {
+  // 22:00 on Nov 16 in São Paulo, already Nov 17 in UTC.
+  const now = new Date("2026-11-17T01:00:00Z");
+
+  it("lists only today's birthdays, alphabetically, with the age", async () => {
+    await created({
+      name: "Zélia Fictícia",
+      phone: "(48) 99999-0001",
+      cpf: "",
+      birthDate: "1992-11-16",
+    });
+    await created({
+      name: "Ana Fictícia",
+      phone: "(48) 99999-0002",
+      cpf: "",
+      birthDate: "2000-11-16",
+    });
+    await created({
+      name: "Bia Fictícia",
+      phone: "(48) 99999-0003",
+      cpf: "",
+      birthDate: "1990-11-17",
+    });
+    const result = await listBirthdays(CLINIC, now);
+    expect(result.date).toBe("2026-11-16");
+    expect(result.items.map((i) => [i.name, i.age])).toEqual([
+      ["Ana Fictícia", 26],
+      ["Zélia Fictícia", 34],
+    ]);
+    expect(result.items[0]).toMatchObject({
+      nickname: "Mari",
+      phone: "+5548999990002",
+    });
+  });
+
+  it("skips anonymized (birth date cleared), provisional and undated patients", async () => {
+    // patients_anonymized_check forces birth_date to null on anonymized rows,
+    // so this row is already out by date; the anonymized_at filter is a second
+    // guard that the database makes impossible to exercise directly.
+    const anonymized = await created({
+      phone: "(48) 99999-0001",
+      cpf: "",
+      birthDate: "1992-11-16",
+    });
+    await anonymizePatient(CLINIC, anonymized, actorId);
+    const original = await created({
+      phone: "(48) 99999-0002",
+      cpf: "",
+      birthDate: "1990-01-01",
+    });
+    await db.insert(patients).values({
+      clinicId: CLINIC,
+      name: "Provisória Fictícia",
+      nameNormalized: "provisoria ficticia",
+      phone: "+5548999990002",
+      birthDate: "1992-11-16",
+      pendingLinkPatientId: original,
+    });
+    await db.insert(patients).values({
+      clinicId: CLINIC,
+      name: "Sem Data Fictícia",
+      nameNormalized: "sem data ficticia",
+      phone: "+5548999990003",
+    });
+    expect((await listBirthdays(CLINIC, now)).items).toEqual([]);
+  });
+
+  it("lists a Feb 29 birth on Feb 28 of a non-leap year only", async () => {
+    await created({
+      phone: "(48) 99999-0001",
+      cpf: "",
+      birthDate: "2000-02-29",
+    });
+    // 22:00 on Feb 28 in São Paulo.
+    const nonLeap = await listBirthdays(
+      CLINIC,
+      new Date("2027-03-01T01:00:00Z"),
+    );
+    expect(nonLeap.date).toBe("2027-02-28");
+    expect(nonLeap.items.map((i) => i.age)).toEqual([27]);
+    const leap = await listBirthdays(CLINIC, new Date("2028-02-29T01:00:00Z"));
+    expect(leap.date).toBe("2028-02-28");
+    expect(leap.items).toEqual([]);
+  });
+
+  it("does not list another clinic's patients", async () => {
+    const other = await otherClinic();
+    await db.insert(patients).values({
+      clinicId: other,
+      name: "Outra Fictícia",
+      nameNormalized: "outra ficticia",
+      phone: "+5548999990009",
+      birthDate: "1992-11-16",
+    });
+    expect((await listBirthdays(CLINIC, now)).items).toEqual([]);
   });
 });

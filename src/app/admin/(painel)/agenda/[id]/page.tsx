@@ -5,7 +5,10 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { getAppointment } from "@/modules/appointments/appointments";
-import { CANCELLATION_REASON_LABELS } from "@/modules/appointments/fields";
+import {
+  CANCELLATION_REASON_LABELS,
+  serviceLabel,
+} from "@/modules/appointments/fields";
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import {
   getAppointmentBilling,
@@ -114,9 +117,13 @@ export default async function AppointmentPage({
     !billing.inPackage &&
     (RECEIVABLE_STATUSES as readonly string[]).includes(appointment.status);
 
-  const serviceText = appointment.customLabel
-    ? `${appointment.customLabel} (${appointment.serviceName})`
-    : appointment.serviceName;
+  const extraNames = appointment.extras.map((extra) => extra.name);
+  const serviceText = serviceLabel(
+    appointment.customLabel
+      ? `${appointment.customLabel} (${appointment.serviceName})`
+      : appointment.serviceName,
+    extraNames,
+  );
 
   // With a team of one, nothing about professionals is shown.
   const professionals = await listActiveProfessionals(clinicId);
@@ -153,8 +160,20 @@ export default async function AppointmentPage({
         id: appointment.serviceId,
         name: `${appointment.serviceName} (inativo)`,
         categoryName: "Serviço atual",
-        durationMinutes: appointment.durationMinutes,
+        durationMinutes: appointment.serviceDurationMinutes,
         isFlexible: appointment.isFlexible,
+      });
+    }
+    // Extras that are no longer bookable stay selectable too.
+    const offered = new Set(services.map((service) => service.id));
+    for (const extra of appointment.extras) {
+      if (offered.has(extra.serviceId)) continue;
+      services.push({
+        id: extra.serviceId,
+        name: `${extra.name} (inativo)`,
+        categoryName: "Serviço atual",
+        durationMinutes: extra.durationMinutes,
+        isFlexible: false,
       });
     }
   }
@@ -178,6 +197,24 @@ export default async function AppointmentPage({
           </p>
           <p>Duração: {appointment.durationMinutes} min</p>
           <p>Serviço: {serviceText}</p>
+          {appointment.extras.length > 0 ? (
+            <div>
+              <h2 id="procedimentos" className="font-medium">
+                Procedimentos
+              </h2>
+              <ul aria-labelledby="procedimentos" className="list-disc pl-5">
+                <li>
+                  {appointment.serviceName} ·{" "}
+                  {appointment.serviceDurationMinutes} min
+                </li>
+                {appointment.extras.map((extra) => (
+                  <li key={extra.serviceId}>
+                    {extra.name} · {extra.durationMinutes} min
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {showProfessional ? (
             <p>Profissional: {appointment.professionalName}</p>
           ) : null}
@@ -354,9 +391,13 @@ export default async function AppointmentPage({
             patientName={appointment.patientName}
             services={services}
             professionals={professionalChoices}
+            allowExtras={!appointment.inPackage}
             defaults={{
               patientId: appointment.patientId,
               serviceId: appointment.serviceId,
+              extraServiceIds: appointment.extras.map(
+                (extra) => extra.serviceId,
+              ),
               professionalId:
                 professionalChoices.length > 1
                   ? appointment.professionalId
