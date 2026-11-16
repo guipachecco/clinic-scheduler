@@ -15,6 +15,8 @@ import {
   services,
 } from "@/db/schema";
 
+import { extraPricesSql } from "@/modules/appointments/extras";
+
 import type { ReceiptValues } from "./fields";
 import type { SaleResult } from "./sales";
 
@@ -106,10 +108,25 @@ export async function getAppointmentBilling(
           eq(services.clinicId, clinicId),
         ),
       );
+    // The extra procedures add their prices; those without one add nothing.
+    const [extras] = await tx
+      .select({ prices: extraPricesSql })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.id, appointmentId),
+          eq(appointments.clinicId, clinicId),
+        ),
+      );
+    const extraCents = extras?.prices.cents ?? 0;
+    const mainCents = service?.priceCents ?? null;
     return {
       inPackage: Boolean(session),
       receipt: receipt ?? null,
-      servicePriceCents: service?.priceCents ?? null,
+      servicePriceCents:
+        mainCents === null && extraCents === 0
+          ? null
+          : (mainCents ?? 0) + extraCents,
     };
   });
 }

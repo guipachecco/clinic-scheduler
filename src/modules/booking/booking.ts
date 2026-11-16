@@ -13,7 +13,8 @@ import {
   services,
 } from "@/db/schema";
 import { lockAgenda } from "@/modules/appointments/appointments";
-import type { Status } from "@/modules/appointments/fields";
+import { extraNamesSql } from "@/modules/appointments/extras";
+import { serviceLabel, type Status } from "@/modules/appointments/fields";
 import type { DayHours } from "@/modules/schedule/schedule";
 
 import { type BusyInterval, freeSlots, parseLocalDate } from "./slots";
@@ -525,6 +526,7 @@ export async function listMyAppointments(
     startsAt: appointments.startsAt,
     endsAt: appointments.endsAt,
     serviceName: appointments.serviceName,
+    extraNames: extraNamesSql,
     status: appointments.status,
   };
   const own = and(
@@ -543,6 +545,16 @@ export async function listMyAppointments(
       .where(and(own, lt(appointments.startsAt, now)))
       .orderBy(desc(appointments.startsAt), desc(appointments.id))
       .limit(PAST_LIST_LIMIT);
-    return { upcoming, past };
+    // Every procedure of the block. The owner's private custom label is not
+    // readable by the client role (migration 0016), so the main service's
+    // own name stands first.
+    const labelled = ({
+      extraNames,
+      ...item
+    }: (typeof upcoming)[number]): MyAppointment => ({
+      ...item,
+      serviceName: serviceLabel(item.serviceName, extraNames),
+    });
+    return { upcoming: upcoming.map(labelled), past: past.map(labelled) };
   });
 }

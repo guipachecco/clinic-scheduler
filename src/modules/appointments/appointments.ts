@@ -27,8 +27,10 @@ import {
   CANCELLATION_REASON_LABELS,
   canTransition,
   isEditableStatus,
+  serviceLabel,
   type Status,
 } from "./fields";
+import { extraNamesSql } from "./extras";
 import { checkWarnings, type Warning } from "./rules";
 
 // Data functions for the admin agenda of one clinic: every function takes the
@@ -67,6 +69,16 @@ export type AppointmentRecord = {
   confirmedAt: Date | null;
   editable: boolean;
   allowedTransitions: Status[];
+  // The other procedures of the block, in order; `active` is whether the
+  // service is still bookable (it and its category are active).
+  extras: {
+    serviceId: string;
+    name: string;
+    durationMinutes: number;
+    active: boolean;
+  }[];
+  // A session of a package (a sale_sessions row points to it).
+  inPackage: boolean;
 };
 
 export type CalendarEvent = {
@@ -1133,8 +1145,8 @@ export async function getAppointment(
   now: Date = new Date(),
 ): Promise<AppointmentRecord | null> {
   if (!UUID_PATTERN.test(id)) return null;
-  const [row] = await inClinic(clinicId, (tx) =>
-    tx
+  const found = await inClinic(clinicId, async (tx) => {
+    const [main] = await tx
       .select({
         id: appointments.id,
         patientId: appointments.patientId,
@@ -1158,9 +1170,48 @@ export async function getAppointment(
       .innerJoin(services, eq(appointments.serviceId, services.id))
       .innerJoin(professionals, professionalJoin)
       .where(and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)))
-      .limit(1),
-  );
-  if (!row) return null;
+      .limit(1);
+    if (!main) return null;
+    const extras = await tx
+      .select({
+        serviceId: appointmentServices.serviceId,
+        name: appointmentServices.serviceName,
+        durationMinutes: appointmentServices.serviceDurationMinutes,
+        active: sql<boolean>`${services.isActive} and ${serviceCategories.isActive}`,
+      })
+      .from(appointmentServices)
+      .innerJoin(
+        services,
+        and(
+          eq(services.clinicId, appointmentServices.clinicId),
+          eq(services.id, appointmentServices.serviceId),
+        ),
+      )
+      .innerJoin(
+        serviceCategories,
+        eq(services.categoryId, serviceCategories.id),
+      )
+      .where(
+        and(
+          eq(appointmentServices.appointmentId, id),
+          eq(appointmentServices.clinicId, clinicId),
+        ),
+      )
+      .orderBy(asc(appointmentServices.position));
+    const [session] = await tx
+      .select({ id: saleSessions.id })
+      .from(saleSessions)
+      .where(
+        and(
+          eq(saleSessions.appointmentId, id),
+          eq(saleSessions.clinicId, clinicId),
+        ),
+      )
+      .limit(1);
+    return { row: main, extras, inPackage: Boolean(session) };
+  });
+  if (!found) return null;
+  const { row, extras, inPackage } = found;
   // Anonymized patients cannot be (re)scheduled, but their appointments
   // still take status corrections.
   const writable = !row.anonymizedAt;
@@ -1187,6 +1238,8 @@ export async function getAppointment(
     allowedTransitions: APPOINTMENT_STATUSES.filter(
       (to) => canTransition(row.status, to, row.startsAt, now).ok,
     ),
+    extras,
+    inPackage,
   };
 }
 
@@ -1198,6 +1251,7 @@ const calendarColumns = {
   source: appointments.source,
   serviceName: appointments.serviceName,
   customLabel: appointments.customLabel,
+  extraNames: extraNamesSql,
   name: patients.name,
   nickname: patients.nickname,
   anonymizedAt: patients.anonymizedAt,
@@ -1213,6 +1267,7 @@ function toCalendarEvent(row: {
   source: "admin" | "online";
   serviceName: string;
   customLabel: string | null;
+  extraNames: string[];
   name: string;
   nickname: string | null;
   anonymizedAt: Date | null;
@@ -1220,13 +1275,16 @@ function toCalendarEvent(row: {
   professionalName: string;
 }): CalendarEvent {
   const patientLabel = displayName(row);
-  const serviceLabel = row.customLabel ?? row.serviceName;
+  const label = serviceLabel(
+    row.customLabel ?? row.serviceName,
+    row.extraNames,
+  );
   const online = row.source === "online";
   return {
     id: row.id,
-    title: `${patientLabel} · ${serviceLabel}${online ? " · Online" : ""}`,
+    title: `${patientLabel} · ${label}${online ? " · Online" : ""}`,
     patientLabel,
-    serviceLabel,
+    serviceLabel: label,
     start: row.startsAt.toISOString(),
     end: row.endsAt.toISOString(),
     status: row.status,
@@ -1331,6 +1389,7 @@ export async function listPatientAppointments(
     endsAt: appointments.endsAt,
     serviceName: appointments.serviceName,
     customLabel: appointments.customLabel,
+    extraNames: extraNamesSql,
     status: appointments.status,
   };
   // One transaction runs one query at a time: each is awaited in turn.
@@ -1362,5 +1421,12 @@ export async function listPatientAppointments(
         .limit(PATIENT_LIST_LIMIT),
     ]),
   );
-  return { upcoming, past };
+  const labelled = ({
+    extraNames,
+    ...item
+  }: (typeof upcoming)[number]): PatientAppointmentItem => ({
+    ...item,
+    serviceName: serviceLabel(item.customLabel ?? item.serviceName, extraNames),
+  });
+  return { upcoming: upcoming.map(labelled), past: past.map(labelled) };
 }

@@ -12,6 +12,7 @@ import {
 import { db, endPools } from "@/db/owner";
 import {
   appointments,
+  appointmentServices,
   auditLogs,
   businessHours,
   clinics,
@@ -757,5 +758,75 @@ describe("online booking", () => {
       serviceName: "Serviço fictício agendável",
       status: "confirmed",
     });
+  });
+});
+
+describe("my appointments with several procedures", () => {
+  it("shows every procedure to the client, never the owner's private label", async () => {
+    const professional = await defaultProfessional(clinicId);
+    const extras = await db
+      .insert(services)
+      .values(
+        ["Pedicure", "Spa"].map((name) => ({
+          clinicId,
+          categoryId,
+          name,
+          slug: `extra-cliente-${name.toLowerCase()}`,
+          durationMinutes: 30,
+          isActive: true,
+        })),
+      )
+      .returning({ id: services.id });
+    const book = async (
+      time: string,
+      customLabel: string | null,
+      names: string[],
+    ) => {
+      const startsAt = new Date(local(MONDAY, time));
+      const endsAt = new Date(startsAt.getTime() + 30 * 60_000);
+      const [row] = await db
+        .insert(appointments)
+        .values({
+          clinicId,
+          patientId: patient.ana,
+          professionalId: professional.id,
+          serviceId,
+          serviceName: "Serviço fictício agendável",
+          serviceDurationMinutes: 30,
+          customLabel,
+          startsAt,
+          endsAt,
+          occupiedFrom: startsAt,
+          occupiedUntil: endsAt,
+          status: "confirmed",
+          source: "admin",
+          confirmedAt: NOW,
+        })
+        .returning({ id: appointments.id });
+      if (names.length > 0) {
+        await db.insert(appointmentServices).values(
+          names.map((name, index) => ({
+            clinicId,
+            appointmentId: row!.id,
+            serviceId: extras[index]!.id,
+            serviceName: name,
+            serviceDurationMinutes: 30,
+            position: index + 1,
+          })),
+        );
+      }
+      return row!.id;
+    };
+    const plain = await book("09:00", null, []);
+    const withExtras = await book("10:00", null, ["Pedicure", "Spa"]);
+    const labelled = await book("11:00", "Retorno fictício", ["Pedicure"]);
+
+    const mine = await listMyAppointments(ctx("ana"));
+    const names = new Map(mine.upcoming.map((a) => [a.id, a.serviceName]));
+    expect(names.get(plain)).toBe("Serviço fictício agendável");
+    expect(names.get(withExtras)).toBe(
+      "Serviço fictício agendável + Pedicure + Spa",
+    );
+    expect(names.get(labelled)).toBe("Serviço fictício agendável + Pedicure");
   });
 });

@@ -956,6 +956,8 @@ describe("getAppointment", () => {
       confirmedAt: NOW,
       editable: true,
       allowedTransitions: ["cancelled"],
+      extras: [],
+      inPackage: false,
     });
     const after = await getAppointment(
       CLINIC,
@@ -1525,5 +1527,120 @@ describe("extra procedures", () => {
     expect(first.ok && second.ok && first.id === second.id).toBe(true);
     expect(await appointmentCount()).toBe(1);
     expect(await db.select().from(appointmentServices)).toHaveLength(2);
+  });
+});
+
+describe("reads with several procedures", () => {
+  const range = {
+    from: new Date("2026-11-10T03:00:00Z"),
+    to: new Date("2026-11-11T03:00:00Z"),
+  };
+
+  it("shows the main service alone exactly as before", async () => {
+    const id = await created();
+    const [event] = await listAppointmentsInRange(CLINIC, {
+      ...range,
+      includeCancelled: false,
+    });
+    expect(event).toMatchObject({
+      id,
+      title: "Mari · Limpeza fictícia",
+      serviceLabel: "Limpeza fictícia",
+    });
+    const { upcoming } = await listPatientAppointments(CLINIC, patientId, NOW);
+    expect(upcoming[0]!.serviceName).toBe("Limpeza fictícia");
+  });
+
+  it("joins the main service and the extras in order", async () => {
+    const id = await created({ extraServiceIds: [extraAId, extraBId] });
+    const label = "Limpeza fictícia + Extra A fictício + Extra B fictício";
+    const [event] = await listAppointmentsInRange(CLINIC, {
+      ...range,
+      includeCancelled: false,
+    });
+    expect(event).toMatchObject({
+      title: `Mari · ${label}`,
+      serviceLabel: label,
+    });
+    const [requested] = await db
+      .update(appointments)
+      .set({ status: "requested", confirmedAt: null })
+      .where(eq(appointments.id, id))
+      .returning({ id: appointments.id });
+    const waiting = await listRequestedFrom(CLINIC, NOW);
+    expect(waiting.find((e) => e.id === requested!.id)?.serviceLabel).toBe(
+      label,
+    );
+    const { upcoming } = await listPatientAppointments(CLINIC, patientId, NOW);
+    expect(upcoming[0]).toMatchObject({
+      serviceName: label,
+      customLabel: null,
+    });
+  });
+
+  it("puts the flexible label first", async () => {
+    await created({
+      serviceId: flexibleServiceId,
+      customLabel: LABEL,
+      extraServiceIds: [extraAId],
+    });
+    const [event] = await listAppointmentsInRange(CLINIC, {
+      ...range,
+      includeCancelled: false,
+    });
+    expect(event!.serviceLabel).toBe(`${LABEL} + Extra A fictício`);
+    const { upcoming } = await listPatientAppointments(CLINIC, patientId, NOW);
+    expect(upcoming[0]!.serviceName).toBe(`${LABEL} + Extra A fictício`);
+  });
+
+  it("getAppointment returns the extras in order and keeps the main name", async () => {
+    const id = await created({ extraServiceIds: [extraBId, extraAId] });
+    const record = await getAppointment(CLINIC, id, NOW);
+    expect(record).toMatchObject({
+      serviceName: "Limpeza fictícia",
+      inPackage: false,
+    });
+    expect(record!.extras).toEqual([
+      {
+        serviceId: extraBId,
+        name: "Extra B fictício",
+        durationMinutes: 40,
+        active: true,
+      },
+      {
+        serviceId: extraAId,
+        name: "Extra A fictício",
+        durationMinutes: 20,
+        active: true,
+      },
+    ]);
+    // An extra whose service was deactivated since stays listed, inactive.
+    await db
+      .update(services)
+      .set({ isActive: false })
+      .where(eq(services.id, extraAId));
+    const after = await getAppointment(CLINIC, id, NOW);
+    expect(after!.extras.map((e) => e.active)).toEqual([true, false]);
+  });
+
+  it("getAppointment has no extras when there are none", async () => {
+    const id = await created();
+    expect((await getAppointment(CLINIC, id, NOW))!.extras).toEqual([]);
+  });
+});
+
+describe("getAppointment inPackage", () => {
+  it("is true only for a session of a package", async () => {
+    const id = await created();
+    expect((await getAppointment(CLINIC, id, NOW))!.inPackage).toBe(false);
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`set local session_replication_role = replica`);
+      await tx.insert(saleSessions).values({
+        clinicId: CLINIC,
+        saleItemId: crypto.randomUUID(),
+        appointmentId: id,
+      });
+    });
+    expect((await getAppointment(CLINIC, id, NOW))!.inPackage).toBe(true);
   });
 });

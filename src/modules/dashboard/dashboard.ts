@@ -6,6 +6,12 @@ import { DateTime } from "luxon";
 import { inClinic } from "@/db/client";
 import { appointments, patients, services } from "@/db/schema";
 import { countRequestedFrom } from "@/modules/appointments/appointments";
+import {
+  type ExtraPrices,
+  extraNamesSql,
+  extraPricesSql,
+} from "@/modules/appointments/extras";
+import { serviceLabel } from "@/modules/appointments/fields";
 import { getClinicTimezone } from "@/modules/clinic-page/panel";
 import { ANONYMIZED_NAME, listBirthdays } from "@/modules/patients/patients";
 import { listPendingLinks } from "@/modules/patients/links";
@@ -48,6 +54,8 @@ const itemColumns = {
   serviceName: appointments.serviceName,
   customLabel: appointments.customLabel,
   priceCents: services.priceCents,
+  extraNames: extraNamesSql,
+  extraPrices: extraPricesSql,
   name: patients.name,
   phone: patients.phone,
   anonymizedAt: patients.anonymizedAt,
@@ -63,22 +71,32 @@ function toItem(row: {
   serviceName: string;
   customLabel: string | null;
   priceCents: number | null;
+  extraNames: string[];
+  extraPrices: ExtraPrices;
   name: string;
   phone: string | null;
   anonymizedAt: Date | null;
 }): DayItem {
   const anonymized = row.anonymizedAt !== null;
+  // The sum of the prices that are known; null only when no procedure has one.
+  const { cents, missing } = row.extraPrices;
+  const noPrice = row.priceCents === null && cents === 0;
   return {
     id: row.id,
     startsAt: row.startsAt,
     endsAt: row.endsAt,
     status: row.status,
     online: row.source === "online",
-    priceCents: row.priceCents,
+    priceCents: noPrice ? null : (row.priceCents ?? 0) + cents,
+    pricePartial:
+      row.extraNames.length > 0 && (row.priceCents === null || missing),
     patientId: row.patientId,
     patientName: anonymized ? ANONYMIZED_NAME : row.name,
     patientPhone: anonymized ? null : row.phone,
-    serviceName: row.customLabel ?? row.serviceName,
+    serviceName: serviceLabel(
+      row.customLabel ?? row.serviceName,
+      row.extraNames,
+    ),
     durationMinutes: Math.round(
       (row.endsAt.getTime() - row.startsAt.getTime()) / MINUTE,
     ),
