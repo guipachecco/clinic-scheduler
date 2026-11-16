@@ -1,11 +1,10 @@
 import "server-only";
 
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 
 import { inClinic } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import {
-  appointmentServices,
   appointments,
   auditLogs,
   installments,
@@ -15,6 +14,9 @@ import {
   sales,
   services,
 } from "@/db/schema";
+
+import { extraNamesSql, extraPricesSql } from "@/modules/appointments/extras";
+import { serviceLabel } from "@/modules/appointments/fields";
 
 import type { ReceiptValues } from "./fields";
 import type { SaleResult } from "./sales";
@@ -43,8 +45,7 @@ export type AppointmentBilling = {
   inPackage: boolean;
   // The receipt that counts, once she received it.
   receipt: AppointmentReceipt | null;
-  // The price today of the visit's service, or of all of them when it has
-  // several, to prefill "Receber" (null when none has a price).
+  // The service's price today, to prefill "Receber" (null when it has none).
   servicePriceCents: number | null;
 };
 
@@ -99,38 +100,34 @@ export async function getAppointmentBilling(
       )
       .orderBy(desc(receipts.createdAt))
       .limit(1);
-    // A visit with several services (appointment_services) adds them up.
-    const visit = await tx
-      .select({ serviceId: appointmentServices.serviceId })
-      .from(appointmentServices)
+    const [service] = await tx
+      .select({ priceCents: services.priceCents })
+      .from(services)
       .where(
         and(
-          eq(appointmentServices.clinicId, clinicId),
-          eq(appointmentServices.appointmentId, appointmentId),
+          eq(services.id, appointment.serviceId),
+          eq(services.clinicId, clinicId),
         ),
       );
-    const serviceIds =
-      visit.length > 0
-        ? visit.map((row) => row.serviceId)
-        : [appointment.serviceId];
-    const prices = (
-      await tx
-        .select({ priceCents: services.priceCents })
-        .from(services)
-        .where(
-          and(
-            inArray(services.id, serviceIds),
-            eq(services.clinicId, clinicId),
-          ),
-        )
-    ).flatMap((row) => (row.priceCents === null ? [] : [row.priceCents]));
+    // The extra procedures add their prices; those without one add nothing.
+    const [extras] = await tx
+      .select({ prices: extraPricesSql })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.id, appointmentId),
+          eq(appointments.clinicId, clinicId),
+        ),
+      );
+    const extraCents = extras?.prices.cents ?? 0;
+    const mainCents = service?.priceCents ?? null;
     return {
       inPackage: Boolean(session),
       receipt: receipt ?? null,
       servicePriceCents:
-        prices.length > 0
-          ? prices.reduce((sum, cents) => sum + cents, 0)
-          : null,
+        mainCents === null && extraCents === 0
+          ? null
+          : (mainCents ?? 0) + extraCents,
     };
   });
 }
@@ -171,6 +168,7 @@ export async function createReceipt(
             patientId: appointments.patientId,
             serviceName: appointments.serviceName,
             customLabel: appointments.customLabel,
+            extraNames: extraNamesSql,
             status: appointments.status,
           })
           .from(appointments)
@@ -193,7 +191,10 @@ export async function createReceipt(
         }
         // The appointment decides who and what was paid.
         patientId = appointment.patientId;
-        description = (appointment.customLabel ?? appointment.serviceName)
+        description = serviceLabel(
+          appointment.customLabel ?? appointment.serviceName,
+          appointment.extraNames,
+        )
           .trim()
           .slice(0, 80);
       } else if (!description) {

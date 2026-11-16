@@ -14,7 +14,8 @@ import {
   services,
 } from "@/db/schema";
 import { lockAgenda } from "@/modules/appointments/appointments";
-import type { Status } from "@/modules/appointments/fields";
+import { extraNamesSql } from "@/modules/appointments/extras";
+import { serviceLabel, type Status } from "@/modules/appointments/fields";
 import type { DayHours } from "@/modules/schedule/schedule";
 
 import { type BusyInterval, freeSlots, parseLocalDate } from "./slots";
@@ -87,13 +88,14 @@ type BookingService = {
 
 // What she books in one go: one service or more, back to back, as a single
 // appointment. The services come in the clinic's order; the first one is the
-// appointment's own service (appointments.service_id).
+// appointment's main service (appointments.service_id) and the others are
+// its extra procedures (appointment_services), as in the panel.
 type BookingVisit = {
   services: BookingService[];
-  // Every name, joined: "Esmaltação em gel + Detox dos pés".
-  name: string;
+  // Of all the services together.
   durationMinutes: number;
-  // The widest buffer of its services on each side.
+  // Preparation of the first service and cleanup of the last, as in the
+  // panel (occupiedRange in the appointments module).
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
 };
@@ -141,7 +143,7 @@ async function readClinic(
 // services_client hides every other one (inactive, offline, flexible,
 // inactive category). The WHERE repeats the service-level conditions (active,
 // online, not flexible); the category check is left to the policy, and the
-// insert policies of 0014 and 0035 check all of them again. Null when a
+// insert policies of 0014 and 0036 check all of them again. Null when a
 // service is not open, or the list is empty, too long or repeats one.
 async function readVisit(
   tx: Tx,
@@ -180,12 +182,9 @@ async function readVisit(
   if (rows.length !== ids.length) return null;
   return {
     services: rows,
-    name: rows.map((row) => row.name).join(" + "),
     durationMinutes: rows.reduce((sum, row) => sum + row.durationMinutes, 0),
-    bufferBeforeMinutes: Math.max(
-      ...rows.map((row) => row.bufferBeforeMinutes),
-    ),
-    bufferAfterMinutes: Math.max(...rows.map((row) => row.bufferAfterMinutes)),
+    bufferBeforeMinutes: rows[0]!.bufferBeforeMinutes,
+    bufferAfterMinutes: rows.at(-1)!.bufferAfterMinutes,
   };
 }
 
@@ -457,7 +456,10 @@ export async function bookOnline(
       if (!clinic) return { ok: false, reason: "unavailable" };
       const visit = await readVisit(tx, ctx.clinicId, input.serviceIds);
       if (!visit) return { ok: false, reason: "unavailable" };
-      const service = visit.services[0]!;
+      const [service, ...extras] = visit.services as [
+        BookingService,
+        ...BookingService[],
+      ];
       const professionalId = await readProfessional(tx, ctx.clinicId);
       if (!professionalId) return { ok: false, reason: "unavailable" };
 
@@ -501,8 +503,8 @@ export async function bookOnline(
             patientId: ctx.patientId,
             professionalId,
             serviceId: service.id,
-            serviceName: visit.name,
-            serviceDurationMinutes: visit.durationMinutes,
+            serviceName: service.name,
+            serviceDurationMinutes: service.durationMinutes,
             customLabel: null,
             startsAt,
             endsAt,
@@ -518,16 +520,16 @@ export async function bookOnline(
           })
           .returning({ id: appointments.id }),
       );
-      if (visit.services.length > 1) {
+      if (extras.length > 0) {
         await insertBooking(() =>
           tx.insert(appointmentServices).values(
-            visit.services.map((item, position) => ({
+            extras.map((item, index) => ({
               clinicId: ctx.clinicId,
               appointmentId: row!.id,
               serviceId: item.id,
               serviceName: item.name,
-              durationMinutes: item.durationMinutes,
-              position,
+              serviceDurationMinutes: item.durationMinutes,
+              position: index + 1,
             })),
           ),
         );
@@ -544,8 +546,8 @@ export async function bookOnline(
           patientId: ctx.patientId,
           professionalId,
           serviceId: service.id,
-          ...(visit.services.length > 1
-            ? { serviceIds: visit.services.map((item) => item.id) }
+          ...(extras.length > 0
+            ? { extraServiceIds: extras.map((item) => item.id) }
             : {}),
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
@@ -582,6 +584,7 @@ export async function listMyAppointments(
     startsAt: appointments.startsAt,
     endsAt: appointments.endsAt,
     serviceName: appointments.serviceName,
+    extraNames: extraNamesSql,
     status: appointments.status,
   };
   const own = and(
@@ -600,6 +603,16 @@ export async function listMyAppointments(
       .where(and(own, lt(appointments.startsAt, now)))
       .orderBy(desc(appointments.startsAt), desc(appointments.id))
       .limit(PAST_LIST_LIMIT);
-    return { upcoming, past };
+    // Every procedure of the block. The owner's private custom label is not
+    // readable by the client role (migration 0016), so the main service's
+    // own name stands first.
+    const labelled = ({
+      extraNames,
+      ...item
+    }: (typeof upcoming)[number]): MyAppointment => ({
+      ...item,
+      serviceName: serviceLabel(item.serviceName, extraNames),
+    });
+    return { upcoming: upcoming.map(labelled), past: past.map(labelled) };
   });
 }

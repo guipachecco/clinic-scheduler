@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db, endPools } from "@/db/owner";
 import {
   appointments,
+  appointmentServices,
   businessHours,
   patients,
   serviceCategories,
@@ -15,6 +16,7 @@ import {
   getPanelHome,
   getWeekMarks,
 } from "@/modules/dashboard/dashboard";
+import { daySummary } from "@/modules/dashboard/day";
 
 import { otherClinic } from "../helpers/clinic";
 
@@ -358,6 +360,41 @@ describe("getPanelHome", () => {
     expect(requested.alerts).toBe(1);
   });
 
+  it("counts today's birthdays in the clinic's own time zone", async () => {
+    const maria = and(
+      eq(patients.clinicId, clinicId),
+      eq(patients.name, "Maria Painel"),
+    );
+    // Maria's birthday is Nov 10.
+    await db.update(patients).set({ birthDate: "1990-11-10" }).where(maria);
+    try {
+      const onBirthday = await getPanelHome(
+        clinicId,
+        new Date("2026-11-10T12:00:00Z"),
+      );
+      expect(onBirthday.birthdays).toBe(1);
+      // Nov 11 01:00 UTC is still Nov 10 22:00 local: counts.
+      const lateUtc = await getPanelHome(
+        clinicId,
+        new Date("2026-11-11T01:00:00Z"),
+      );
+      expect(lateUtc.birthdays).toBe(1);
+      const nextDay = await getPanelHome(
+        clinicId,
+        new Date("2026-11-11T12:00:00Z"),
+      );
+      expect(nextDay.birthdays).toBe(0);
+      // Another clinic never sees it.
+      const other = await getPanelHome(
+        otherId,
+        new Date("2026-11-10T12:00:00Z"),
+      );
+      expect(other.birthdays).toBe(0);
+    } finally {
+      await db.update(patients).set({ birthDate: null }).where(maria);
+    }
+  });
+
   it("skips a day with only cancelled appointments", async () => {
     // Wednesday 17:00 local: nothing left today; Thursday has only a cancelled one.
     const home = await getPanelHome(clinicId, new Date("2026-11-11T20:00:00Z"));
@@ -381,5 +418,110 @@ describe("getPanelHome", () => {
     const home = await getPanelHome(clinicId, new Date("2026-11-10T22:00:00Z"));
     expect(home.next).toBeNull();
     expect(home.nextDayFirst?.id).toBe(ids.wednesday);
+  });
+});
+
+describe("appointments with several procedures", () => {
+  // Tuesday 2026-12-15, in no other test's range.
+  let patientId: string;
+  let mainId: string;
+  let pedicureId: string;
+  let freePedicureId: string;
+  const dayIds: Record<string, string> = {};
+
+  async function addExtras(appointmentId: string, extras: [string, string][]) {
+    await db.insert(appointmentServices).values(
+      extras.map(([id, name], index) => ({
+        clinicId,
+        appointmentId,
+        serviceId: id,
+        serviceName: name,
+        serviceDurationMinutes: 30,
+        position: index + 1,
+      })),
+    );
+  }
+
+  beforeAll(async () => {
+    const [category] = await db
+      .select({ id: serviceCategories.id })
+      .from(serviceCategories)
+      .where(eq(serviceCategories.clinicId, clinicId));
+    const [patient] = await db
+      .select({ id: patients.id })
+      .from(patients)
+      .where(
+        and(eq(patients.clinicId, clinicId), eq(patients.name, "Maria Painel")),
+      );
+    patientId = patient!.id;
+    mainId = await seedService(clinicId, category!.id, "main-50", 5000);
+    pedicureId = await seedService(clinicId, category!.id, "extra-30", 3000);
+    freePedicureId = await seedService(
+      clinicId,
+      category!.id,
+      "extra-free",
+      null,
+    );
+
+    dayIds.priced = await seedAppointment({
+      clinic: clinicId,
+      patientId,
+      serviceId: mainId,
+      start: "2026-12-15T09:00:00-03:00",
+      end: "2026-12-15T10:30:00-03:00",
+      status: "confirmed",
+    });
+    await addExtras(dayIds.priced, [[pedicureId, "Pedicure"]]);
+    dayIds.partial = await seedAppointment({
+      clinic: clinicId,
+      patientId,
+      serviceId: mainId,
+      start: "2026-12-15T11:00:00-03:00",
+      end: "2026-12-15T12:00:00-03:00",
+      status: "confirmed",
+    });
+    await addExtras(dayIds.partial, [[freePedicureId, "Spa"]]);
+    dayIds.plain = await seedAppointment({
+      clinic: clinicId,
+      patientId,
+      serviceId: mainId,
+      start: "2026-12-15T14:00:00-03:00",
+      end: "2026-12-15T15:00:00-03:00",
+      status: "confirmed",
+    });
+  });
+
+  it("joins the names and sums the known prices of each item", async () => {
+    const agenda = await getDayAgenda(clinicId, "2026-12-15");
+    const byId = new Map(agenda.items.map((item) => [item.id, item]));
+    expect(byId.get(dayIds.priced)).toMatchObject({
+      serviceName: "Serviço fictício + Pedicure",
+      priceCents: 8000,
+      pricePartial: false,
+    });
+    expect(byId.get(dayIds.partial)).toMatchObject({
+      serviceName: "Serviço fictício + Spa",
+      priceCents: 5000,
+      pricePartial: true,
+    });
+    // No extras: exactly as before.
+    expect(byId.get(dayIds.plain)).toMatchObject({
+      serviceName: "Serviço fictício",
+      priceCents: 5000,
+      pricePartial: false,
+    });
+  });
+
+  it("marks the day's forecast partial when an extra has no price", async () => {
+    const agenda = await getDayAgenda(clinicId, "2026-12-15");
+    expect(daySummary(agenda.items).previsto).toEqual({
+      cents: 18000,
+      partial: true,
+    });
+    const complete = agenda.items.filter((i) => i.id !== dayIds.partial);
+    expect(daySummary(complete).previsto).toEqual({
+      cents: 13000,
+      partial: false,
+    });
   });
 });

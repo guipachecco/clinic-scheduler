@@ -88,6 +88,13 @@ const DURATION_MESSAGE = "A duração deve ser de 5 a 720 minutos.";
 export const MIN_DURATION_MINUTES = 5;
 export const MAX_DURATION_MINUTES = 720;
 export const LABEL_MAX_LENGTH = 60;
+// Extras on top of the main service.
+export const MAX_EXTRA_SERVICES = 9;
+
+// "Manicure + Pedicure": the main service name followed by the extras.
+export function serviceLabel(main: string, extras: readonly string[]): string {
+  return [main, ...extras].join(" + ");
+}
 
 // Checkboxes: true / "on" when ticked, absent when not.
 const checkbox = z
@@ -142,8 +149,34 @@ export const appointmentFormSchema = z
         }
         return number;
       }),
+    // Other services booked in the same block, in order; the main one stays in
+    // serviceId.
+    extraServiceIds: z
+      .array(z.uuid("Escolha o serviço."))
+      .max(
+        MAX_EXTRA_SERVICES,
+        `No máximo ${MAX_EXTRA_SERVICES} procedimentos extras.`,
+      )
+      .optional()
+      .transform((value) => value ?? []),
     idempotencyKey: z.uuid("Recarregue a página e tente de novo."),
     acknowledgeWarnings: checkbox,
+  })
+  .superRefine((value, ctx) => {
+    // Zod still runs this when a field failed; there is nothing to check then.
+    if (!Array.isArray(value.extraServiceIds)) return;
+    const seen = new Set<string>([value.serviceId]);
+    for (const id of value.extraServiceIds) {
+      if (seen.has(id)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["extraServiceIds"],
+          message: "Não repita o mesmo procedimento.",
+        });
+        return;
+      }
+      seen.add(id);
+    }
   })
   .transform((value) => {
     // A wall-clock time in a DST gap moves forward (see localToUtc).
@@ -151,6 +184,7 @@ export const appointmentFormSchema = z
     return {
       patientId: value.patientId,
       serviceId: value.serviceId,
+      extraServiceIds: value.extraServiceIds,
       professionalId: value.professionalId,
       customLabel: value.customLabel,
       startsAt,

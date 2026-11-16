@@ -16,6 +16,9 @@ import { inClinic, type Tx } from "@/db/client";
 import { findPgError, isUniqueViolation } from "@/db/errors";
 import { anamneses, appointments, auditLogs, patients } from "@/db/schema";
 
+import { getClinicTimezone } from "@/modules/clinic-page/panel";
+
+import { ageTurning, birthdayKeys } from "./birthdays";
 import {
   normalizeName,
   type PatientFormInput,
@@ -369,6 +372,64 @@ export async function searchPatients(
     ...(hasMore && last
       ? { next: { nameNormalized: last.sortKey, id: last.id } }
       : {}),
+  };
+}
+
+export type BirthdayItem = {
+  id: string;
+  name: string;
+  nickname: string | null;
+  phone: string | null;
+  age: number;
+};
+
+// Today's birthdays in the clinic time zone, alphabetical. Anonymized and
+// provisional (pending link) records never show. Feb 29 people are listed on
+// Feb 28 in non-leap years.
+export async function listBirthdays(
+  clinicId: string,
+  now: Date = new Date(),
+): Promise<{ date: string; items: BirthdayItem[] }> {
+  const timezone = await getClinicTimezone(clinicId);
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+  const keys = birthdayKeys(date);
+
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: patients.id,
+        name: patients.name,
+        nickname: patients.nickname,
+        phone: patients.phone,
+        birthDate: patients.birthDate,
+      })
+      .from(patients)
+      .where(
+        and(
+          eq(patients.clinicId, clinicId),
+          isNull(patients.anonymizedAt),
+          isNull(patients.pendingLinkPatientId),
+          inArray(sql`to_char(${patients.birthDate}, 'MM-DD')`, keys),
+        ),
+      )
+      .orderBy(asc(SORT_KEY), asc(patients.id)),
+  );
+
+  return {
+    date,
+    items: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      nickname: row.nickname,
+      phone: row.phone,
+      // Safe: the to_char filter above only matches rows with a birth date.
+      age: ageTurning(row.birthDate!, date),
+    })),
   };
 }
 

@@ -33,7 +33,7 @@ function AppointmentList({
               {formatLocal(item.startsAt, "dd/MM/yyyy")}{" "}
               {formatLocal(item.startsAt, "HH:mm")}
             </span>
-            <span>{item.customLabel ?? item.serviceName}</span>
+            <span>{item.serviceName}</span>
             <StatusBadge status={item.status} />
           </Link>
         </li>

@@ -1,4 +1,4 @@
-﻿import { and, eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq, inArray, like, sql } from "drizzle-orm";
 import {
   afterAll,
   beforeAll,
@@ -27,7 +27,6 @@ import {
 import {
   getAppointment,
   listAppointmentsInRange,
-  updateAppointment,
 } from "@/modules/appointments/appointments";
 import {
   bookOnline,
@@ -92,7 +91,7 @@ vi.mock("@/db/client", async (importOriginal) => {
 const DOMAIN = "@agendamento-online.example.test";
 const SLUG = "clinica-agendamento-online";
 // 2033-03-01 is a Tuesday. The clinic opens Monday to Friday, 09:00-12:00
-// (SÃ£o Paulo, -03:00).
+// (São Paulo, -03:00).
 const NOW = new Date("2033-03-01T12:00:00Z");
 const MONDAY = "2033-03-07";
 const TUESDAY = "2033-03-08";
@@ -230,7 +229,7 @@ beforeAll(async () => {
     .values({
       clinicId,
       categoryId,
-      name: "ServiÃ§o fictÃ­cio agendÃ¡vel",
+      name: "Serviço fictício agendável",
       slug: "servico-agendavel",
       durationMinutes: 60,
       bufferBeforeMinutes: 0,
@@ -249,7 +248,7 @@ beforeAll(async () => {
     .values({
       clinicId,
       categoryId,
-      name: "Atendimento flexÃ­vel fictÃ­cio",
+      name: "Atendimento flexível fictício",
       slug: "servico-flexivel",
       durationMinutes: 60,
       isActive: true,
@@ -330,7 +329,7 @@ describe("online booking", () => {
     expect(list).toEqual([
       {
         id: serviceId,
-        name: "ServiÃ§o fictÃ­cio agendÃ¡vel",
+        name: "Serviço fictício agendável",
         description: null,
         durationMinutes: 60,
         priceCents: 12_000,
@@ -431,7 +430,7 @@ describe("online booking", () => {
         patientId: patient.bia,
         professionalId: second!.id,
         serviceId,
-        serviceName: "ServiÃ§o fictÃ­cio",
+        serviceName: "Serviço fictício",
         serviceDurationMinutes: 60,
         startsAt: new Date(local(MONDAY, "09:00")),
         endsAt: new Date(local(MONDAY, "10:00")),
@@ -666,7 +665,7 @@ describe("online booking", () => {
       local(MONDAY, "08:00"),
       local("2033-03-01", "10:00"),
       local("2033-05-02", "09:00"),
-      "nÃ£o Ã© uma data",
+      "não é uma data",
     ]) {
       expect(
         await bookOnline(ctx("ana"), { serviceIds: [serviceId], startsAt }),
@@ -761,15 +760,15 @@ describe("online booking", () => {
       ["endsAt", "id", "serviceName", "startsAt", "status"].sort(),
     );
     expect(mine.upcoming[0]).toMatchObject({
-      serviceName: "ServiÃ§o fictÃ­cio agendÃ¡vel",
+      serviceName: "Serviço fictício agendável",
       status: "confirmed",
     });
   });
 
   describe("several services in one visit", () => {
     let secondId: string;
-    const SECOND = "Segundo serviÃ§o fictÃ­cio";
-    const BOTH = `ServiÃ§o fictÃ­cio agendÃ¡vel + ${SECOND}`;
+    const SECOND = "Segundo serviço fictício";
+    const BOTH = `Serviço fictício agendável + ${SECOND}`;
 
     beforeAll(async () => {
       const [second] = await db
@@ -802,7 +801,7 @@ describe("online booking", () => {
         .select({
           serviceId: appointmentServices.serviceId,
           serviceName: appointmentServices.serviceName,
-          durationMinutes: appointmentServices.durationMinutes,
+          durationMinutes: appointmentServices.serviceDurationMinutes,
           position: appointmentServices.position,
         })
         .from(appointmentServices)
@@ -845,23 +844,18 @@ describe("online booking", () => {
       expect(rows[0]).toMatchObject({
         id,
         serviceId,
-        serviceName: BOTH,
-        serviceDurationMinutes: 90,
+        // The main service in the appointment's own columns, as in the panel.
+        serviceName: "Serviço fictício agendável",
+        serviceDurationMinutes: 60,
         status: "confirmed",
         source: "online",
       });
       expect(rows[0]!.endsAt.toISOString()).toBe("2033-03-07T13:30:00.000Z");
-      // The widest buffer of the two after the visit.
+      // The cleanup of the last service after the visit.
       expect(rows[0]!.occupiedUntil.toISOString()).toBe(
         "2033-03-07T13:45:00.000Z",
       );
       expect(await visitRows(id)).toEqual([
-        {
-          serviceId,
-          serviceName: "ServiÃ§o fictÃ­cio agendÃ¡vel",
-          durationMinutes: 60,
-          position: 0,
-        },
         {
           serviceId: secondId,
           serviceName: SECOND,
@@ -876,7 +870,7 @@ describe("online booking", () => {
         .where(eq(auditLogs.entityId, id));
       expect(audit!.changes).toMatchObject({
         serviceId,
-        serviceIds: [serviceId, secondId],
+        extraServiceIds: [secondId],
         durationMinutes: 90,
       });
 
@@ -948,52 +942,82 @@ describe("online booking", () => {
             appointmentId: id,
             serviceId: secondId,
             serviceName: SECOND,
-            durationMinutes: 30,
+            serviceDurationMinutes: 30,
             position: 1,
           }),
         ),
       ).rejects.toThrow();
       expect(await visitRows(id)).toEqual([]);
     });
+  });
+});
 
-    it("the panel changing the service makes it a single-service one", async () => {
-      const result = await bookOnline(ctx("ana"), {
-        serviceIds: [serviceId, secondId],
-        startsAt: local(MONDAY, "09:00"),
-      });
-      const id = (result as { appointmentId: string }).appointmentId;
-      const record = (await getAppointment(clinicId, id, NOW))!;
-      const values = {
-        patientId: record.patientId,
-        serviceId: record.serviceId,
-        professionalId: null,
-        customLabel: null,
-        startsAt: new Date(local(MONDAY, "09:30")),
-        endsAt: new Date(local(MONDAY, "11:00")),
-        durationMinutes: 90,
-        idempotencyKey: id,
-        acknowledgeWarnings: true,
-      };
-      // Moving it keeps the visit as it was booked.
-      expect(
-        await updateAppointment(clinicId, id, values, user.ana, NOW),
-      ).toEqual({ ok: true, id });
-      expect(await visitRows(id)).toHaveLength(2);
-      expect((await getAppointment(clinicId, id, NOW))!.serviceName).toBe(BOTH);
-
-      expect(
-        await updateAppointment(
+describe("my appointments with several procedures", () => {
+  it("shows every procedure to the client, never the owner's private label", async () => {
+    const professional = await defaultProfessional(clinicId);
+    const extras = await db
+      .insert(services)
+      .values(
+        ["Pedicure", "Spa"].map((name) => ({
           clinicId,
-          id,
-          { ...values, serviceId: secondId },
-          user.ana,
-          NOW,
-        ),
-      ).toEqual({ ok: true, id });
-      expect(await visitRows(id)).toEqual([]);
-      expect((await getAppointment(clinicId, id, NOW))!.serviceName).toBe(
-        SECOND,
-      );
-    });
+          categoryId,
+          name,
+          slug: `extra-cliente-${name.toLowerCase()}`,
+          durationMinutes: 30,
+          isActive: true,
+        })),
+      )
+      .returning({ id: services.id });
+    const book = async (
+      time: string,
+      customLabel: string | null,
+      names: string[],
+    ) => {
+      const startsAt = new Date(local(MONDAY, time));
+      const endsAt = new Date(startsAt.getTime() + 30 * 60_000);
+      const [row] = await db
+        .insert(appointments)
+        .values({
+          clinicId,
+          patientId: patient.ana,
+          professionalId: professional.id,
+          serviceId,
+          serviceName: "Serviço fictício agendável",
+          serviceDurationMinutes: 30,
+          customLabel,
+          startsAt,
+          endsAt,
+          occupiedFrom: startsAt,
+          occupiedUntil: endsAt,
+          status: "confirmed",
+          source: "admin",
+          confirmedAt: NOW,
+        })
+        .returning({ id: appointments.id });
+      if (names.length > 0) {
+        await db.insert(appointmentServices).values(
+          names.map((name, index) => ({
+            clinicId,
+            appointmentId: row!.id,
+            serviceId: extras[index]!.id,
+            serviceName: name,
+            serviceDurationMinutes: 30,
+            position: index + 1,
+          })),
+        );
+      }
+      return row!.id;
+    };
+    const plain = await book("09:00", null, []);
+    const withExtras = await book("10:00", null, ["Pedicure", "Spa"]);
+    const labelled = await book("11:00", "Retorno fictício", ["Pedicure"]);
+
+    const mine = await listMyAppointments(ctx("ana"));
+    const names = new Map(mine.upcoming.map((a) => [a.id, a.serviceName]));
+    expect(names.get(plain)).toBe("Serviço fictício agendável");
+    expect(names.get(withExtras)).toBe(
+      "Serviço fictício agendável + Pedicure + Spa",
+    );
+    expect(names.get(labelled)).toBe("Serviço fictício agendável + Pedicure");
   });
 });

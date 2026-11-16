@@ -1,5 +1,5 @@
 {
-  "id": "49ec2c59-4cd5-45a2-8a10-073e5c1491c7",
+  "id": "15229aad-780a-4ad9-9cdc-8104065a721c",
   "prevId": "adb69b69-6e93-481d-aa70-43e7cf89c97b",
   "version": "7",
   "dialect": "postgresql",
@@ -605,15 +605,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "duration_minutes": {
-          "name": "duration_minutes",
+        "service_duration_minutes": {
+          "name": "service_duration_minutes",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
         "position": {
           "name": "position",
-          "type": "smallint",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -626,15 +626,9 @@
         }
       },
       "indexes": {
-        "appointment_services_service_idx": {
-          "name": "appointment_services_service_idx",
+        "appointment_services_service_id_idx": {
+          "name": "appointment_services_service_id_idx",
           "columns": [
-            {
-              "expression": "clinic_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
             {
               "expression": "service_id",
               "isExpression": false,
@@ -649,6 +643,19 @@
         }
       },
       "foreignKeys": {
+        "appointment_services_clinic_id_clinics_id_fk": {
+          "name": "appointment_services_clinic_id_clinics_id_fk",
+          "tableFrom": "appointment_services",
+          "tableTo": "clinics",
+          "columnsFrom": [
+            "clinic_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
         "appointment_services_appointment_fk": {
           "name": "appointment_services_appointment_fk",
           "tableFrom": "appointment_services",
@@ -701,13 +708,9 @@
       },
       "policies": {},
       "checkConstraints": {
-        "appointment_services_duration_check": {
-          "name": "appointment_services_duration_check",
-          "value": "\"appointment_services\".\"duration_minutes\" > 0"
-        },
         "appointment_services_position_check": {
           "name": "appointment_services_position_check",
-          "value": "\"appointment_services\".\"position\" between 0 and 9"
+          "value": "\"appointment_services\".\"position\" between 1 and 9"
         }
       },
       "isRLSEnabled": false

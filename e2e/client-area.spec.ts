@@ -436,20 +436,26 @@ test.describe("client area", () => {
       ).toBeVisible();
       await expect(client.getByText(BOTH)).toBeVisible();
 
-      // One appointment for the visit, as long as the two services together.
-      const booked = await query<{ minutes: number; services: number }>(
+      // One appointment for the visit, as long as the two services together:
+      // the first is its main service, the second an extra procedure.
+      const booked = await query<{ minutes: number; main: string }>(
         `SELECT extract(epoch FROM a.ends_at - a.starts_at)::int / 60 AS minutes,
-                (SELECT count(*)::int FROM appointment_services v
-                 WHERE v.appointment_id = a.id) AS services
-         FROM appointments a WHERE a.service_name = $1`,
-        [BOTH],
+                a.service_name AS main
+         FROM appointments a
+         JOIN appointment_services v ON v.appointment_id = a.id
+         WHERE v.service_id = $1`,
+        [second!.id],
       );
       expect(booked).toHaveLength(1);
-      expect(booked[0]!.services).toBe(2);
+      expect(booked[0]!.main).toBe(A.service);
       expect(booked[0]!.minutes).toBeGreaterThan(30);
     } finally {
       // Leaves the clinic as the other tests expect it.
-      await query(`DELETE FROM appointments WHERE service_name = $1`, [BOTH]);
+      await query(
+        `DELETE FROM appointments WHERE id IN
+           (SELECT appointment_id FROM appointment_services WHERE service_id = $1)`,
+        [second!.id],
+      );
       await query(`DELETE FROM services WHERE id = $1`, [second!.id]);
     }
   });

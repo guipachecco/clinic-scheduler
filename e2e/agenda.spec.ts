@@ -334,6 +334,7 @@ test.describe("agenda", () => {
   test.describe("agendamentos", () => {
     const CATEGORY = "Agenda (teste)";
     const SERVICE = "Consulta (teste agenda)";
+    const SERVICE_B = "Retoque (teste agenda)";
     const PATIENT = {
       name: "Marina Agenda Teste",
       phone: "(48) 99999-0042",
@@ -456,7 +457,9 @@ test.describe("agenda", () => {
         PATIENT.name,
         BLOCKER_PATIENT_ID,
       ]);
-      await sql("DELETE FROM services WHERE name = $1", [SERVICE]);
+      await sql("DELETE FROM services WHERE name = ANY($1)", [
+        [SERVICE, SERVICE_B],
+      ]);
       await sql("DELETE FROM service_categories WHERE name = $1", [CATEGORY]);
       // Only this clinic's: the client-area clinics keep theirs.
       await sql("DELETE FROM business_hours WHERE clinic_id = $1", [CLINIC_ID]);
@@ -687,6 +690,80 @@ test.describe("agenda", () => {
     test("an off-step inicio rounds down to the 5-minute step", async () => {
       await page.goto(`/admin/agenda/novo?inicio=${TARGET_DATE}T10:07`);
       await expect(page.getByLabel("Horário")).toHaveValue("10:05");
+    });
+
+    test("one appointment block holds several procedures", async () => {
+      await page.goto("/admin/servicos/novo");
+      await page.getByLabel("Categoria").selectOption({ label: CATEGORY });
+      await page.getByLabel("Nome", { exact: true }).fill(SERVICE_B);
+      await page.getByLabel("Duração (min)").fill("30");
+      await page
+        .getByLabel("Forma de exibir o preço")
+        .selectOption("on_request");
+      await page.getByRole("button", { name: "Cadastrar serviço" }).click();
+      await expect(page).toHaveURL(/\/admin\/servicos$/);
+
+      await page.goto("/admin/agenda/novo");
+      // No extra before the main service is chosen.
+      await expect(
+        page.getByRole("button", { name: "Adicionar procedimento" }),
+      ).toHaveCount(0);
+      await fillAppointment(TARGET_DATE, "16:00");
+      await page
+        .getByRole("button", { name: "Adicionar procedimento" })
+        .click();
+      const extra = page.getByLabel("Procedimento 2", { exact: true });
+      await expect(extra).toBeFocused();
+      // The main service is not offered again.
+      await expect(extra.locator("option", { hasText: SERVICE })).toHaveCount(
+        0,
+      );
+      await extra.selectOption({ label: SERVICE_B });
+      await expect(page.getByLabel("Duração (min)")).toHaveValue("80");
+      await page.getByRole("button", { name: "Agendar", exact: true }).click();
+
+      await expect(page).toHaveURL(/\/admin\/agenda\/[0-9a-f-]{36}$/);
+      const blockUrl = page.url();
+      await expect(
+        page.getByText(`Serviço: ${SERVICE} + ${SERVICE_B}`, { exact: true }),
+      ).toBeVisible();
+      await expect(page.getByText("16:00–17:20")).toBeVisible();
+      const list = page.getByRole("list", { name: "Procedimentos" });
+      await expect(list.getByRole("listitem")).toHaveText([
+        `${SERVICE} · 50 min`,
+        `${SERVICE_B} · 30 min`,
+      ]);
+
+      await showTargetWeek();
+      await expect(
+        calendar()
+          .locator(
+            `.fc-timegrid-col[data-date="${TARGET_DATE}"] .fc-timegrid-event`,
+          )
+          .filter({ hasText: `Marina · ${SERVICE} + ${SERVICE_B}` }),
+      ).toBeVisible();
+
+      await page.goto(patientUrl);
+      await expect(
+        page
+          .getByRole("region", { name: "Atendimentos" })
+          .getByText(`${SERVICE} + ${SERVICE_B}`),
+      ).toBeVisible();
+
+      // Removing the extra brings back the main service alone.
+      await page.goto(blockUrl);
+      await page
+        .getByRole("button", { name: "Remover procedimento 2" })
+        .click();
+      await expect(page.getByLabel("Duração (min)")).toHaveValue("50");
+      await page.getByRole("button", { name: "Salvar alterações" }).click();
+      await expect(page.getByText("Agendamento salvo.")).toBeVisible();
+      await expect(
+        page.getByText(`Serviço: ${SERVICE}`, { exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("list", { name: "Procedimentos" }),
+      ).toHaveCount(0);
     });
   });
 });

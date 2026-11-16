@@ -250,8 +250,15 @@
     {
       "idx": 35,
       "version": "7",
-      "when": 1794768995318,
+      "when": 1794845183308,
       "tag": "0035_appointment_services",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794869791414,
+      "tag": "0036_client_books_extra_services",
       "breakpoints": true
     }
   ]

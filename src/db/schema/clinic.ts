@@ -843,21 +843,24 @@ export const appointments = pgTable(
   ],
 );
 
-// The services of a visit that has more than one (migration 0035), in the
-// order they are named. Such an appointment keeps the first one in
-// appointments.service_id, every name joined in service_name and the total
-// in service_duration_minutes; an appointment with a single service has no
-// rows here.
+// The extra procedures of an appointment (migration 0035). The appointment
+// keeps its main service in its own columns; each row here is one more
+// procedure done in the same block, in order (position 1 to 9). Name and
+// duration are copied when booked, like on appointments, so later edits to
+// the service do not change the history. Deleting the appointment deletes its
+// extras; a service in use is never deleted.
 export const appointmentServices = pgTable(
   "appointment_services",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    clinicId: uuid("clinic_id").notNull(),
+    clinicId: uuid("clinic_id")
+      .notNull()
+      .references(() => clinics.id, { onDelete: "restrict" }),
     appointmentId: uuid("appointment_id").notNull(),
     serviceId: uuid("service_id").notNull(),
     serviceName: text("service_name").notNull(),
-    durationMinutes: integer("duration_minutes").notNull(),
-    position: smallint("position").notNull(),
+    serviceDurationMinutes: integer("service_duration_minutes").notNull(),
+    position: integer("position").notNull(),
     createdAt: createdAt(),
   },
   (t) => [
@@ -879,11 +882,10 @@ export const appointmentServices = pgTable(
       t.appointmentId,
       t.position,
     ),
-    index("appointment_services_service_idx").on(t.clinicId, t.serviceId),
-    check("appointment_services_duration_check", sql`${t.durationMinutes} > 0`),
+    index("appointment_services_service_id_idx").on(t.serviceId),
     check(
       "appointment_services_position_check",
-      sql`${t.position} between 0 and 9`,
+      sql`${t.position} between 1 and 9`,
     ),
   ],
 );
