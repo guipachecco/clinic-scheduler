@@ -57,7 +57,12 @@ async function extra(e: Parameters<typeof extraSql>[0]) {
   return (await one<{ id: string }>(extraSql(e))).id;
 }
 
-async function appointment(patient: string, clinic: string, service: string, day: number) {
+async function appointment(
+  patient: string,
+  clinic: string,
+  service: string,
+  day: number,
+) {
   return (
     await one<{ id: string }>(
       sql`insert into appointments (clinic_id, patient_id, service_id, service_name,
@@ -230,17 +235,13 @@ describe("appointment_services database", () => {
   it("refuses a repeated service or position in the same appointment", async () => {
     await extra({ appointment: appointment1, service: serviceB, position: 3 });
     expect(
-      await failure(
-        db.execute(extraSql({ service: serviceB, position: 4 })),
-      ),
+      await failure(db.execute(extraSql({ service: serviceB, position: 4 }))),
     ).toEqual({
       code: "23505",
       constraint: "appointment_services_service_unique",
     });
     expect(
-      await failure(
-        db.execute(extraSql({ service: serviceC, position: 3 })),
-      ),
+      await failure(db.execute(extraSql({ service: serviceC, position: 3 }))),
     ).toEqual({
       code: "23505",
       constraint: "appointment_services_position_unique",
@@ -283,8 +284,11 @@ describe("appointment_services database", () => {
   it("a service in use is never deleted, and deleting the appointment deletes its extras", async () => {
     // serviceA is an extra of appointment1 (added above).
     expect(
-      (await failure(db.execute(sql`delete from services where id = ${serviceA}`)))
-        .code,
+      (
+        await failure(
+          db.execute(sql`delete from services where id = ${serviceA}`),
+        )
+      ).code,
     ).toBe("23503");
 
     const temp = await appointment(patient1, CLINIC, serviceC, 3);
