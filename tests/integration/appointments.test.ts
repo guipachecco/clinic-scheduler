@@ -4,9 +4,11 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db, endPools } from "@/db/owner";
 import {
   appointments,
+  appointmentServices,
   auditLogs,
   businessHours,
   patients,
+  saleSessions,
   serviceCategories,
   services,
   timeBlocks,
@@ -28,7 +30,7 @@ import {
   type AppointmentFormValues,
 } from "@/modules/appointments/fields";
 
-import { CLINIC, defaultProfessional } from "../helpers/clinic";
+import { CLINIC, defaultProfessional, otherClinic } from "../helpers/clinic";
 
 // Every record here is fictitious and exists only during the test.
 
@@ -45,6 +47,9 @@ let otherServiceId: string;
 let flexibleServiceId: string;
 let inactiveServiceId: string;
 let inactiveCategoryServiceId: string;
+let extraAId: string;
+let extraBId: string;
+let bufferedExtraId: string;
 
 const PATIENT_NAME = "Maria Fictícia da Silva";
 const LABEL = "Encaixe de retorno";
@@ -159,6 +164,22 @@ beforeEach(async () => {
   inactiveCategoryServiceId = await insertService({
     slug: "categoria-fechada-ficticio",
     categoryId: closedCategory!.id,
+  });
+  extraAId = await insertService({
+    slug: "extra-a-ficticio",
+    name: "Extra A fictício",
+    durationMinutes: 20,
+  });
+  extraBId = await insertService({
+    slug: "extra-b-ficticio",
+    name: "Extra B fictício",
+    durationMinutes: 40,
+  });
+  bufferedExtraId = await insertService({
+    slug: "extra-limpeza-ficticio",
+    name: "Extra com limpeza fictício",
+    durationMinutes: 25,
+    bufferAfterMinutes: 15,
   });
 
   const [patient, plain, anonymized] = await db
@@ -1201,5 +1222,308 @@ describe("overlap race backstop", () => {
       formError: "Este horário conflita com outro atendimento.",
     });
     expect(await appointmentCount()).toBe(1);
+  });
+});
+
+async function extraRows(appointmentId: string) {
+  return db
+    .select()
+    .from(appointmentServices)
+    .where(eq(appointmentServices.appointmentId, appointmentId))
+    .orderBy(asc(appointmentServices.position));
+}
+
+describe("extra procedures", () => {
+  it("stores the extras in order with the name and duration copied", async () => {
+    const id = await created({ extraServiceIds: [extraAId, extraBId] });
+    const rows = await extraRows(id);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      clinicId: CLINIC,
+      serviceId: extraAId,
+      serviceName: "Extra A fictício",
+      serviceDurationMinutes: 20,
+      position: 1,
+    });
+    expect(rows[1]).toMatchObject({
+      serviceId: extraBId,
+      serviceName: "Extra B fictício",
+      serviceDurationMinutes: 40,
+      position: 2,
+    });
+    const [audit] = await audits(id);
+    expect(audit!.changes).toMatchObject({
+      extraServiceIds: [extraAId, extraBId],
+    });
+  });
+
+  it("leaves extraServiceIds out of the audit when there are none", async () => {
+    const id = await created();
+    const [audit] = await audits(id);
+    expect(audit!.changes).not.toHaveProperty("extraServiceIds");
+    expect(await extraRows(id)).toHaveLength(0);
+  });
+
+  it("refuses a missing, flexible, inactive or other-clinic extra and writes nothing", async () => {
+    const other = await otherClinic();
+    const [category] = await db
+      .insert(serviceCategories)
+      .values({ clinicId: other, name: "Cat", slug: "cat-extra-outra" })
+      .returning();
+    const [foreign] = await db
+      .insert(services)
+      .values({
+        clinicId: other,
+        categoryId: category!.id,
+        name: "Serviço de outra clínica",
+        slug: "servico-outra-clinica",
+        durationMinutes: 30,
+      })
+      .returning();
+    const cases: [string, string][] = [
+      [foreign!.id, "Escolha um serviço cadastrado."],
+      [crypto.randomUUID(), "Escolha um serviço cadastrado."],
+      [flexibleServiceId, "O encaixe só pode ser o serviço principal."],
+      [inactiveServiceId, "Serviço inativo."],
+      [inactiveCategoryServiceId, "Serviço inativo."],
+    ];
+    for (const [extra, message] of cases) {
+      const result = await createAppointment(
+        CLINIC,
+        form({ extraServiceIds: [extraAId, extra] }),
+        actorId,
+        NOW,
+      );
+      expect(result).toEqual({
+        ok: false,
+        fieldErrors: { extraServiceIds: message },
+      });
+    }
+    expect(await appointmentCount()).toBe(0);
+    expect(await db.select().from(appointmentServices)).toHaveLength(0);
+  });
+
+  it("refuses a repeat that differs only in letter case", async () => {
+    for (const extras of [
+      [extraAId, extraAId.toUpperCase()],
+      [serviceId.toUpperCase()],
+    ]) {
+      const values = { ...form(), extraServiceIds: extras };
+      const result = await createAppointment(CLINIC, values, actorId, NOW);
+      expect(result).toEqual({
+        ok: false,
+        fieldErrors: { extraServiceIds: "Não repita o mesmo procedimento." },
+      });
+    }
+    expect(await appointmentCount()).toBe(0);
+  });
+
+  it("occupies until the cleanup of the last procedure", async () => {
+    // Main service without cleanup, last extra with 15 minutes.
+    const buffered = await created({
+      serviceId: extraAId,
+      extraServiceIds: [bufferedExtraId],
+    });
+    const savedBuffered = await row(buffered);
+    expect(savedBuffered.occupiedUntil.getTime()).toBe(
+      savedBuffered.endsAt.getTime() + 15 * MINUTE,
+    );
+    expect(savedBuffered.occupiedFrom.getTime()).toBe(
+      savedBuffered.startsAt.getTime(),
+    );
+
+    // Main service has a 15 minute cleanup, the last extra has none: the
+    // last procedure decides, and the main one's preparation still counts.
+    const last = await created({
+      startTime: "13:00",
+      extraServiceIds: [extraAId],
+    });
+    const savedLast = await row(last);
+    expect(savedLast.occupiedUntil.getTime()).toBe(savedLast.endsAt.getTime());
+    expect(savedLast.occupiedFrom.getTime()).toBe(
+      savedLast.startsAt.getTime() - 10 * MINUTE,
+    );
+  });
+
+  it("adds, removes and reorders extras on edit", async () => {
+    const id = await created({ extraServiceIds: [extraAId] });
+    const edit = (extras: string[]) =>
+      updateAppointment(
+        CLINIC,
+        id,
+        form({ extraServiceIds: extras }),
+        actorId,
+        NOW,
+      );
+    expect(await edit([extraAId, extraBId])).toEqual({ ok: true, id });
+    expect((await extraRows(id)).map((r) => r.serviceId)).toEqual([
+      extraAId,
+      extraBId,
+    ]);
+    expect(await edit([extraBId, extraAId])).toEqual({ ok: true, id });
+    const reordered = await extraRows(id);
+    expect(reordered.map((r) => [r.serviceId, r.position])).toEqual([
+      [extraBId, 1],
+      [extraAId, 2],
+    ]);
+    expect(await edit([])).toEqual({ ok: true, id });
+    expect(await extraRows(id)).toHaveLength(0);
+    const logs = await audits(id);
+    expect(logs.map((l) => l.action)).toEqual([
+      "appointment.created",
+      "appointment.updated",
+      "appointment.updated",
+      "appointment.updated",
+    ]);
+    expect(logs[1]!.changes).toEqual({
+      extrasChanged: true,
+      extraServiceIds: [extraAId, extraBId],
+    });
+    expect(logs[3]!.changes).toEqual({
+      extrasChanged: true,
+      extraServiceIds: [],
+    });
+  });
+
+  it("recomputes the occupied range when the extras change", async () => {
+    const id = await created();
+    expect((await row(id)).occupiedUntil.toISOString()).toBe(
+      "2026-11-10T14:15:00.000Z",
+    );
+    await updateAppointment(
+      CLINIC,
+      id,
+      form({ extraServiceIds: [extraAId] }),
+      actorId,
+      NOW,
+    );
+    // The last procedure has no cleanup.
+    expect((await row(id)).occupiedUntil.toISOString()).toBe(
+      "2026-11-10T14:00:00.000Z",
+    );
+  });
+
+  it("checks conflicts when only the extras change", async () => {
+    const id = await created({ serviceId: extraAId });
+    await created({ serviceId: extraAId, startTime: "11:10" });
+    // Same time and main service, but the extra's cleanup now reaches the
+    // appointment that starts at 11:10 (ends 11:00 + 15 minutes).
+    const result = await updateAppointment(
+      CLINIC,
+      id,
+      form({ serviceId: extraAId, extraServiceIds: [bufferedExtraId] }),
+      actorId,
+      NOW,
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      formError: expect.stringContaining("conflita"),
+    });
+    expect(await extraRows(id)).toHaveLength(0);
+  });
+
+  it("writes no audit when the edit changes nothing", async () => {
+    const id = await created({ extraServiceIds: [extraAId, extraBId] });
+    const result = await updateAppointment(
+      CLINIC,
+      id,
+      form({ extraServiceIds: [extraAId, extraBId] }),
+      actorId,
+      NOW,
+    );
+    expect(result).toEqual({ ok: true, id });
+    expect(await audits(id)).toHaveLength(1);
+    expect(await extraRows(id)).toHaveLength(2);
+  });
+
+  it("keeps an extra that was deactivated after booking, but refuses a new inactive one", async () => {
+    const id = await created({ extraServiceIds: [extraAId] });
+    await db
+      .update(services)
+      .set({ isActive: false })
+      .where(eq(services.id, extraAId));
+    const kept = await updateAppointment(
+      CLINIC,
+      id,
+      form({ extraServiceIds: [extraAId], startTime: "11:00" }),
+      actorId,
+      NOW,
+    );
+    expect(kept).toEqual({ ok: true, id });
+    expect((await extraRows(id)).map((r) => r.serviceId)).toEqual([extraAId]);
+    const added = await updateAppointment(
+      CLINIC,
+      id,
+      form({ extraServiceIds: [extraAId, inactiveServiceId] }),
+      actorId,
+      NOW,
+    );
+    expect(added).toEqual({
+      ok: false,
+      fieldErrors: { extraServiceIds: "Serviço inativo." },
+    });
+  });
+
+  it("refuses extras on a package session", async () => {
+    const id = await created();
+    // Only the session link matters for this rule, not the sale behind it, so
+    // the foreign keys are skipped for this one insert.
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`set local session_replication_role = replica`);
+      await tx.insert(saleSessions).values({
+        clinicId: CLINIC,
+        saleItemId: crypto.randomUUID(),
+        appointmentId: id,
+      });
+    });
+    const result = await updateAppointment(
+      CLINIC,
+      id,
+      form({ extraServiceIds: [extraAId] }),
+      actorId,
+      NOW,
+    );
+    expect(result).toEqual({
+      ok: false,
+      formError: "Sessão de pacote não aceita outros procedimentos.",
+    });
+    expect(await extraRows(id)).toHaveLength(0);
+    const same = await updateAppointment(CLINIC, id, form(), actorId, NOW);
+    expect(same).toEqual({ ok: true, id });
+  });
+
+  it("keeps the extras on a drag and uses the cleanup of the last one", async () => {
+    const id = await created({
+      serviceId: extraAId,
+      extraServiceIds: [extraBId, bufferedExtraId],
+    });
+    const result = await rescheduleAppointment(
+      CLINIC,
+      id,
+      {
+        startsAt: new Date("2026-11-11T14:00:00Z"),
+        endsAt: new Date("2026-11-11T15:00:00Z"),
+        acknowledgeWarnings: false,
+      },
+      actorId,
+      NOW,
+    );
+    expect(result).toEqual({ ok: true, id });
+    const saved = await row(id);
+    expect(saved.occupiedFrom.toISOString()).toBe("2026-11-11T14:00:00.000Z");
+    expect(saved.occupiedUntil.toISOString()).toBe("2026-11-11T15:15:00.000Z");
+    expect((await extraRows(id)).map((r) => r.serviceId)).toEqual([
+      extraBId,
+      bufferedExtraId,
+    ]);
+  });
+
+  it("creates one appointment and two extra rows for a repeated key", async () => {
+    const values = form({ extraServiceIds: [extraAId, extraBId] });
+    const first = await createAppointment(CLINIC, values, actorId, NOW);
+    const second = await createAppointment(CLINIC, values, actorId, NOW);
+    expect(first.ok && second.ok && first.id === second.id).toBe(true);
+    expect(await appointmentCount()).toBe(1);
+    expect(await db.select().from(appointmentServices)).toHaveLength(2);
   });
 });

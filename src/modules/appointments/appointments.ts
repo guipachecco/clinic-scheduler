@@ -7,9 +7,11 @@ import { isAppointmentOverlapError, isUniqueViolation } from "@/db/errors";
 import {
   ACTIVE_APPOINTMENT_STATUSES,
   appointments,
+  appointmentServices,
   auditLogs,
   patients,
   professionals,
+  saleSessions,
   serviceCategories,
   services,
 } from "@/db/schema";
@@ -34,7 +36,7 @@ import { checkWarnings, type Warning } from "./rules";
 // write runs in one transaction that takes, in this order: the clinic's
 // agenda advisory lock, the patient row
 // FOR SHARE, the appointment row FOR UPDATE (updates only), then reads the
-// service. Patient names and labels never go to audit_logs or into error
+// service and the extra procedures. Patient names and labels never go to audit_logs or into error
 // messages; audit `changes` hold ids, ISO instants, durations and codes only.
 
 export type AppointmentResult =
@@ -120,6 +122,9 @@ const LABEL_REQUIRED = "Informe o rótulo deste atendimento.";
 const LABEL_FORBIDDEN = "Este serviço não usa rótulo.";
 const OVERLAP_RACE = "Este horário conflita com outro atendimento.";
 const REASON_REQUIRED = "Escolha o motivo do cancelamento.";
+const EXTRA_REPEATED = "Não repita o mesmo procedimento.";
+const EXTRA_FLEXIBLE = "O encaixe só pode ser o serviço principal.";
+const PACKAGE_NO_EXTRAS = "Sessão de pacote não aceita outros procedimentos.";
 const ALREADY_SUBMITTED =
   "Este formulário já foi enviado. Recarregue a página para criar outro agendamento.";
 
@@ -219,15 +224,90 @@ function serviceRefusal(
   return null;
 }
 
-function occupiedRange(startsAt: Date, endsAt: Date, service: ServiceRow) {
+// Preparation of the main service before the block, cleanup of the last
+// procedure after it (`last` is the main service when there are no extras).
+function occupiedRange(
+  startsAt: Date,
+  endsAt: Date,
+  service: ServiceRow,
+  last: ServiceRow = service,
+) {
   return {
     occupiedFrom: new Date(
       startsAt.getTime() - service.bufferBeforeMinutes * MINUTE,
     ),
     occupiedUntil: new Date(
-      endsAt.getTime() + service.bufferAfterMinutes * MINUTE,
+      endsAt.getTime() + last.bufferAfterMinutes * MINUTE,
     ),
   };
+}
+
+// Validates the extra procedures of a block, in order. Ids are compared
+// ignoring letter case, and a repeat of the main service or of another extra
+// is refused before anything is read. `keptIds` are the extras the
+// appointment already has, which stay allowed on edit even when they are no
+// longer bookable.
+async function readExtras(
+  tx: Tx,
+  clinicId: string,
+  mainId: string,
+  extraIds: readonly string[],
+  keptIds: ReadonlySet<string> = new Set(),
+): Promise<{ extras: ServiceRow[] } | { fail: Fail }> {
+  const seen = new Set([mainId.toLowerCase()]);
+  for (const id of extraIds) {
+    if (seen.has(id.toLowerCase())) {
+      return { fail: fieldFail("extraServiceIds", EXTRA_REPEATED) };
+    }
+    seen.add(id.toLowerCase());
+  }
+  const extras: ServiceRow[] = [];
+  for (const id of extraIds) {
+    const extra = UUID_PATTERN.test(id)
+      ? await readService(tx, clinicId, id)
+      : undefined;
+    const message = !extra
+      ? SERVICE_MISSING
+      : extra.isFlexible
+        ? EXTRA_FLEXIBLE
+        : !extra.bookable && !keptIds.has(extra.id)
+          ? SERVICE_INACTIVE
+          : null;
+    if (message || !extra) {
+      return { fail: fieldFail("extraServiceIds", message!) };
+    }
+    extras.push(extra);
+  }
+  return { extras };
+}
+
+// The extras of an appointment, in order.
+async function readExtraRows(tx: Tx, clinicId: string, appointmentId: string) {
+  return tx
+    .select({ serviceId: appointmentServices.serviceId })
+    .from(appointmentServices)
+    .where(
+      and(
+        eq(appointmentServices.appointmentId, appointmentId),
+        eq(appointmentServices.clinicId, clinicId),
+      ),
+    )
+    .orderBy(asc(appointmentServices.position));
+}
+
+function extraValues(
+  clinicId: string,
+  appointmentId: string,
+  extras: readonly ServiceRow[],
+) {
+  return extras.map((extra, index) => ({
+    clinicId,
+    appointmentId,
+    serviceId: extra.id,
+    serviceName: extra.name,
+    serviceDurationMinutes: extra.durationMinutes,
+    position: index + 1,
+  }));
 }
 
 // The professional an appointment goes to: the one asked for, when she is an
@@ -426,6 +506,15 @@ export async function createAppointment(
       const serviceFail = serviceRefusal(service, values.customLabel);
       if (serviceFail || !service) return serviceFail!;
 
+      const read = await readExtras(
+        tx,
+        clinicId,
+        service.id,
+        values.extraServiceIds,
+      );
+      if ("fail" in read) return read.fail;
+      const { extras } = read;
+
       const professional = await professionalFor(
         tx,
         clinicId,
@@ -433,7 +522,12 @@ export async function createAppointment(
       );
       if ("fail" in professional) return professional.fail;
 
-      const occupied = occupiedRange(values.startsAt, values.endsAt, service);
+      const occupied = occupiedRange(
+        values.startsAt,
+        values.endsAt,
+        service,
+        extras.at(-1),
+      );
       const overlap = await overlapRefusal(
         tx,
         clinicId,
@@ -471,6 +565,11 @@ export async function createAppointment(
           idempotencyKey: values.idempotencyKey,
         })
         .returning({ id: appointments.id });
+      if (extras.length > 0) {
+        await tx
+          .insert(appointmentServices)
+          .values(extraValues(clinicId, row!.id, extras));
+      }
 
       await tx.insert(auditLogs).values({
         clinicId,
@@ -483,6 +582,9 @@ export async function createAppointment(
           patientId: values.patientId,
           professionalId: professional.id,
           serviceId: service.id,
+          ...(extras.length > 0
+            ? { extraServiceIds: extras.map((extra) => extra.id) }
+            : {}),
           ...period(values.startsAt, values.endsAt),
           status: "confirmed",
           ...(warned.codes.length > 0 ? { warnings: warned.codes } : {}),
@@ -674,6 +776,30 @@ export async function updateAppointment(
       );
       if (serviceFail || !service) return serviceFail!;
 
+      const currentExtras = await readExtraRows(tx, clinicId, id);
+      if (values.extraServiceIds.length > 0) {
+        const [session] = await tx
+          .select({ id: saleSessions.id })
+          .from(saleSessions)
+          .where(
+            and(
+              eq(saleSessions.appointmentId, id),
+              eq(saleSessions.clinicId, clinicId),
+            ),
+          )
+          .limit(1);
+        if (session) return formFail(PACKAGE_NO_EXTRAS);
+      }
+      const read = await readExtras(
+        tx,
+        clinicId,
+        service.id,
+        values.extraServiceIds,
+        new Set(currentExtras.map((extra) => extra.serviceId)),
+      );
+      if ("fail" in read) return read.fail;
+      const { extras } = read;
+
       const professional = await professionalFor(
         tx,
         clinicId,
@@ -688,18 +814,34 @@ export async function updateAppointment(
       const timeChanged =
         values.startsAt.getTime() !== current.startsAt.getTime() ||
         values.endsAt.getTime() !== current.endsAt.getTime();
+      const extrasChanged =
+        extras.length !== currentExtras.length ||
+        extras.some(
+          (extra, index) => extra.id !== currentExtras[index]!.serviceId,
+        );
       if (
         !serviceChanged &&
         !professionalChanged &&
         !labelChanged &&
-        !timeChanged
+        !timeChanged &&
+        !extrasChanged
       ) {
         return { ok: true, id };
       }
 
       let occupied: { occupiedFrom: Date; occupiedUntil: Date } | undefined;
-      if (serviceChanged || timeChanged || professionalChanged) {
-        occupied = occupiedRange(values.startsAt, values.endsAt, service);
+      if (
+        serviceChanged ||
+        timeChanged ||
+        professionalChanged ||
+        extrasChanged
+      ) {
+        occupied = occupiedRange(
+          values.startsAt,
+          values.endsAt,
+          service,
+          extras.at(-1),
+        );
         const overlap = await overlapRefusal(
           tx,
           clinicId,
@@ -743,6 +885,22 @@ export async function updateAppointment(
         .where(
           and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)),
         );
+      // The panel role cannot UPDATE the extras: replace them.
+      if (extrasChanged) {
+        await tx
+          .delete(appointmentServices)
+          .where(
+            and(
+              eq(appointmentServices.appointmentId, id),
+              eq(appointmentServices.clinicId, clinicId),
+            ),
+          );
+        if (extras.length > 0) {
+          await tx
+            .insert(appointmentServices)
+            .values(extraValues(clinicId, id, extras));
+        }
+      }
 
       const serviceChanges = serviceChanged
         ? {
@@ -753,6 +911,12 @@ export async function updateAppointment(
         : {};
       const otherChanges = {
         ...(labelChanged ? { labelChanged: true } : {}),
+        ...(extrasChanged
+          ? {
+              extrasChanged: true,
+              extraServiceIds: extras.map((extra) => extra.id),
+            }
+          : {}),
         ...(professionalChanged
           ? {
               fromProfessionalId: current.professionalId,
@@ -813,7 +977,19 @@ export async function rescheduleAppointment(
         return { ok: true, id };
       }
 
-      const occupied = occupiedRange(input.startsAt, input.endsAt, service);
+      // Extras stay as they are; only the last procedure's cleanup matters.
+      const lastExtra = (await readExtraRows(tx, clinicId, id)).at(-1);
+      const last = lastExtra
+        ? await readService(tx, clinicId, lastExtra.serviceId)
+        : service;
+      if (!last) return formFail(NOT_FOUND);
+
+      const occupied = occupiedRange(
+        input.startsAt,
+        input.endsAt,
+        service,
+        last,
+      );
       const overlap = await overlapRefusal(
         tx,
         clinicId,
