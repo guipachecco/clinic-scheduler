@@ -17,6 +17,7 @@ import { CLINIC, otherClinic, productCategory } from "../helpers/clinic";
 
 let other: string;
 let patientId: string;
+let serviceCategoryId: string;
 let serviceId: string;
 let productId: string;
 let quoteId: string;
@@ -51,9 +52,19 @@ beforeAll(async () => {
           returning id`,
     )
   ).id;
+  // Its own service: what other files leave behind depends on the run order.
+  serviceCategoryId = (
+    await one<{ id: string }>(
+      sql`insert into service_categories (clinic_id, name, slug)
+          values (${CLINIC}, 'Categoria Produtos', 'categoria-produtos')
+          returning id`,
+    )
+  ).id;
   serviceId = (
     await one<{ id: string }>(
-      sql`select id from services where clinic_id = ${CLINIC} limit 1`,
+      sql`insert into services (clinic_id, category_id, name, slug, duration_minutes)
+          values (${CLINIC}, ${serviceCategoryId}, 'Serviço Produtos', 'servico-produtos', 60)
+          returning id`,
     )
   ).id;
   productId = (
@@ -92,6 +103,14 @@ afterAll(async () => {
   );
   if (patientId) {
     await db.execute(sql`delete from patients where id = ${patientId}`);
+  }
+  if (serviceId) {
+    await db.execute(sql`delete from services where id = ${serviceId}`);
+  }
+  if (serviceCategoryId) {
+    await db.execute(
+      sql`delete from service_categories where id = ${serviceCategoryId}`,
+    );
   }
   await endPools();
 });
