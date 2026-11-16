@@ -246,6 +246,13 @@
       "when": 1794768561231,
       "tag": "0034_booking_window_one_year",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794845183308,
+      "tag": "0035_appointment_services",
+      "breakpoints": true
     }
   ]
 }
