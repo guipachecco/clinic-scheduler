@@ -17,6 +17,7 @@ import {
   appointmentFormSchema,
   LABEL_MAX_LENGTH,
   MAX_DURATION_MINUTES,
+  MAX_EXTRA_SERVICES,
   MIN_DURATION_MINUTES,
   type AppointmentFormInput,
   type AppointmentFormValues,
@@ -46,9 +47,11 @@ export type ProfessionalChoice = { id: string; name: string };
 // `professionals` are the choices of the selector, the default one first. The
 // selector shows only with more than one; otherwise the server picks (a new
 // appointment goes to the default professional, an edit keeps hers).
+// `allowExtras` is false for a package session, which holds one procedure.
 type Props = {
   services: ServiceOption[];
   professionals: ProfessionalChoice[];
+  allowExtras: boolean;
 } & (
   | {
       mode: "create";
@@ -71,6 +74,7 @@ type Field = keyof AppointmentFormInput;
 const SHOWN_FIELDS: readonly string[] = [
   "patientId",
   "serviceId",
+  "extraServiceIds",
   "professionalId",
   "customLabel",
   "date",
@@ -87,6 +91,18 @@ function byCategory(services: ServiceOption[]) {
     groups.set(service.categoryName, group);
   }
   return [...groups];
+}
+
+function ServiceOptions({ services }: { services: ServiceOption[] }) {
+  return byCategory(services).map(([category, options]) => (
+    <optgroup key={category} label={category}>
+      {options.map((option) => (
+        <option key={option.id} value={option.id}>
+          {option.name}
+        </option>
+      ))}
+    </optgroup>
+  ));
 }
 
 function resultCount(count: number): string {
@@ -259,6 +275,7 @@ export function AppointmentForm(props: Props) {
           date: props.date,
           startTime: props.startTime,
           durationMinutes: "",
+          extraServiceIds: [],
           idempotencyKey,
           acknowledgeWarnings: false,
         };
@@ -284,6 +301,55 @@ export function AppointmentForm(props: Props) {
 
   const serviceId = useWatch({ control, name: "serviceId" });
   const service = props.services.find((item) => item.id === serviceId);
+  const extraIds = useWatch({ control, name: "extraServiceIds" }) ?? [];
+  const extraError = (() => {
+    const error = errors.extraServiceIds;
+    if (!error) return undefined;
+    // A bad entry is reported on its index, the list itself on the field.
+    return (
+      error.message ??
+      (Array.isArray(error) ? error.find(Boolean)?.message : undefined)
+    );
+  })();
+  // Focus follows the control that replaced the one just used.
+  const focusNext = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (focusNext.current) document.getElementById(focusNext.current)?.focus();
+    focusNext.current = null;
+  }, [extraIds.length]);
+
+  // The block lasts as long as its procedures together.
+  function totalMinutes(ids: string[]) {
+    return ids.reduce(
+      (sum, id) =>
+        sum +
+        (props.services.find((item) => item.id === id)?.durationMinutes ?? 0),
+      0,
+    );
+  }
+
+  function addExtra() {
+    focusNext.current = `extra-service-${extraIds.length}`;
+    setValue("extraServiceIds", [...extraIds, ""]);
+  }
+
+  function changeExtra(index: number, id: string) {
+    const next = extraIds.map((current, at) => (at === index ? id : current));
+    setValue("extraServiceIds", next);
+    setValue("durationMinutes", String(totalMinutes([serviceId, ...next])));
+    clearErrors("extraServiceIds");
+    dropWarnings();
+  }
+
+  function removeExtra(index: number) {
+    const next = extraIds.filter((_, at) => at !== index);
+    focusNext.current = "add-extra";
+    setValue("extraServiceIds", next);
+    setValue("durationMinutes", String(totalMinutes([serviceId, ...next])));
+    clearErrors("extraServiceIds");
+    dropWarnings();
+  }
 
   // The registration page sends the user back here with the same slot. Only
   // the time travels in the URL, and only when the fields are valid.
@@ -318,12 +384,17 @@ export function AppointmentForm(props: Props) {
       document.getElementById("patient-search")?.focus();
       return;
     }
+    // The extra selects are not registered fields.
+    if (name === "extraServiceIds") {
+      document.getElementById("extra-service-0")?.focus();
+      return;
+    }
     setFocus(name);
   }
 
   function onInvalid(fieldErrors: FieldErrors<AppointmentFormInput>) {
     const first = (Object.keys(fieldErrors) as Field[])[0];
-    if (first === "patientId") focusField(first);
+    if (first === "patientId" || first === "extraServiceIds") focusField(first);
   }
 
   function applyFailure(result: Extract<AppointmentResult, { ok: false }>) {
@@ -416,23 +487,25 @@ export function AppointmentForm(props: Props) {
                 const chosen = props.services.find(
                   (item) => item.id === event.target.value,
                 );
-                if (!chosen) return;
-                setValue("durationMinutes", String(chosen.durationMinutes));
+                if (!chosen) {
+                  // Back to "Escolha o serviço": the extras hide with it.
+                  setValue("extraServiceIds", []);
+                  return;
+                }
+                // The new main service may already be one of the extras.
+                const rest = extraIds.filter((id) => id !== chosen.id);
+                setValue("extraServiceIds", rest);
+                setValue(
+                  "durationMinutes",
+                  String(totalMinutes([chosen.id, ...rest])),
+                );
                 if (!chosen.isFlexible) setValue("customLabel", "");
                 dropWarnings();
               },
             })}
           >
             <option value="">Escolha o serviço</option>
-            {byCategory(props.services).map(([category, options]) => (
-              <optgroup key={category} label={category}>
-                {options.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
+            <ServiceOptions services={props.services} />
           </NativeSelect>
           <FieldError
             id="serviceId-error"
@@ -479,6 +552,66 @@ export function AppointmentForm(props: Props) {
           </div>
         ) : null}
       </div>
+
+      {service ? (
+        <div className="grid gap-3">
+          {extraIds.map((extraId, index) => {
+            const taken = new Set([serviceId, ...extraIds]);
+            const choices = props.services.filter(
+              (item) =>
+                !item.isFlexible &&
+                (item.id === extraId || !taken.has(item.id)),
+            );
+            const number = index + 2;
+            return (
+              <div key={index} className="grid gap-2">
+                <Label htmlFor={`extra-service-${index}`}>
+                  Procedimento {number}
+                </Label>
+                <div className="flex gap-2">
+                  <NativeSelect
+                    id={`extra-service-${index}`}
+                    value={extraId}
+                    onChange={(event) => changeExtra(index, event.target.value)}
+                    aria-invalid={Boolean(extraError)}
+                    aria-describedby={
+                      extraError ? "extraServiceIds-error" : undefined
+                    }
+                    className="flex-1"
+                  >
+                    <option value="">Escolha o serviço</option>
+                    <ServiceOptions services={choices} />
+                  </NativeSelect>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-label={`Remover procedimento ${number}`}
+                    onClick={() => removeExtra(index)}
+                  >
+                    Remover
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+          <FieldError id="extraServiceIds-error" message={extraError} />
+          {!props.allowExtras ? (
+            <p className="text-sm text-muted-foreground">
+              Sessão de pacote: só um procedimento.
+            </p>
+          ) : extraIds.length < MAX_EXTRA_SERVICES ? (
+            <Button
+              id="add-extra"
+              type="button"
+              variant="outline"
+              className="w-fit"
+              onClick={addExtra}
+            >
+              Adicionar procedimento
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <div className="grid content-start gap-2">
