@@ -12,6 +12,7 @@ import {
 } from "react-hook-form";
 
 import { FieldError, FormError } from "@/components/form-message";
+import { Icon } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -88,10 +89,13 @@ function DayRow({
                 <Button
                   type="button"
                   variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:bg-status-no-show hover:text-status-no-show-foreground"
                   aria-label={`Remover intervalo ${index + 1}: ${name}`}
+                  title="Remover intervalo"
                   onClick={() => remove(index)}
                 >
-                  Remover
+                  <Icon name="trash" />
                 </Button>
               </div>
               <FieldError id={errorId} message={message} />
@@ -101,12 +105,13 @@ function DayRow({
         <FieldError id={`dia-${weekday}-erro`} message={listError} />
         <Button
           type="button"
-          variant="outline"
+          variant="dashed"
           className="w-fit"
           disabled={fields.length >= MAX_INTERVALS}
           aria-label={`Adicionar intervalo: ${name}`}
           onClick={() => append({ start: "", end: "" })}
         >
+          <Icon name="plus" />
           Adicionar intervalo
         </Button>
       </div>

@@ -9,6 +9,12 @@ import {
   removeOwnerPhoto,
   saveOwnerPhoto,
 } from "@/modules/branding/photo";
+import {
+  discardDraft,
+  getBuilderState,
+  saveDraftPatch,
+  uploadDraftImage,
+} from "@/modules/page-builder/builder";
 
 import { CLINIC, otherClinic } from "../helpers/clinic";
 
@@ -118,6 +124,43 @@ describe("owner photo", () => {
     const id = (await photoId(CLINIC))!;
     expect(await getClinicMedia(other, id)).toBeNull();
     expect(await getClinicMedia(CLINIC, id)).not.toBeNull();
+  });
+
+  it("drops the page draft's pending photo, keeping the rest of the draft", async () => {
+    const pending = await uploadDraftImage(CLINIC, "ownerPhoto", {
+      bytes: await jpeg(),
+      mimeType: "image/jpeg",
+    });
+    expect(pending.ok).toBe(true);
+    if (!pending.ok) return;
+    await saveDraftPatch(CLINIC, { headline: "Rascunho" });
+
+    const saved = await saveOwnerPhoto(
+      CLINIC,
+      { bytes: await jpeg(), mimeType: "image/jpeg" },
+      actor,
+    );
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+
+    const state = await getBuilderState(CLINIC);
+    expect(state.draft).toEqual({ headline: "Rascunho" });
+    expect(state.published.ownerPhotoMediaId).toBe(saved.mediaId);
+    expect(
+      await db.select().from(media).where(eq(media.id, pending.mediaId)),
+    ).toHaveLength(0);
+
+    // A draft that only removed the photo leaves no draft behind.
+    await discardDraft(CLINIC, actor);
+    await saveDraftPatch(CLINIC, { ownerPhotoMediaId: null });
+    await removeOwnerPhoto(CLINIC, actor);
+    expect((await getBuilderState(CLINIC)).hasDraft).toBe(false);
+    expect(await photoId(CLINIC)).toBeNull();
+    await saveOwnerPhoto(
+      CLINIC,
+      { bytes: await jpeg(), mimeType: "image/jpeg" },
+      actor,
+    );
   });
 
   it("removing clears the column and the row, and is a no-op without photo", async () => {

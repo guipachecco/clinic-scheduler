@@ -10,6 +10,28 @@ const PATHS = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
+  close: <path d="M6 6l12 12M18 6 6 18" />,
+  trash: (
+    <>
+      <path d="M4.5 7h15M10 7V4.5h4V7" />
+      <path d="M6.5 7l.8 11a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9l.8-11" />
+      <path d="M10 11v5M14 11v5" />
+    </>
+  ),
+  userOff: (
+    <>
+      <circle cx="10" cy="8" r="3.5" />
+      <path d="M3.5 20c.9-4 3.6-6 6.5-6 1.2 0 2.3.3 3.3.9" />
+      <path d="m16 15 5 5M21 15l-5 5" />
+    </>
+  ),
+  camera: (
+    <>
+      <path d="M4 9a2 2 0 0 1 2-2h1.6l1.2-2h6.4l1.2 2H18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+      <circle cx="12" cy="13" r="3.2" />
+    </>
+  ),
   chevronRight: <path d="m9 6 6 6-6 6" />,
   arrowIn: (
     <>

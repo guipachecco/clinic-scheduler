@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { FieldError, FormError } from "@/components/form-message";
+import { Icon, type IconName } from "@/components/icon";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -22,6 +23,18 @@ const ACTION_LABELS: Record<Exclude<Status, "requested">, string> = {
   completed: "Marcar como concluído",
   no_show: "Marcar falta",
   cancelled: "Cancelar agendamento",
+};
+
+// One main action per state (yellow): confirming a request, concluding a
+// confirmed appointment. A no-show is a soft red; cancelling stays quiet.
+const ACTION_STYLE: Record<
+  Exclude<Status, "requested">,
+  { variant: "default" | "danger" | "outline"; icon: IconName }
+> = {
+  confirmed: { variant: "default", icon: "check" },
+  completed: { variant: "default", icon: "check" },
+  no_show: { variant: "danger", icon: "userOff" },
+  cancelled: { variant: "outline", icon: "close" },
 };
 
 const REASONS = Object.entries(CANCELLATION_REASON_LABELS) as [
@@ -107,7 +120,7 @@ export function StatusActions({
             <Button
               key={to}
               type="button"
-              variant={to === "cancelled" ? "outline" : "default"}
+              variant={ACTION_STYLE[to].variant}
               disabled={pending || (to === "cancelled" && cancelling)}
               onClick={() => {
                 if (to === "cancelled") {
@@ -117,6 +130,7 @@ export function StatusActions({
                 void change(to);
               }}
             >
+              <Icon name={ACTION_STYLE[to].icon} />
               {ACTION_LABELS[to]}
             </Button>
           ))}
