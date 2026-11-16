@@ -51,8 +51,24 @@ export type BookableService = {
   preparationInstructions: string | null;
 };
 
+// A booked service of the visit, as read inside the booking's transaction.
+export type BookedService = {
+  id: string;
+  name: string;
+  durationMinutes: number;
+  preparationInstructions: string | null;
+};
+
+// On success, the services booked (in the clinic's order: the first is the
+// main one) and their total duration, so the confirmation shows exactly what
+// was written without reading the services again.
 export type BookingResult =
-  | { ok: true; appointmentId: string }
+  | {
+      ok: true;
+      appointmentId: string;
+      services: BookedService[];
+      durationMinutes: number;
+    }
   | { ok: false; reason: "taken" | "unavailable" | "unverified" };
 
 export type MyAppointment = {
@@ -84,6 +100,7 @@ type BookingService = {
   durationMinutes: number;
   bufferBeforeMinutes: number;
   bufferAfterMinutes: number;
+  preparationInstructions: string | null;
 };
 
 // What she books in one go: one service or more, back to back, as a single
@@ -167,6 +184,7 @@ async function readVisit(
       durationMinutes: services.durationMinutes,
       bufferBeforeMinutes: services.bufferBeforeMinutes,
       bufferAfterMinutes: services.bufferAfterMinutes,
+      preparationInstructions: services.preparationInstructions,
     })
     .from(services)
     .where(
@@ -560,7 +578,17 @@ export async function bookOnline(
       // foreign key check waits for an anonymization in progress. Reading
       // the row again afterwards sees it, and the booking is undone.
       if (!(await isOwnRow(tx, ctx))) throw new RowNoLongerHers();
-      return { ok: true, appointmentId: row!.id };
+      return {
+        ok: true,
+        appointmentId: row!.id,
+        services: visit.services.map((item) => ({
+          id: item.id,
+          name: item.name,
+          durationMinutes: item.durationMinutes,
+          preparationInstructions: item.preparationInstructions,
+        })),
+        durationMinutes: visit.durationMinutes,
+      };
     });
   } catch (error) {
     if (error instanceof RowNoLongerHers || error instanceof InsertRefused) {

@@ -833,7 +833,25 @@ describe("online booking", () => {
         serviceIds: [secondId, serviceId],
         startsAt: local(MONDAY, "09:00"),
       });
-      expect(result).toMatchObject({ ok: true });
+      // What was written, for the confirmation: no second read.
+      expect(result).toMatchObject({
+        ok: true,
+        services: [
+          {
+            id: serviceId,
+            name: "Serviço fictício agendável",
+            durationMinutes: 60,
+            preparationInstructions: "Venha sem maquiagem.",
+          },
+          {
+            id: secondId,
+            name: SECOND,
+            durationMinutes: 30,
+            preparationInstructions: null,
+          },
+        ],
+        durationMinutes: 90,
+      });
       const id = (result as { appointmentId: string }).appointmentId;
 
       const rows = await db
@@ -897,6 +915,18 @@ describe("online booking", () => {
       expect(await visitRows(id)).toEqual([]);
       expect(await getAppointmentBilling(clinicId, id)).toMatchObject({
         servicePriceCents: 12_000,
+      });
+    });
+
+    it("ids in capitals book and come back as stored", async () => {
+      const result = await bookOnline(ctx("ana"), {
+        serviceIds: [secondId.toUpperCase(), serviceId.toUpperCase()],
+        startsAt: local(MONDAY, "09:00"),
+      });
+      expect(result).toMatchObject({
+        ok: true,
+        services: [{ id: serviceId }, { id: secondId }],
+        durationMinutes: 90,
       });
     });
 

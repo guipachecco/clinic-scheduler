@@ -6,7 +6,6 @@ import * as z from "zod";
 import { logger } from "@/lib/logger";
 import {
   bookOnline,
-  listBookableServices,
   listDaysWithSlots,
   listFreeSlots,
   MAX_SERVICES_PER_VISIT,
@@ -85,10 +84,10 @@ export async function book(slug: string, input: unknown): Promise<BookResult> {
   }
   if (!result.ok) return result;
 
-  // In the clinic's order, like the appointment's own name.
-  const booked = (await listBookableServices(ctx)).filter((item) =>
-    parsed.data.serviceIds.includes(item.id),
-  );
+  // What bookOnline wrote, in the clinic's order, read in its own
+  // transaction: no second read that a change to a service in between (or a
+  // different letter case in the ids) could make disagree with the booking.
+  const booked = result.services;
   const several = booked.length > 1;
   const preparation = booked
     .filter((item) => item.preparationInstructions)
@@ -107,10 +106,7 @@ export async function book(slug: string, input: unknown): Promise<BookResult> {
       serviceName: booked.map((item) => item.name).join(" + "),
       dateLabel: start.toFormat("cccc, d 'de' LLLL 'de' yyyy"),
       timeLabel: start.toFormat("HH:mm"),
-      durationMinutes: booked.reduce(
-        (sum, item) => sum + item.durationMinutes,
-        0,
-      ),
+      durationMinutes: result.durationMinutes,
       address: clinic.address,
       mapsUrl: clinic.mapsUrl,
       preparationInstructions: preparation || null,
