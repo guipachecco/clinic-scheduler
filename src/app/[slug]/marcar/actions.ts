@@ -6,17 +6,18 @@ import * as z from "zod";
 import { logger } from "@/lib/logger";
 import {
   bookOnline,
-  listBookableServices,
   listDaysWithSlots,
   listFreeSlots,
+  MAX_SERVICES_PER_VISIT,
 } from "@/modules/booking/booking";
 import { requireClient } from "@/modules/clients/session";
 
 // The booking steps of /<slug>/marcar. Each action rebuilds who she is from
 // the server session (requireClient); nothing the browser sends but the
-// service, the month or day and the chosen start is used.
+// services, the month or day and the chosen start is used.
 
 export type Confirmation = {
+  // Every service of the visit, joined by " + ".
   serviceName: string;
   dateLabel: string;
   timeLabel: string;
@@ -30,11 +31,16 @@ export type BookResult =
   | { ok: true; confirmation: Confirmation }
   | { ok: false; reason: "taken" | "unavailable" | "unverified" };
 
-const serviceId = z.uuid();
+// The services of one visit: at least one, none twice.
+const serviceIds = z
+  .array(z.uuid())
+  .min(1)
+  .max(MAX_SERVICES_PER_VISIT)
+  .refine((ids) => new Set(ids).size === ids.length);
 const month = z.string().regex(/^\d{4}-\d{2}$/);
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const bookSchema = z.object({
-  serviceId,
+  serviceIds,
   startsAt: z.iso.datetime({ offset: true }),
 });
 
@@ -42,26 +48,26 @@ const back = (slug: string) => `/${slug}/marcar`;
 
 export async function loadDays(
   slug: string,
-  service: unknown,
+  services: unknown,
   monthValue: unknown,
 ): Promise<string[]> {
   const { ctx } = await requireClient(slug, back(slug));
-  const id = serviceId.safeParse(service);
+  const ids = serviceIds.safeParse(services);
   const m = month.safeParse(monthValue);
-  if (!id.success || !m.success) return [];
-  return listDaysWithSlots(ctx, id.data, m.data);
+  if (!ids.success || !m.success) return [];
+  return listDaysWithSlots(ctx, ids.data, m.data);
 }
 
 export async function loadSlots(
   slug: string,
-  service: unknown,
+  services: unknown,
   day: unknown,
 ): Promise<string[]> {
   const { ctx } = await requireClient(slug, back(slug));
-  const id = serviceId.safeParse(service);
+  const ids = serviceIds.safeParse(services);
   const d = date.safeParse(day);
-  if (!id.success || !d.success) return [];
-  return listFreeSlots(ctx, id.data, d.data);
+  if (!ids.success || !d.success) return [];
+  return listFreeSlots(ctx, ids.data, d.data);
 }
 
 export async function book(slug: string, input: unknown): Promise<BookResult> {
@@ -78,22 +84,32 @@ export async function book(slug: string, input: unknown): Promise<BookResult> {
   }
   if (!result.ok) return result;
 
-  const service = (await listBookableServices(ctx)).find(
-    (item) => item.id === parsed.data.serviceId,
-  );
+  // What bookOnline wrote, in the clinic's order, read in its own
+  // transaction: no second read that a change to a service in between (or a
+  // different letter case in the ids) could make disagree with the booking.
+  const booked = result.services;
+  const several = booked.length > 1;
+  const preparation = booked
+    .filter((item) => item.preparationInstructions)
+    .map((item) =>
+      several
+        ? `${item.name}: ${item.preparationInstructions}`
+        : item.preparationInstructions,
+    )
+    .join("\n\n");
   const start = DateTime.fromISO(parsed.data.startsAt, {
     zone: clinic.timezone,
   }).setLocale("pt-BR");
   return {
     ok: true,
     confirmation: {
-      serviceName: service?.name ?? "",
+      serviceName: booked.map((item) => item.name).join(" + "),
       dateLabel: start.toFormat("cccc, d 'de' LLLL 'de' yyyy"),
       timeLabel: start.toFormat("HH:mm"),
-      durationMinutes: service?.durationMinutes ?? 0,
+      durationMinutes: result.durationMinutes,
       address: clinic.address,
       mapsUrl: clinic.mapsUrl,
-      preparationInstructions: service?.preparationInstructions ?? null,
+      preparationInstructions: preparation || null,
     },
   };
 }

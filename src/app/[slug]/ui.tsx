@@ -24,6 +24,37 @@ export function priceLabel(
   return display === "starting_at" ? `A partir de ${value}` : value;
 }
 
+// The price of a visit with these services. One service keeps its own label.
+// Several add up; "A partir de" when one of them starts at its price or shows
+// none, since the total can only be a floor then.
+export function visitPriceLabel(
+  items: {
+    display: "fixed" | "starting_at" | "on_request" | "hidden";
+    cents: number | null;
+  }[],
+): string | null {
+  const [only] = items;
+  if (!only) return null;
+  if (items.length === 1) return priceLabel(only.display, only.cents);
+  const priced = items.filter(
+    (item) =>
+      item.cents !== null &&
+      (item.display === "fixed" || item.display === "starting_at"),
+  );
+  if (priced.length === 0) {
+    return items.some((item) => item.display === "on_request")
+      ? "Sob consulta"
+      : null;
+  }
+  const total = money.format(
+    priced.reduce((sum, item) => sum + (item.cents ?? 0), 0) / 100,
+  );
+  const floor =
+    priced.length < items.length ||
+    priced.some((item) => item.display === "starting_at");
+  return floor ? `A partir de ${total}` : total;
+}
+
 // https://wa.me/<digits> for a stored E.164 number.
 export function whatsappUrl(e164: string) {
   return `https://wa.me/${e164.replace(/\D/g, "")}`;
