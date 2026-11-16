@@ -15,7 +15,8 @@ import {
   services,
 } from "@/db/schema";
 
-import { extraPricesSql } from "@/modules/appointments/extras";
+import { extraNamesSql, extraPricesSql } from "@/modules/appointments/extras";
+import { serviceLabel } from "@/modules/appointments/fields";
 
 import type { ReceiptValues } from "./fields";
 import type { SaleResult } from "./sales";
@@ -167,6 +168,7 @@ export async function createReceipt(
             patientId: appointments.patientId,
             serviceName: appointments.serviceName,
             customLabel: appointments.customLabel,
+            extraNames: extraNamesSql,
             status: appointments.status,
           })
           .from(appointments)
@@ -189,7 +191,10 @@ export async function createReceipt(
         }
         // The appointment decides who and what was paid.
         patientId = appointment.patientId;
-        description = (appointment.customLabel ?? appointment.serviceName)
+        description = serviceLabel(
+          appointment.customLabel ?? appointment.serviceName,
+          appointment.extraNames,
+        )
           .trim()
           .slice(0, 80);
       } else if (!description) {

@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { PageHeader } from "@/components/page-header";
 import { requireAdmin } from "@/modules/auth/session";
+import { ageText } from "@/modules/patients/birthdays";
 import { formatStoredPhone } from "@/modules/patients/fields";
 import { listBirthdays } from "@/modules/patients/patients";
 
@@ -22,7 +23,9 @@ export default async function BirthdaysPage() {
     weekday: "long",
     day: "numeric",
     month: "long",
-  }).format(new Date(`${date}T12:00:00Z`));
+  })
+    .format(new Date(`${date}T12:00:00Z`))
+    .replace(/^./, (c) => c.toUpperCase());
 
   return (
     <div className="grid max-w-3xl gap-6">
@@ -46,7 +49,7 @@ export default async function BirthdaysPage() {
                     {item.nickname ? ` (${item.nickname})` : ""}
                   </Link>
                   <span className="text-sm text-muted-foreground">
-                    Faz {item.age} anos
+                    {ageText(item.age)}
                     {item.phone ? ` · ${formatStoredPhone(item.phone)}` : ""}
                   </span>
                 </div>
@@ -55,6 +58,7 @@ export default async function BirthdaysPage() {
                     href={`https://wa.me/${digits}`}
                     target="_blank"
                     rel="noopener noreferrer"
+                    aria-label={`WhatsApp de ${item.name}`}
                     className={actionClass}
                   >
                     WhatsApp

@@ -16,3 +16,9 @@ export function birthdayKeys(today: string): string[] {
 export function ageTurning(birthDate: string, today: string): number {
   return Number(today.slice(0, 4)) - Number(birthDate.slice(0, 4));
 }
+
+// How the panel words the age the person turns today.
+export function ageText(age: number): string {
+  if (age === 0) return "Nasceu hoje";
+  return age === 1 ? "Faz 1 ano" : `Faz ${age} anos`;
+}

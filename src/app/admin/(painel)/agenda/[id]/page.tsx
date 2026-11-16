@@ -160,7 +160,7 @@ export default async function AppointmentPage({
         id: appointment.serviceId,
         name: `${appointment.serviceName} (inativo)`,
         categoryName: "Serviço atual",
-        durationMinutes: appointment.durationMinutes,
+        durationMinutes: appointment.serviceDurationMinutes,
         isFlexible: appointment.isFlexible,
       });
     }

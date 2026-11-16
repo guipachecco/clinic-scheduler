@@ -163,11 +163,10 @@ test.describe("pacientes", () => {
     await expect(
       page.getByRole("heading", { name: "Aniversariantes de hoje" }),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name })).toBeVisible();
-    await expect(page.getByRole("link", { name: "WhatsApp" })).toHaveAttribute(
-      "href",
-      "https://wa.me/5548999990002",
-    );
+    await expect(page.getByRole("link", { name, exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: `WhatsApp de ${name}` }),
+    ).toHaveAttribute("href", "https://wa.me/5548999990002");
   });
 
   test("anonymizing is optional, tucked in a closed section", async () => {

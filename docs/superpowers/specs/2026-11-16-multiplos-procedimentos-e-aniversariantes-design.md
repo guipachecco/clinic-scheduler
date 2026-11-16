@@ -93,15 +93,15 @@ Guilherme escolheu a **A** pelo menor risco.
 
 Tabela nova `appointment_services`:
 
-| coluna | observação |
-|---|---|
-| `id` | uuid |
-| `clinic_id` | como nas outras tabelas da clínica |
-| `appointment_id` | referência composta (clínica, agendamento), `ON DELETE CASCADE` |
-| `service_id` | referência composta (clínica, serviço), `ON DELETE RESTRICT` |
-| `service_name` | copiado na hora, como em `appointments` |
-| `service_duration_minutes` | copiado na hora |
-| `position` | ordem dentro do bloco, a partir de 1 |
+| coluna                     | observação                                                      |
+| -------------------------- | --------------------------------------------------------------- |
+| `id`                       | uuid                                                            |
+| `clinic_id`                | como nas outras tabelas da clínica                              |
+| `appointment_id`           | referência composta (clínica, agendamento), `ON DELETE CASCADE` |
+| `service_id`               | referência composta (clínica, serviço), `ON DELETE RESTRICT`    |
+| `service_name`             | copiado na hora, como em `appointments`                         |
+| `service_duration_minutes` | copiado na hora                                                 |
+| `position`                 | ordem dentro do bloco, a partir de 1                            |
 
 - Único por (`appointment_id`, `service_id`) e por (`appointment_id`,
   `position`).

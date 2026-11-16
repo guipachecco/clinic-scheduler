@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ageTurning, birthdayKeys } from "./birthdays";
+import { ageText, ageTurning, birthdayKeys } from "./birthdays";
 
 describe("birthdayKeys", () => {
   it("is just today's month and day", () => {
@@ -27,5 +27,20 @@ describe("ageTurning", () => {
 
   it("counts a Feb 29 birth on Feb 28 of a non-leap year", () => {
     expect(ageTurning("2000-02-29", "2027-02-28")).toBe(27);
+  });
+});
+
+describe("ageText", () => {
+  it("says a newborn was born today", () => {
+    expect(ageText(0)).toBe("Nasceu hoje");
+  });
+
+  it("uses the singular for one year", () => {
+    expect(ageText(1)).toBe("Faz 1 ano");
+  });
+
+  it("uses the plural from two years", () => {
+    expect(ageText(2)).toBe("Faz 2 anos");
+    expect(ageText(34)).toBe("Faz 34 anos");
   });
 });

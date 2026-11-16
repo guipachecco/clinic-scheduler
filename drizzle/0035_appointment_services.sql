@@ -3,7 +3,7 @@
 -- Additive only: the old code is still running when this applies and never
 -- names the new table. The appointment keeps its main service in its own
 -- columns; existing appointments simply have no extras. The (clinic_id, id)
--- uniques the composite foreign keys need already exist on appointments (0009)
+-- uniques the composite foreign keys need already exist on appointments (0007_multi_clinic)
 -- and services.
 CREATE TABLE "appointment_services" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

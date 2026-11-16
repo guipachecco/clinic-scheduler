@@ -8,6 +8,7 @@ import {
   auditLogs,
   businessHours,
   patients,
+  saleItems,
   saleSessions,
   serviceCategories,
   services,
@@ -29,6 +30,14 @@ import {
   appointmentFormSchema,
   type AppointmentFormValues,
 } from "@/modules/appointments/fields";
+
+import {
+  approveSchema,
+  quoteFormSchema,
+  scheduleSessionsSchema,
+} from "@/modules/finance/fields";
+import { approveQuote, createQuote } from "@/modules/finance/quotes";
+import { scheduleSessions } from "@/modules/finance/sales";
 
 import { CLINIC, defaultProfessional, otherClinic } from "../helpers/clinic";
 
@@ -71,6 +80,54 @@ async function created(overrides: Record<string, unknown> = {}) {
   const result = await createAppointment(CLINIC, form(overrides), actorId, NOW);
   if (!result.ok) throw new Error(`expected ok: ${JSON.stringify(result)}`);
   return result.id;
+}
+
+// An appointment that is a session of a package, built through the real path:
+// a quote with a service item, approved into a sale, one session scheduled.
+async function packageSession(startTime = "10:00"): Promise<string> {
+  const quote = await createQuote(
+    CLINIC,
+    quoteFormSchema.parse({
+      patientId,
+      validUntil: "2026-11-19",
+      discount: "",
+      notes: "",
+      items: [
+        {
+          kind: "service",
+          serviceId,
+          sessions: "2",
+          unitPrice: "150,00",
+          discount: "",
+        },
+      ],
+    }),
+    actorId,
+  );
+  if (!quote.ok) throw new Error(JSON.stringify(quote));
+  const sale = await approveQuote(
+    CLINIC,
+    quote.id,
+    approveSchema.parse({ plan: "upfront", firstDueDate: "2026-11-03" }),
+    actorId,
+    "2026-11-03",
+  );
+  if (!sale.ok) throw new Error(JSON.stringify(sale));
+  const [item] = await db.select({ id: saleItems.id }).from(saleItems);
+  const scheduled = await scheduleSessions(
+    CLINIC,
+    scheduleSessionsSchema.parse({
+      saleItemId: item!.id,
+      durationMinutes: "60",
+      slots: [{ date: "2026-11-10", startTime }],
+      acknowledgeWarnings: false,
+    }),
+    actorId,
+    NOW,
+  );
+  if (!scheduled.ok) throw new Error(JSON.stringify(scheduled));
+  const [session] = await db.select().from(saleSessions);
+  return session!.appointmentId!;
 }
 
 async function row(id: string) {
@@ -1468,17 +1525,7 @@ describe("extra procedures", () => {
   });
 
   it("refuses extras on a package session", async () => {
-    const id = await created();
-    // Only the session link matters for this rule, not the sale behind it, so
-    // the foreign keys are skipped for this one insert.
-    await db.transaction(async (tx) => {
-      await tx.execute(sql`set local session_replication_role = replica`);
-      await tx.insert(saleSessions).values({
-        clinicId: CLINIC,
-        saleItemId: crypto.randomUUID(),
-        appointmentId: id,
-      });
-    });
+    const id = await packageSession();
     const result = await updateAppointment(
       CLINIC,
       id,
@@ -1634,14 +1681,9 @@ describe("getAppointment inPackage", () => {
   it("is true only for a session of a package", async () => {
     const id = await created();
     expect((await getAppointment(CLINIC, id, NOW))!.inPackage).toBe(false);
-    await db.transaction(async (tx) => {
-      await tx.execute(sql`set local session_replication_role = replica`);
-      await tx.insert(saleSessions).values({
-        clinicId: CLINIC,
-        saleItemId: crypto.randomUUID(),
-        appointmentId: id,
-      });
-    });
-    expect((await getAppointment(CLINIC, id, NOW))!.inPackage).toBe(true);
+    const sessionId = await packageSession("14:00");
+    expect((await getAppointment(CLINIC, sessionId, NOW))!.inPackage).toBe(
+      true,
+    );
   });
 });

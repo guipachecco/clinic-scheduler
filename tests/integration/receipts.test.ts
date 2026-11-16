@@ -445,4 +445,24 @@ describe("receipts with several procedures", () => {
     const billing = await getAppointmentBilling(CLINIC, id);
     expect(billing?.servicePriceCents).toBe(3500);
   });
+
+  it("stores every procedure in the receipt description", async () => {
+    const id = await appointment("confirmed");
+    await addExtra(id, await extraService("Pedicure", 4500), "Pedicure");
+    const result = await createReceipt(
+      CLINIC,
+      values({ appointmentId: id }),
+      actorId,
+    );
+    expect(result.ok).toBe(true);
+    const [row] = await db.select().from(receipts);
+    expect(row?.description).toBe("Manicure Tradicional + Pedicure");
+  });
+
+  it("keeps the main service name when there are no extras", async () => {
+    const id = await appointment("confirmed");
+    await createReceipt(CLINIC, values({ appointmentId: id }), actorId);
+    const [row] = await db.select().from(receipts);
+    expect(row?.description).toBe("Manicure Tradicional");
+  });
 });

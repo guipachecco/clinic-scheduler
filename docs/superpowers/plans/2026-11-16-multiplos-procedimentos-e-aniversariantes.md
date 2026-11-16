@@ -36,12 +36,14 @@
 ### Task 1: Regra de data e listagem
 
 **Files:**
+
 - Create: `src/modules/patients/birthdays.ts` (puro, seguro para o cliente)
 - Create: `src/modules/patients/birthdays.test.ts`
 - Modify: `src/modules/patients/patients.ts` (nova função de leitura)
 - Test: `tests/integration/patients.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `birthdayKeys(today: string): string[]`: recebe `YYYY-MM-DD`, devolve as chaves `MM-DD` que contam como hoje.
   - `ageTurning(birthDate: string, today: string): number`: ano de hoje menos ano de nascimento.
@@ -75,6 +77,7 @@ expect(ageTurning("2000-02-29", "2027-02-28")).toBe(27);
 ### Task 2: Tela e aviso no Início
 
 **Files:**
+
 - Create: `src/app/admin/(painel)/pacientes/aniversariantes/page.tsx`
 - Modify: `src/app/admin/(painel)/pacientes/page.tsx` (link "Aniversariantes")
 - Modify: `src/modules/dashboard/dashboard.ts` (`getPanelHome` devolve `birthdays: number`)
@@ -82,6 +85,7 @@ expect(ageTurning("2000-02-29", "2027-02-28")).toBe(27);
 - Test: `tests/integration/dashboard.test.ts`, `e2e/patients.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `listBirthdays`, `BirthdayItem` (Tarefa 1).
 - Produces: rota `/admin/pacientes/aniversariantes`; campo `birthdays: number` em `getPanelHome`.
 
@@ -104,11 +108,13 @@ expect(ageTurning("2000-02-29", "2027-02-28")).toBe(27);
 ### Task 3: Tabela `appointment_services`
 
 **Files:**
+
 - Modify: `src/db/schema/clinic.ts`
 - Create: `drizzle/0035_appointment_services.sql` (gerado por `npm run db:generate`, depois renomeado e completado à mão, como as migrações anteriores)
 - Create: `tests/integration/appointment-services-db.test.ts`
 
 **Interfaces:**
+
 - Produces: tabela Drizzle `appointmentServices` com `id`, `clinicId`, `appointmentId`, `serviceId`, `serviceName`, `serviceDurationMinutes`, `position`, `createdAt`.
 
 - [ ] **Step 1: Testes de banco (falhando)**, no estilo de `stock-db.test.ts`:
@@ -132,10 +138,12 @@ expect(ageTurning("2000-02-29", "2027-02-28")).toBe(27);
 ### Task 4: Esquema do formulário e texto do serviço
 
 **Files:**
+
 - Modify: `src/modules/appointments/fields.ts`
 - Test: `src/modules/appointments/fields.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `MAX_EXTRA_SERVICES = 9`
   - `serviceLabel(main: string, extras: readonly string[]): string`
@@ -163,14 +171,17 @@ safeParse({ ...valid, extraServiceIds: ["x"] })           // erro: "Escolha o se
 ### Task 5: Gravar extras ao criar, editar e remarcar
 
 **Files:**
+
 - Modify: `src/modules/appointments/appointments.ts`
 - Test: `tests/integration/appointments.test.ts`
 
 **Interfaces:**
+
 - Consumes: `appointmentServices` (Tarefa 3), `extraServiceIds` (Tarefa 4).
 - Produces: `createAppointment` e `updateAppointment` gravam os extras; assinaturas inalteradas. Erros de extra vêm em `fieldErrors.extraServiceIds`.
 
 Regras a implementar:
+
 - Cada extra passa por `readService`; recusas, nesta ordem: inexistente → "Escolha um serviço cadastrado."; flexível → "O encaixe só pode ser o serviço principal."; não agendável → "Serviço inativo." (na edição, um extra que já estava no agendamento continua aceito).
 - Agendamento com linha em `sale_sessions` e `extraServiceIds` não vazio → `formError` "Sessão de pacote não aceita outros procedimentos."
 - Faixa ocupada: preparação do principal antes; limpeza do **último** procedimento depois (o principal quando não há extras). Vale também em `rescheduleAppointment`, que hoje usa só o principal.
@@ -195,11 +206,13 @@ Regras a implementar:
 ### Task 6: Leituras (texto e valores)
 
 **Files:**
+
 - Create: `src/modules/appointments/extras.ts` (server-only: subconsultas compartilhadas)
 - Modify: `src/modules/appointments/appointments.ts`, `src/modules/dashboard/dashboard.ts`, `src/modules/dashboard/day.ts`, `src/modules/finance/receipts.ts`, `src/modules/booking/booking.ts`
 - Test: `tests/integration/appointments.test.ts`, `dashboard.test.ts`, `receipts.test.ts`, `booking.test.ts`; `src/modules/dashboard/day.test.ts` se existir
 
 **Interfaces:**
+
 - Consumes: `serviceLabel` (Tarefa 4).
 - Produces:
   - em `extras.ts`: `extraNamesSql` (`sql<string[]>`, nomes por `position`, `{}` quando não há) e `extraPricesSql` (`sql<{ cents: number; missing: boolean }>`: soma dos preços conhecidos dos extras e se algum não tem preço), ambos correlacionados com `appointments.id`;
@@ -224,6 +237,7 @@ Regras a implementar:
 ### Task 7: Formulário e detalhe no painel
 
 **Files:**
+
 - Modify: `src/app/admin/(painel)/agenda/appointment-form.tsx`
 - Modify: `src/app/admin/(painel)/agenda/[id]/page.tsx`
 - Modify: `src/app/admin/(painel)/agenda/novo/page.tsx` (só se precisar repassar props)
@@ -231,10 +245,12 @@ Regras a implementar:
 - Test: `e2e/agenda.spec.ts`
 
 **Interfaces:**
+
 - Consumes: `extraServiceIds`, `MAX_EXTRA_SERVICES`, `AppointmentRecord.extras`, `AppointmentRecord.inPackage`.
 - Produces: `ServiceOption` ganha nada novo; `AppointmentForm` ganha a prop `allowExtras: boolean` (falso para sessão de pacote).
 
 Comportamento:
+
 - Abaixo de "Serviço": um seletor por extra, rotulado "Procedimento 2", "Procedimento 3"..., com as mesmas opções menos os flexíveis e menos os já escolhidos, e um botão "Remover" (com nome acessível "Remover procedimento N").
 - Botão "Adicionar procedimento": visível quando há serviço principal escolhido, `allowExtras` e menos de 9 extras. Com `allowExtras` falso, no lugar do botão: "Sessão de pacote: só um procedimento."
 - Ao escolher, trocar ou remover qualquer serviço: `durationMinutes` vira a soma das durações dos escolhidos, e os avisos pendentes caem (`dropWarnings`).
