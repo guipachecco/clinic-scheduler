@@ -427,6 +427,7 @@ export async function listBirthdays(
       name: row.name,
       nickname: row.nickname,
       phone: row.phone,
+      // Safe: the to_char filter above only matches rows with a birth date.
       age: ageTurning(row.birthDate!, date),
     })),
   };

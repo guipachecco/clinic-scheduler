@@ -706,7 +706,10 @@ describe("listBirthdays", () => {
     });
   });
 
-  it("skips anonymized, provisional and undated patients", async () => {
+  it("skips anonymized (birth date cleared), provisional and undated patients", async () => {
+    // patients_anonymized_check forces birth_date to null on anonymized rows,
+    // so this row is already out by date; the anonymized_at filter is a second
+    // guard that the database makes impossible to exercise directly.
     const anonymized = await created({
       phone: "(48) 99999-0001",
       cpf: "",
@@ -733,6 +736,24 @@ describe("listBirthdays", () => {
       phone: "+5548999990003",
     });
     expect((await listBirthdays(CLINIC, now)).items).toEqual([]);
+  });
+
+  it("lists a Feb 29 birth on Feb 28 of a non-leap year only", async () => {
+    await created({
+      phone: "(48) 99999-0001",
+      cpf: "",
+      birthDate: "2000-02-29",
+    });
+    // 22:00 on Feb 28 in São Paulo.
+    const nonLeap = await listBirthdays(
+      CLINIC,
+      new Date("2027-03-01T01:00:00Z"),
+    );
+    expect(nonLeap.date).toBe("2027-02-28");
+    expect(nonLeap.items.map((i) => i.age)).toEqual([27]);
+    const leap = await listBirthdays(CLINIC, new Date("2028-02-29T01:00:00Z"));
+    expect(leap.date).toBe("2028-02-28");
+    expect(leap.items).toEqual([]);
   });
 
   it("does not list another clinic's patients", async () => {
