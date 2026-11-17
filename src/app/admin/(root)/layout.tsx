@@ -4,8 +4,10 @@ import { getTheme } from "@/lib/theme-server";
 import { requireRoot } from "@/modules/auth/session";
 
 import { SignOutButton } from "../(painel)/sign-out-button";
+import { RootNav } from "./root-nav";
 
-// Pages outside any clinic, only for root (the clinic list).
+// Pages outside any clinic, only for root: the clinic list, what each clinic
+// has (resources) and how the system is doing (monitoring).
 export default async function RootAreaLayout({
   children,
 }: {
@@ -28,7 +30,8 @@ export default async function RootAreaLayout({
           <SignOutButton />
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 bg-background px-4 py-8 md:px-8">
+      <main className="mx-auto grid w-full max-w-6xl flex-1 grid-cols-1 content-start gap-6 bg-background px-4 py-6 md:px-8 md:py-8">
+        <RootNav />
         {children}
       </main>
     </div>

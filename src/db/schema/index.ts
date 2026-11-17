@@ -5,3 +5,4 @@ export * from "./mercado-pago";
 export * from "./asaas";
 export * from "./anamnesis";
 export * from "./stock";
+export * from "./platform";

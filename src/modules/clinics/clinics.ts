@@ -311,6 +311,46 @@ export async function updateClinic(
   });
 }
 
+// One switch of the resources screen: turns a single module on or off,
+// keeping the others as they are. Like updateClinic, nothing is deleted.
+export async function setClinicModule(
+  id: string,
+  key: ClinicModule,
+  on: boolean,
+  actorUserId: string,
+): Promise<{ ok: boolean }> {
+  if (!UUID_PATTERN.test(id)) return { ok: false };
+  return platformDb.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ modules: clinics.modules })
+      .from(clinics)
+      .where(eq(clinics.id, id))
+      .limit(1)
+      .for("update");
+    if (!current) return { ok: false };
+    const next = modulesSchema.parse(
+      on
+        ? [...current.modules, key]
+        : current.modules.filter((item) => item !== key),
+    );
+    if (next.join() === current.modules.join()) return { ok: true };
+    await tx
+      .update(clinics)
+      .set({ modules: next, updatedAt: new Date() })
+      .where(eq(clinics.id, id));
+    await tx.insert(auditLogs).values({
+      clinicId: id,
+      actorType: "admin",
+      actorUserId,
+      action: "clinic.updated",
+      entityType: "clinic",
+      entityId: id,
+      changes: { modules: { before: current.modules, after: next } },
+    });
+    return { ok: true };
+  });
+}
+
 export async function setClinicActive(
   id: string,
   isActive: boolean,
