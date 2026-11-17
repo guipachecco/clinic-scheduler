@@ -112,7 +112,24 @@ const output = {
   error: console.error.bind(console),
 };
 
+type ErrorSink = (message: string, context?: LogContext) => void;
+let errorSink: ErrorSink | null = null;
+
+// Lets the server keep a copy of every logger.error for root's monitoring
+// screen (src/instrumentation.ts). The sink must never throw nor log errors
+// itself; a failure in it is swallowed here as a last guard.
+export function setErrorSink(sink: ErrorSink | null) {
+  errorSink = sink;
+}
+
 function write(level: LogLevel, message: string, context?: LogContext) {
+  if (level === "error" && errorSink) {
+    try {
+      errorSink(message, context);
+    } catch {
+      // The log line below still goes out.
+    }
+  }
   if (LEVEL_WEIGHT[level] < LEVEL_WEIGHT[currentLevel()]) return;
   const entry = {
     level,

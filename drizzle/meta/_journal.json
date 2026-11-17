@@ -281,6 +281,13 @@
       "when": 1794917526584,
       "tag": "0039_asaas_own_account",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794949368435,
+      "tag": "0040_platform_monitoring",
+      "breakpoints": true
     }
   ]
 }
