@@ -157,7 +157,9 @@ const unpaid = sql`coalesce((
 //   is "paid" again and the rest is owed again.
 // - No-show: the clinic keeps the deposit (its payment stays) and the rest
 //   installment is cancelled; the sale stays.
-// - Cancelled: left to the cancellation flow.
+// - Cancelled: the rest installment is cancelled, whatever the deposit's
+//   fate; cancelWithDeposit decides that one (kept, or refunded with the
+//   whole sale cancelled, in which case nothing is left here to do).
 export async function syncDepositSale(
   tx: Tx,
   clinicId: string,
@@ -217,7 +219,13 @@ export async function syncDepositSale(
       .where(and(rest, isNull(installments.cancelledAt), unpaid));
     return;
   }
-  if (row.appointmentStatus === "cancelled") return;
+  if (row.appointmentStatus === "cancelled") {
+    await tx
+      .update(installments)
+      .set({ cancelledAt: now })
+      .where(and(rest, isNull(installments.cancelledAt), unpaid));
+    return;
+  }
 
   if (row.status === "kept") {
     await tx

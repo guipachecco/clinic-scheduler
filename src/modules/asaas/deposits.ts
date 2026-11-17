@@ -16,7 +16,16 @@ import {
   services,
 } from "@/db/schema";
 import { logger } from "@/lib/logger";
-import { lockAgenda } from "@/modules/appointments/appointments";
+import {
+  type AppointmentResult,
+  changeAppointmentStatus,
+  lockAgenda,
+} from "@/modules/appointments/appointments";
+import {
+  CANCELLATION_REASON_LABELS,
+  type CancellationReason,
+  canTransition,
+} from "@/modules/appointments/fields";
 import { cancelSaleInTx } from "@/modules/finance/sales";
 import { todayLocal } from "@/modules/schedule/time";
 
@@ -33,6 +42,7 @@ import {
 } from "./api";
 import { createDepositSale } from "./deposit-sale";
 import {
+  cancellationOutcome,
   type CloseReason,
   type DepositStatus,
   depositFor,
@@ -961,7 +971,8 @@ async function decidePaidDeposit(
 
 // Refunded from the Asaas app: the deposit payment is reversed here and the
 // sale is cancelled. The appointment stays as it is; the owner decides
-// about it.
+// about it. A kept deposit (no-show, late cancel) the owner chose to give
+// back from the app goes the same way.
 async function reverseRefundedDeposit(
   clinicId: string,
   depositId: string,
@@ -981,7 +992,7 @@ async function reverseRefundedDeposit(
       .for("update");
     if (
       !deposit ||
-      deposit.status !== "paid" ||
+      (deposit.status !== "paid" && deposit.status !== "kept") ||
       deposit.chargeId !== chargeId ||
       !deposit.paymentId
     ) {
@@ -1023,4 +1034,299 @@ async function reverseRefundedDeposit(
     });
     return "refunded";
   });
+}
+
+// ------------------------------------------------------------- cancelling
+
+export type CancellationPreview = {
+  hasPaidDeposit: boolean;
+  outcome: "refund" | "keep";
+  amountCents: number;
+};
+
+const PANEL_REFUND_REASON = "Sinal devolvido";
+const OUTSIDE_REFUND_REASON = "Sinal devolvido por fora";
+const NOT_FOUND = "Atendimento não encontrado.";
+const BY_REQUIRED = "Escolha quem desmarcou.";
+
+// Why Asaas refused a refund, in the owner's words. Codes only: the body of
+// an Asaas error never leaves api.ts.
+const INSUFFICIENT_BALANCE = "saldo insuficiente na conta";
+const REFUND_FAILURE_TEXTS: Record<string, string> = {
+  insufficient_balance: INSUFFICIENT_BALANCE,
+  insufficient_funds: INSUFFICIENT_BALANCE,
+  invalid_balance: INSUFFICIENT_BALANCE,
+};
+const REFUND_FAILURE_DEFAULT = "tente de novo mais tarde";
+
+function refundFailureText(error: unknown): string {
+  if (error instanceof AsaasError) {
+    for (const code of error.codes) {
+      const text = REFUND_FAILURE_TEXTS[code];
+      if (text) return text;
+      if (/insufficient|balance|saldo/i.test(code)) return INSUFFICIENT_BALANCE;
+    }
+  }
+  return REFUND_FAILURE_DEFAULT;
+}
+
+const refundFailed = (text: string): AppointmentResult => ({
+  ok: false,
+  formError: `O Asaas não conseguiu devolver: ${text}.`,
+  refundFailed: true,
+});
+
+async function depositForCancel(clinicId: string, appointmentId: string) {
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        id: asaasDeposits.id,
+        status: asaasDeposits.status,
+        amountCents: asaasDeposits.amountCents,
+        chargeId: asaasDeposits.chargeId,
+        paymentId: asaasDeposits.paymentId,
+        appointmentStatus: appointments.status,
+        startsAt: appointments.startsAt,
+      })
+      .from(asaasDeposits)
+      .innerJoin(
+        appointments,
+        and(
+          eq(appointments.clinicId, asaasDeposits.clinicId),
+          eq(appointments.id, asaasDeposits.appointmentId),
+        ),
+      )
+      .where(
+        and(
+          eq(asaasDeposits.clinicId, clinicId),
+          eq(asaasDeposits.appointmentId, appointmentId),
+        ),
+      ),
+  );
+  return row ?? null;
+}
+
+// What cancelling now would do with the deposit, for the text the owner
+// reads before confirming. Null when the appointment has no deposit (and
+// always while Asaas is off).
+export async function previewCancellation(
+  clinicId: string,
+  appointmentId: string,
+  by: "patient" | "clinic",
+  now: Date = new Date(),
+): Promise<CancellationPreview | null> {
+  if (!asaasEnabled() || !UUID_PATTERN.test(appointmentId)) return null;
+  const row = await depositForCancel(clinicId, appointmentId);
+  if (!row) return null;
+  return {
+    hasPaidDeposit: row.status === "paid",
+    outcome: cancellationOutcome({ by, startsAt: row.startsAt, now }),
+    amountCents: row.amountCents,
+  };
+}
+
+type Settlement = "keep" | "refunded_asaas" | "refunded_outside";
+
+// The deposit side of the cancellation, in the agenda's transaction (the
+// appointment row is already locked). Re-reads the deposit under lock: if
+// the Asaas webhook already reversed it, there is nothing left to do.
+async function settleDeposit(
+  tx: Tx,
+  clinicId: string,
+  depositId: string,
+  settlement: Settlement,
+  by: "patient" | "clinic",
+  actorUserId: string,
+  now: Date,
+): Promise<void> {
+  const [deposit] = await tx
+    .select()
+    .from(asaasDeposits)
+    .where(
+      and(
+        eq(asaasDeposits.id, depositId),
+        eq(asaasDeposits.clinicId, clinicId),
+      ),
+    )
+    .for("update");
+  if (!deposit || deposit.status !== "paid" || !deposit.paymentId) return;
+
+  if (settlement === "keep") {
+    // syncDepositSale, right after, cancels the rest installment.
+    await tx
+      .update(asaasDeposits)
+      .set({ status: "kept", updatedAt: now })
+      .where(eq(asaasDeposits.id, deposit.id));
+    return;
+  }
+
+  const reason =
+    settlement === "refunded_asaas"
+      ? PANEL_REFUND_REASON
+      : OUTSIDE_REFUND_REASON;
+  const reversed = await tx
+    .update(payments)
+    .set({
+      reversedAt: now,
+      reversedByUserId: actorUserId,
+      reversalReason: reason,
+    })
+    .where(
+      and(
+        eq(payments.id, deposit.paymentId),
+        eq(payments.clinicId, clinicId),
+        isNull(payments.reversedAt),
+      ),
+    )
+    .returning({ id: payments.id });
+  if (reversed.length > 0) {
+    await tx.insert(auditLogs).values({
+      clinicId,
+      actorType: "admin",
+      actorUserId,
+      action: "payment.reversed",
+      entityType: "payment",
+      entityId: deposit.paymentId,
+      changes: { depositId: deposit.id, amountCents: deposit.amountCents },
+    });
+  }
+  if (deposit.saleId) {
+    // The patient has it all back: every installment with nothing paid goes.
+    await cancelSaleInTx(
+      tx,
+      clinicId,
+      deposit.saleId,
+      { reason, cancelFutureSessions: false },
+      actorUserId,
+      now,
+    );
+  }
+  await tx
+    .update(asaasDeposits)
+    .set({ status: "refunded", updatedAt: now })
+    .where(eq(asaasDeposits.id, deposit.id));
+  await tx.insert(auditLogs).values({
+    clinicId,
+    actorType: "admin",
+    actorUserId,
+    action:
+      settlement === "refunded_asaas"
+        ? "asaas.deposit_refunded"
+        : "asaas.deposit_refunded_outside",
+    entityType: "appointment",
+    entityId: deposit.appointmentId,
+    changes: {
+      depositId: deposit.id,
+      chargeId: deposit.chargeId,
+      amountCents: deposit.amountCents,
+      by,
+    },
+  });
+}
+
+// Cancels from the panel an appointment that may have a Pix deposit.
+// - Paid, and the rule says refund: the refund goes to Asaas first, outside
+//   any transaction. If Asaas refuses, nothing changes and the owner reads
+//   why (she may then cancel with skipRefund). Once accepted, one
+//   transaction cancels the appointment, reverses the deposit payment and
+//   cancels the sale; the deposit is 'refunded'. Should that transaction
+//   fail, a retry does not refund twice (Asaas answers "already refunded",
+//   which refundCharge counts as done), and the PAYMENT_REFUNDED webhook
+//   reverses the payment here anyway.
+// - Paid, and the rule says keep: the deposit is 'kept' (its payment and the
+//   sale stay) and only the rest installment is cancelled.
+// - skipRefund: she gave the money back some other way; the same as a
+//   refund here, without calling Asaas.
+// - Pending, or no deposit at all: the plain cancellation (which closes a
+//   pending deposit and deletes its charge).
+export async function cancelWithDeposit(
+  clinicId: string,
+  appointmentId: string,
+  input: {
+    by: "patient" | "clinic";
+    reason: CancellationReason;
+    skipRefund?: boolean;
+  },
+  actorUserId: string,
+  fetchImpl: Fetch = fetch,
+  now: Date = new Date(),
+): Promise<AppointmentResult> {
+  if (!UUID_PATTERN.test(appointmentId)) {
+    return { ok: false, formError: NOT_FOUND };
+  }
+  if (input.by !== "patient" && input.by !== "clinic") {
+    return { ok: false, fieldErrors: { by: BY_REQUIRED } };
+  }
+  const change = {
+    to: "cancelled" as const,
+    reason: input.reason,
+    cancelledBy: input.by,
+  };
+  const deposit = asaasEnabled()
+    ? await depositForCancel(clinicId, appointmentId)
+    : null;
+  const paid =
+    deposit?.status === "paid" && deposit.chargeId && deposit.paymentId
+      ? { ...deposit, chargeId: deposit.chargeId }
+      : null;
+  // Anything the status change would refuse is refused before money moves.
+  const valid =
+    paid &&
+    Object.hasOwn(CANCELLATION_REASON_LABELS, input.reason) &&
+    canTransition(paid.appointmentStatus, "cancelled", paid.startsAt, now).ok;
+  if (!paid || !valid) {
+    return changeAppointmentStatus(
+      clinicId,
+      appointmentId,
+      change,
+      actorUserId,
+      now,
+      fetchImpl,
+    );
+  }
+
+  const outcome = cancellationOutcome({
+    by: input.by,
+    startsAt: paid.startsAt,
+    now,
+  });
+  const settlement: Settlement =
+    outcome === "keep"
+      ? "keep"
+      : input.skipRefund
+        ? "refunded_outside"
+        : "refunded_asaas";
+
+  if (settlement === "refunded_asaas") {
+    const apiKey = await accountApiKey(clinicId);
+    if (!apiKey) return refundFailed(REFUND_FAILURE_DEFAULT);
+    try {
+      await refundCharge(apiKey, paid.chargeId, fetchImpl);
+    } catch (error) {
+      logger.warn("asaas: sinal não devolvido", {
+        clinicId,
+        code: failureCode(error),
+      });
+      return refundFailed(refundFailureText(error));
+    }
+  }
+
+  return changeAppointmentStatus(
+    clinicId,
+    appointmentId,
+    change,
+    actorUserId,
+    now,
+    fetchImpl,
+    (tx) =>
+      settleDeposit(
+        tx,
+        clinicId,
+        paid.id,
+        settlement,
+        input.by,
+        actorUserId,
+        now,
+      ),
+  );
 }

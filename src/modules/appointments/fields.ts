@@ -259,6 +259,10 @@ export const statusChangeSchema = z
     id: z.uuid(),
     to: z.enum(APPOINTMENT_STATUSES, "Escolha o novo status."),
     reason: z.string().optional(),
+    // Who called it off ("Quem desmarcou?"), asked only with a paid deposit.
+    by: z.enum(["patient", "clinic"]).optional(),
+    // Cancel without refunding at Asaas: she gave the deposit back herself.
+    skipRefund: z.boolean().optional(),
   })
   .transform((value, ctx) => {
     if (value.to !== "cancelled") return { id: value.id, to: value.to };
@@ -271,7 +275,13 @@ export const statusChangeSchema = z
       });
       return z.NEVER;
     }
-    return { id: value.id, to: value.to, reason };
+    return {
+      id: value.id,
+      to: value.to,
+      reason,
+      ...(value.by ? { by: value.by } : {}),
+      ...(value.skipRefund ? { skipRefund: true } : {}),
+    };
   });
 
 export type StatusChangeInput = z.input<typeof statusChangeSchema>;

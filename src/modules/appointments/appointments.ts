@@ -57,6 +57,8 @@ export type AppointmentResult =
       fieldErrors?: Record<string, string>;
       formError?: string;
       warnings?: Warning[];
+      // Asaas refused to refund the deposit: the owner may cancel without it.
+      refundFailed?: boolean;
     };
 
 export type AppointmentRecord = {
@@ -1105,15 +1107,26 @@ export async function rescheduleAppointment(
 const isReason = (value: unknown): value is CancellationReason =>
   typeof value === "string" && Object.hasOwn(CANCELLATION_REASON_LABELS, value);
 
+// Runs inside the status change's transaction, after the appointment row is
+// locked and the transition checked, before the row is written (the deposit
+// side of a cancellation, see cancelWithDeposit).
+export type StatusChangeHook = (tx: Tx) => Promise<void>;
+
 // `fetchImpl` reaches Asaas only after the transaction commits: confirming
-// by hand a booking still waiting for its Pix deposit cancels that charge.
+// by hand a booking still waiting for its Pix deposit, or cancelling it,
+// cancels that charge. `cancelledBy` defaults to the clinic.
 export async function changeAppointmentStatus(
   clinicId: string,
   id: string,
-  input: { to: Status; reason?: CancellationReason },
+  input: {
+    to: Status;
+    reason?: CancellationReason;
+    cancelledBy?: "clinic" | "patient";
+  },
   actorUserId: string,
   now: Date = new Date(),
   fetchImpl: Fetch = fetch,
+  inTx?: StatusChangeHook,
 ): Promise<AppointmentResult> {
   if (!UUID_PATTERN.test(id)) return formFail(NOT_FOUND);
   if (!APPOINTMENT_STATUSES.includes(input.to)) {
@@ -1145,20 +1158,22 @@ export async function changeAppointmentStatus(
         if (!allowed.ok) return formFail(allowed.message);
 
         // Confirmed by hand (paid some other way): the deposit closes and no
-        // sale is made for it. The charge goes once this commits.
+        // sale is made for it. Cancelled while it waits for the Pix: the
+        // deposit closes too. The charge goes once this commits.
         if (
           asaasEnabled() &&
           current.status === "requested" &&
-          input.to === "confirmed"
+          (input.to === "confirmed" || input.to === "cancelled")
         ) {
           chargeToCancel = await closePendingDeposit(
             tx,
             clinicId,
             id,
-            "manual_confirm",
+            input.to === "confirmed" ? "manual_confirm" : "clinic_cancelled",
             now,
           );
         }
+        if (inTx) await inTx(tx);
 
         const reason = input.to === "cancelled" ? input.reason! : undefined;
         await tx
@@ -1169,7 +1184,7 @@ export async function changeAppointmentStatus(
             ...(reason
               ? {
                   cancelledAt: now,
-                  cancelledBy: "clinic" as const,
+                  cancelledBy: input.cancelledBy ?? "clinic",
                   cancellationReason: reason,
                 }
               : {}),

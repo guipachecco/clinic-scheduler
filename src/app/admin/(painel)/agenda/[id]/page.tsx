@@ -9,7 +9,10 @@ import {
   CANCELLATION_REASON_LABELS,
   serviceLabel,
 } from "@/modules/appointments/fields";
-import { sweepBeforePanel } from "@/modules/asaas/deposits";
+import {
+  previewCancellation,
+  sweepBeforePanel,
+} from "@/modules/asaas/deposits";
 import { depositMinutesLeft, type DepositStatus } from "@/modules/asaas/rules";
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import {
@@ -150,6 +153,20 @@ export default async function AppointmentPage({
     deposit && !depositWithRest
       ? (DEPOSIT_TEXTS[deposit.status]?.(money(deposit.amountCents)) ?? null)
       : null;
+  // A paid deposit: cancelling asks who called it off and says what happens
+  // to the deposit (the clinic always refunds; the patient only more than
+  // 24h before).
+  const cancelPreview =
+    deposit?.status === "paid" &&
+    appointment.allowedTransitions.includes("cancelled")
+      ? await previewCancellation(clinicId, appointment.id, "patient", now)
+      : null;
+  const depositCancel = cancelPreview?.hasPaidDeposit
+    ? {
+        amount: money(cancelPreview.amountCents),
+        patientRefunds: cancelPreview.outcome === "refund",
+      }
+    : undefined;
 
   const extraNames = appointment.extras.map((extra) => extra.name);
   const serviceText = serviceLabel(
@@ -418,6 +435,7 @@ export default async function AppointmentPage({
           id={appointment.id}
           allowedTransitions={appointment.allowedTransitions}
           depositPending={holdMinutes !== undefined}
+          depositCancel={depositCancel}
         />
       </section>
 

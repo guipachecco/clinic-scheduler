@@ -343,6 +343,35 @@ describe("statusChangeSchema", () => {
     ).toEqual({ id, to: "completed" });
   });
 
+  it("keeps who cancelled and skipRefund only for a cancellation", () => {
+    expect(
+      statusChangeSchema.parse({
+        id,
+        to: "cancelled",
+        reason: "patient_request",
+        by: "patient",
+        skipRefund: true,
+      }),
+    ).toEqual({
+      id,
+      to: "cancelled",
+      reason: "patient_request",
+      by: "patient",
+      skipRefund: true,
+    });
+    expect(
+      statusChangeSchema.safeParse({
+        id,
+        to: "cancelled",
+        reason: "other",
+        by: "system",
+      }).success,
+    ).toBe(false);
+    expect(
+      statusChangeSchema.parse({ id, to: "confirmed", by: "clinic" }),
+    ).toEqual({ id, to: "confirmed" });
+  });
+
   it("rejects unknown statuses", () => {
     expect(statusChangeSchema.safeParse({ id, to: "deleted" }).success).toBe(
       false,
