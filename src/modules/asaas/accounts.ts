@@ -15,7 +15,6 @@ import {
 import {
   AsaasError,
   createEvpKey,
-  createSubaccount,
   getAccountStatus,
   listPixKeys,
   type Fetch,
@@ -95,6 +94,7 @@ export async function activateAccount(
   actorUserId: string,
   fetchImpl: Fetch = fetch,
 ): Promise<{ ok: true } | { ok: false; formError: string }> {
+  void fetchImpl; // Temporary until Task 3.
   const rootKey = env.ASAAS_API_KEY;
   if (rootKey === undefined || env.ASAAS_WEBHOOK_TOKEN === undefined) {
     return {
@@ -108,19 +108,8 @@ export async function activateAccount(
 
   let created: { id: string; walletId: string; apiKey: string };
   try {
-    created = await createSubaccount(
-      rootKey,
-      {
-        ...values,
-        webhookUrl: new URL(
-          "/api/webhooks/asaas",
-          env.BETTER_AUTH_URL,
-        ).toString(),
-        webhookToken: env.ASAAS_WEBHOOK_TOKEN,
-        webhookEmail: values.email,
-      },
-      fetchImpl,
-    );
+    // Temporary: Task 3 rewrites this file to connect the owner's own key.
+    throw new Error("substituído na Task 3");
   } catch (error) {
     logger.warn("asaas: subconta recusada", {
       clinicId,

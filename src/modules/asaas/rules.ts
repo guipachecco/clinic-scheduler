@@ -111,3 +111,17 @@ export function isValidCpfCnpj(digits: string): boolean {
 export function accountReady(status: { general: string }): boolean {
   return status.general === "APPROVED";
 }
+
+// Which Asaas environment an API key belongs to, by its prefix. An unknown
+// prefix is left for Asaas itself to accept or refuse.
+export function keyEnvironment(
+  apiKey: string,
+): "production" | "sandbox" | "unknown" {
+  if (apiKey.startsWith("$aact_prod_")) return "production";
+  if (apiKey.startsWith("$aact_hmlg_")) return "sandbox";
+  return "unknown";
+}
+
+export function baseUrlEnvironment(url: string): "production" | "sandbox" {
+  return url.includes("sandbox") ? "sandbox" : "production";
+}

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   accountReady,
+  baseUrlEnvironment,
   cancellationOutcome,
   depositFor,
   depositMinutesLeft,
   isValidCpfCnpj,
+  keyEnvironment,
   lateArrival,
 } from "./rules";
 
@@ -204,5 +206,22 @@ describe("depositMinutesLeft", () => {
     expect(
       depositMinutesLeft(expiresAt, new Date("2033-03-01T13:00:00Z")),
     ).toBe(0);
+  });
+});
+
+describe("keyEnvironment", () => {
+  it("reconhece o ambiente pelo prefixo da chave", () => {
+    expect(keyEnvironment("$aact_prod_x")).toBe("production");
+    expect(keyEnvironment("$aact_hmlg_x")).toBe("sandbox");
+    expect(keyEnvironment("abc")).toBe("unknown");
+  });
+});
+
+describe("baseUrlEnvironment", () => {
+  it("sandbox é qualquer URL que contenha sandbox", () => {
+    expect(baseUrlEnvironment("https://api-sandbox.asaas.com/v3")).toBe(
+      "sandbox",
+    );
+    expect(baseUrlEnvironment("https://api.asaas.com/v3")).toBe("production");
   });
 });

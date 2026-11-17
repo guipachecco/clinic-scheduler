@@ -36,7 +36,7 @@ async function call<T>(
   fetchImpl: Fetch,
   apiKey: string,
   path: string,
-  init: { method: "GET" | "POST" | "DELETE"; body?: unknown },
+  init: { method: "GET" | "POST" | "PUT" | "DELETE"; body?: unknown },
 ): Promise<T> {
   const headers: Record<string, string> = {
     accept: "application/json",
@@ -68,59 +68,90 @@ const WEBHOOK_EVENTS = [
   "PAYMENT_DELETED",
 ];
 
-// ------------------------------------------------------------- subaccounts
+// ---------------------------------------------------------------- account
 
-export type SubaccountInput = {
-  name: string;
-  email: string;
-  cpfCnpj: string;
-  birthDate?: string;
-  companyType?: string;
-  mobilePhone: string;
-  incomeValue: number;
-  address: string;
-  addressNumber: string;
-  province: string;
-  postalCode: string;
-  webhookUrl: string;
-  webhookToken: string;
-  // Where Asaas warns about a paused webhook queue. Asaas requires it.
-  webhookEmail: string;
-};
-
-export async function createSubaccount(
+export async function getCommercialInfo(
   apiKey: string,
-  input: SubaccountInput,
   fetchImpl: Fetch = fetch,
-): Promise<{ id: string; walletId: string; apiKey: string }> {
-  const { webhookUrl, webhookToken, webhookEmail, ...account } = input;
-  const raw = await call<{ id: string; walletId: string; apiKey: string }>(
+): Promise<{ name: string; email: string }> {
+  const raw = await call<{ name: string; email: string }>(
     fetchImpl,
     apiKey,
-    "/accounts",
-    {
-      method: "POST",
-      body: {
-        ...account,
-        // Asaas refuses the account when the webhook lacks name, email,
-        // enabled, interrupted or apiVersion (sandbox, 17/11/2026).
-        webhooks: [
-          {
-            name: "Zemana",
-            url: webhookUrl,
-            email: webhookEmail,
-            enabled: true,
-            interrupted: false,
-            apiVersion: 3,
-            sendType: "SEQUENTIALLY",
-            authToken: webhookToken,
-            events: WEBHOOK_EVENTS,
-          },
-        ],
-      },
-    },
+    "/myAccount/commercialInfo",
+    { method: "GET" },
   );
-  return { id: raw.id, walletId: raw.walletId, apiKey: raw.apiKey };
+  return { name: raw.name, email: raw.email };
+}
+
+// The wallet id identifies the Asaas account: one account connects to one
+// clinic only.
+export async function getWalletId(
+  apiKey: string,
+  fetchImpl: Fetch = fetch,
+): Promise<string> {
+  const raw = await call<{ data?: { id: string }[] }>(
+    fetchImpl,
+    apiKey,
+    "/wallets",
+    { method: "GET" },
+  );
+  const first = raw.data?.[0];
+  if (first === undefined) {
+    throw new AsaasError("O Asaas não devolveu a carteira da conta.", 0, [
+      "no_wallet",
+    ]);
+  }
+  return first.id;
+}
+
+// -------------------------------------------------------------- webhooks
+
+export async function listWebhooks(
+  apiKey: string,
+  fetchImpl: Fetch = fetch,
+): Promise<{ id: string; url: string }[]> {
+  const raw = await call<{ data?: { id: string; url: string }[] }>(
+    fetchImpl,
+    apiKey,
+    "/webhooks?limit=100",
+    { method: "GET" },
+  );
+  return (raw.data ?? []).map((hook) => ({ id: hook.id, url: hook.url }));
+}
+
+// Creates the Zemana webhook, or updates it when `id` is given (PUT replaces
+// the whole webhook, so it also turns a paused one back on). Asaas refuses a
+// webhook without name, email, enabled, interrupted or apiVersion (sandbox,
+// 17/11/2026).
+export async function saveWebhook(
+  apiKey: string,
+  input: { id?: string; url: string; email: string; authToken: string },
+  fetchImpl: Fetch = fetch,
+): Promise<void> {
+  const body = {
+    name: "Zemana",
+    url: input.url,
+    email: input.email,
+    enabled: true,
+    interrupted: false,
+    apiVersion: 3,
+    sendType: "SEQUENTIALLY",
+    authToken: input.authToken,
+    events: WEBHOOK_EVENTS,
+  };
+  if (input.id === undefined) {
+    await call<unknown>(fetchImpl, apiKey, "/webhooks", {
+      method: "POST",
+      body,
+    });
+  } else {
+    await call<unknown>(
+      fetchImpl,
+      apiKey,
+      `/webhooks/${encodeURIComponent(input.id)}`,
+      { method: "PUT", body },
+    );
+  }
 }
 
 export async function getAccountStatus(

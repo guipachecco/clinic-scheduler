@@ -3,9 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   AsaasError,
   createPixPayment,
-  createSubaccount,
   deletePayment,
+  getCommercialInfo,
   getPayment,
+  getWalletId,
+  listWebhooks,
+  saveWebhook,
   type Fetch,
 } from "./api";
 
@@ -84,51 +87,80 @@ describe("asaas api", () => {
     expect(error.message).not.toContain("123");
   });
 
-  it("createSubaccount registers the webhook with the token", async () => {
+  it("getWalletId returns the first wallet and sends no body", async () => {
+    const { calls, impl } = fakeFetch(200, { data: [{ id: "wal-1" }] });
+    await expect(getWalletId("k", impl)).resolves.toBe("wal-1");
+    expect(calls[0].method).toBe("GET");
+    expect(calls[0].url).toMatch(/\/wallets$/);
+    expect(calls[0].body).toBeUndefined();
+  });
+
+  it("getWalletId throws no_wallet when the list is empty", async () => {
+    const { impl } = fakeFetch(200, { data: [] });
+    const error = await getWalletId("k", impl).catch((e) => e);
+    expect(error).toBeInstanceOf(AsaasError);
+    expect(error.status).toBe(0);
+    expect(error.codes).toEqual(["no_wallet"]);
+  });
+
+  it("getCommercialInfo returns name and email", async () => {
     const { calls, impl } = fakeFetch(200, {
-      id: "acc_1",
-      walletId: "w_1",
-      apiKey: "sub-key",
+      name: "Clinica",
+      email: "dona@b.com",
+      cpfCnpj: "123",
     });
-    const created = await createSubaccount(
+    await expect(getCommercialInfo("k", impl)).resolves.toEqual({
+      name: "Clinica",
+      email: "dona@b.com",
+    });
+    expect(calls[0].url).toMatch(/\/myAccount\/commercialInfo$/);
+  });
+
+  it("listWebhooks asks for 100 and keeps id and url", async () => {
+    const { calls, impl } = fakeFetch(200, {
+      data: [{ id: "wh-1", url: "https://x.test/a", name: "Outro" }],
+    });
+    await expect(listWebhooks("k", impl)).resolves.toEqual([
+      { id: "wh-1", url: "https://x.test/a" },
+    ]);
+    expect(calls[0].url).toMatch(/\/webhooks\?limit=100$/);
+  });
+
+  it.each([
+    [undefined, "POST", /\/webhooks$/],
+    ["wh-1", "PUT", /\/webhooks\/wh-1$/],
+  ])("saveWebhook with id %s uses %s", async (id, method, urlPattern) => {
+    const { calls, impl } = fakeFetch(200, {});
+    await saveWebhook(
       "k",
       {
-        name: "Clinica",
-        email: "a@b.com",
-        cpfCnpj: "00000000000",
-        mobilePhone: "11999999999",
-        incomeValue: 5000,
-        address: "Rua",
-        addressNumber: "1",
-        province: "Centro",
-        postalCode: "01001000",
-        webhookUrl: "https://x.test/api/webhooks/asaas",
-        webhookToken: "tok",
-        webhookEmail: "dona@b.com",
+        id,
+        url: "https://x.test/api/webhooks/asaas",
+        email: "dona@b.com",
+        authToken: "tok",
       },
       impl,
     );
-    const webhooks = calls[0].body?.webhooks as {
-      url: string;
-      authToken: string;
-      events: string[];
-    }[];
+    expect(calls[0].method).toBe(method);
+    expect(calls[0].url).toMatch(urlPattern);
     // The sandbox refuses a webhook without these (checked 17/11/2026).
-    expect(webhooks[0]).toMatchObject({
+    expect(calls[0].body).toMatchObject({
       name: "Zemana",
+      url: "https://x.test/api/webhooks/asaas",
       email: "dona@b.com",
       enabled: true,
       interrupted: false,
       apiVersion: 3,
+      sendType: "SEQUENTIALLY",
+      authToken: "tok",
+      events: [
+        "PAYMENT_RECEIVED",
+        "PAYMENT_CONFIRMED",
+        "PAYMENT_REFUNDED",
+        "PAYMENT_DELETED",
+      ],
     });
-    expect(webhooks[0].authToken).toBe("tok");
-    expect(webhooks[0].url).toBe("https://x.test/api/webhooks/asaas");
-    expect(webhooks[0].events).toContain("PAYMENT_RECEIVED");
-    expect(created).toEqual({
-      id: "acc_1",
-      walletId: "w_1",
-      apiKey: "sub-key",
-    });
+    expect(calls[0].body).not.toHaveProperty("id");
   });
 
   it("deletePayment treats 404 as already gone", async () => {
