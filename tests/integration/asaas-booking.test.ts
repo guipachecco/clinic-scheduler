@@ -533,6 +533,60 @@ describe("online booking with a Pix deposit", () => {
     expect(account!.lastError).toBeNull();
   });
 
+  it("an unexpected error after the hold lets the slot go", async () => {
+    const [account] = await db
+      .select({ apiKeyEnc: asaasAccounts.apiKeyEnc })
+      .from(asaasAccounts)
+      .where(eq(asaasAccounts.clinicId, clinicId));
+    // The key no longer decrypts: startDeposit throws a plain Error before
+    // any deposit row exists.
+    await setAccount({ apiKeyEnc: "nao-decifra" });
+    try {
+      const asaas = fakeAsaas();
+      const result = await bookOnline(
+        ctx("ana"),
+        { serviceId, startsAt: SLOT, cpf: CPF },
+        asaas.fetchImpl,
+      );
+      expect(result).toEqual({ ok: false, reason: "unavailable" });
+      const [row] = await db
+        .select()
+        .from(appointments)
+        .where(eq(appointments.clinicId, clinicId));
+      expect(row).toMatchObject({ status: "cancelled", cancelledBy: "system" });
+      expect(await deposits()).toEqual([]);
+      expect(asaas.calls).toEqual([]);
+      expect(await listFreeSlots(ctx("bia"), serviceId, MONDAY)).toContain(
+        SLOT,
+      );
+    } finally {
+      await setAccount({ apiKeyEnc: account!.apiKeyEnc });
+    }
+  });
+
+  it("a plain error from Asaas after the deposit row closes it too", async () => {
+    const asaas = fakeAsaas();
+    // A network error (not an AsaasError) on the charge.
+    const failing = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/payments") && init?.method === "POST") {
+        throw new Error("conexão caiu");
+      }
+      return asaas.fetchImpl(input, init);
+    }) as typeof fetch;
+    const result = await bookOnline(
+      ctx("ana"),
+      { serviceId, startsAt: SLOT, cpf: CPF },
+      failing,
+    );
+    expect(result).toEqual({ ok: false, reason: "unavailable" });
+    const [deposit] = await deposits();
+    expect(deposit).toMatchObject({
+      status: "closed",
+      closeReason: "charge_failed",
+    });
+    expect(await listFreeSlots(ctx("bia"), serviceId, MONDAY)).toContain(SLOT);
+  });
+
   it("permanent refusal confirms without deposit and flags the account", async () => {
     const asaas = fakeAsaas();
     asaas.state.paymentError = { status: 400, code: "invalid_action" };

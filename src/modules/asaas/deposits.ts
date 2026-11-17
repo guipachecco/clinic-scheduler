@@ -592,7 +592,8 @@ export async function findPendingHold(
   return row?.id ?? null;
 }
 
-// Undoes a booking whose deposit could not be opened.
+// Undoes a booking whose deposit could not be opened: the hold is cancelled
+// and a deposit still pending for it is closed ("charge_failed").
 export async function undoHold(
   clinicId: string,
   appointmentId: string,
@@ -601,6 +602,16 @@ export async function undoHold(
   await inClinic(clinicId, async (tx) => {
     await lockAgenda(tx, clinicId);
     await cancelHold(tx, clinicId, appointmentId, now, "deposit_failed");
+    await tx
+      .update(asaasDeposits)
+      .set({ status: "closed", closeReason: "charge_failed", updatedAt: now })
+      .where(
+        and(
+          eq(asaasDeposits.clinicId, clinicId),
+          eq(asaasDeposits.appointmentId, appointmentId),
+          eq(asaasDeposits.status, "pending"),
+        ),
+      );
   });
 }
 

@@ -12,6 +12,7 @@ import {
   patients,
   services,
 } from "@/db/schema";
+import { logger } from "@/lib/logger";
 import { lockAgenda } from "@/modules/appointments/appointments";
 import { extraNamesSql } from "@/modules/appointments/extras";
 import { serviceLabel, type Status } from "@/modules/appointments/fields";
@@ -518,33 +519,52 @@ async function book(
     return { ok: true, appointmentId: inserted.appointmentId, deposit: null };
   }
 
-  const started = await startDeposit(
-    ctx.clinicId,
-    {
+  // The hold is saved: from here on any failure lets it go, so no slot is
+  // left blocked by a 'requested' appointment without a pending deposit.
+  try {
+    const started = await startDeposit(
+      ctx.clinicId,
+      {
+        appointmentId: inserted.appointmentId,
+        patientId: ctx.patientId,
+        patientName: inserted.patientName,
+        serviceName: inserted.serviceName,
+        amountCents: quote.amountCents,
+        cpf,
+      },
+      now,
+      fetchImpl,
+    );
+    if (started.ok) {
+      return {
+        ok: true,
+        appointmentId: inserted.appointmentId,
+        deposit: started.deposit,
+      };
+    }
+    if (started.reason === "permanent") {
+      await markAccountError(ctx.clinicId, started.code);
+      await confirmWithoutDeposit(ctx.clinicId, inserted.appointmentId, now);
+      return { ok: true, appointmentId: inserted.appointmentId, deposit: null };
+    }
+    await undoHold(ctx.clinicId, inserted.appointmentId, now);
+    return { ok: false, reason: "unavailable" };
+  } catch (error) {
+    logger.error("online booking: deposit failed after the hold", {
+      clinicId: ctx.clinicId,
       appointmentId: inserted.appointmentId,
-      patientId: ctx.patientId,
-      patientName: inserted.patientName,
-      serviceName: inserted.serviceName,
-      amountCents: quote.amountCents,
-      cpf,
-    },
-    now,
-    fetchImpl,
-  );
-  if (started.ok) {
-    return {
-      ok: true,
-      appointmentId: inserted.appointmentId,
-      deposit: started.deposit,
-    };
+      error,
+    });
+    try {
+      await undoHold(ctx.clinicId, inserted.appointmentId, now);
+    } catch {
+      logger.error("online booking: hold not undone", {
+        clinicId: ctx.clinicId,
+        appointmentId: inserted.appointmentId,
+      });
+    }
+    return { ok: false, reason: "unavailable" };
   }
-  if (started.reason === "permanent") {
-    await markAccountError(ctx.clinicId, started.code);
-    await confirmWithoutDeposit(ctx.clinicId, inserted.appointmentId, now);
-    return { ok: true, appointmentId: inserted.appointmentId, deposit: null };
-  }
-  await undoHold(ctx.clinicId, inserted.appointmentId, now);
-  return { ok: false, reason: "unavailable" };
 }
 
 type Inserted =
