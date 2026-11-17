@@ -187,6 +187,30 @@ describe("refreshAccount", () => {
     expect((await row())!.pixKeyReady).toBe(true);
   });
 
+  it("waits for a key awaiting activation instead of creating another", async () => {
+    const asaas = fakeAsaas("APPROVED", [
+      { id: "k", status: "AWAITING_ACTIVATION" },
+    ]);
+    await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
+    expect(await refreshAccount(CLINIC, asaas.fetchImpl)).toMatchObject({
+      status: "approved",
+      pixKeyReady: false,
+      lastError: null,
+    });
+    expect(await pixOnline()).toHaveLength(0);
+    // Asaas activates it later: the next refresh turns the deposit on.
+    asaas.state.keys[0]!.status = "ACTIVE";
+    expect(await refreshAccount(CLINIC, asaas.fetchImpl)).toMatchObject({
+      pixKeyReady: true,
+    });
+    expect(await pixOnline()).toHaveLength(1);
+    expect(
+      asaas.calls.some(
+        (c) => c.method === "POST" && c.path.endsWith("/pix/addressKeys"),
+      ),
+    ).toBe(false);
+  });
+
   it("maps a rejected account and null without a subaccount", async () => {
     expect(await refreshAccount(CLINIC, fakeAsaas().fetchImpl)).toBeNull();
     const asaas = fakeAsaas("REJECTED");

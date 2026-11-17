@@ -187,6 +187,14 @@ export async function activateAccount(
   }
 }
 
+// Pix key statuses that will never become ACTIVE again.
+const GONE_KEY_STATUSES = new Set([
+  "DELETED",
+  "ERROR",
+  "AWAITING_DELETION",
+  "AWAITING_ACCOUNT_DELETION",
+]);
+
 function mapStatus(general: string): AccountView["status"] {
   if (accountReady({ general })) return "approved";
   return general === "REJECTED" ? "rejected" : "pending";
@@ -210,11 +218,16 @@ export async function refreshAccount(
     );
     let pixKeyReady = row.pixKeyReady;
     if (status === "approved" && !pixKeyReady) {
+      // Only an ACTIVE key receives Pix. A new key starts as
+      // AWAITING_ACTIVATION and Asaas activates it later, so a key on its way
+      // is waited for, never duplicated (Asaas also rate-limits creation).
       const keys = await listPixKeys(apiKey, fetchImpl);
-      if (!keys.some((k) => k.status === "ACTIVE")) {
-        await createEvpKey(apiKey, fetchImpl);
+      if (keys.some((k) => k.status === "ACTIVE")) {
+        pixKeyReady = true;
+      } else if (!keys.some((k) => !GONE_KEY_STATUSES.has(k.status))) {
+        const created = await createEvpKey(apiKey, fetchImpl);
+        pixKeyReady = created.status === "ACTIVE";
       }
-      pixKeyReady = true;
     }
     await inClinic(clinicId, async (tx) => {
       await tx
