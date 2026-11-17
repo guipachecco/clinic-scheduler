@@ -6,7 +6,7 @@ Construído em 16/11/2026 a partir do [desenho aprovado](superpowers/specs/2026-
 
 ## O fluxo
 
-1. **Conectar** (`/admin/financeiro/sinal-pix`, só a dona): a dona cria a conta no Asaas, gera uma chave de API (Integrações, Chaves de API, Gerar chave) e cola na tela. A Zemana testa a chave lendo a conta, guarda a chave criptografada, registra na conta dela um webhook "Zemana" (ou atualiza e reativa o que já existe) e guarda o nome da conta para mostrar na tela. Uma conta Asaas conecta em uma clínica só. "Trocar chave" reconecta pelo mesmo formulário e reativa o webhook.
+1. **Conectar** (`/admin/financeiro/sinal-pix`, só a dona): a dona cria a conta no Asaas, gera uma chave de API (Integrações, Chaves de API, criar chave) e cola na tela. A Zemana testa a chave lendo a conta, guarda a chave criptografada, registra na conta dela um webhook "Zemana" (ou atualiza e reativa o que já existe) e guarda o nome da conta para mostrar na tela. Uma conta Asaas conecta em uma clínica só. "Trocar chave" reconecta pelo mesmo formulário e reativa o webhook.
 2. **Aprovação**: a tela mostra o status e consulta o Asaas ao abrir e pelos avisos. Conta aprovada: a Zemana usa a chave Pix ativa da conta (de qualquer tipo) ou cria uma, cria a forma de pagamento "Pix online" da clínica e liga o sinal. A dona pode desligar e ligar de novo.
 3. **Marcar**: na confirmação do horário, a cliente vê o valor do sinal e a regra de devolução, informa o CPF (de quem paga, pode ser outra pessoa) e recebe o QR Code e o "copia e cola". O agendamento nasce "Aguardando sinal" e segura o horário por **30 minutos**. A tela consulta o pagamento a cada poucos segundos. Quem sai e volta encontra o QR em "Meus horários".
 4. **Pix pago**: o Asaas avisa o webhook (`/api/webhooks/asaas`). O sistema confere o token, reconsulta a cobrança no Asaas com a chave da dona e, se paga, confirma o agendamento e cria a venda "Sinal online".
@@ -66,19 +66,19 @@ Não há webhook para cadastrar à mão no painel do Asaas: ao conectar, a Zeman
 
 ## Onde o código está
 
-| Parte                                                   | Arquivo                                                                                                                  |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Tabelas                                                 | `src/db/schema/asaas.ts`, migrações `drizzle/0036_asaas.sql`, `0037_asaas_client_hold.sql` e `0038_asaas_link_fixes.sql` |
-| Chamadas ao Asaas (todas aceitam um `fetch` para teste) | `src/modules/asaas/api.ts`                                                                                               |
-| Regras puras (15%, mínimo, 24h, pagamento tardio, CPF)  | `src/modules/asaas/rules.ts`                                                                                             |
-| Conectar conta, chave Pix, liga e desliga               | `src/modules/asaas/accounts.ts`, `fields.ts`                                                                             |
-| Sinal: cobrança, expiração, aviso, cancelamento         | `src/modules/asaas/deposits.ts`                                                                                          |
-| Venda "Sinal online"                                    | `src/modules/asaas/deposit-sale.ts`, `src/modules/finance/sales.ts`                                                      |
-| Webhook                                                 | `src/app/api/webhooks/asaas/route.ts`                                                                                    |
-| Painel (conectar e ligar)                               | `src/app/admin/(painel)/financeiro/sinal-pix/`                                                                           |
-| Agenda (status, detalhe, cancelar com devolução)        | `src/app/admin/(painel)/agenda/`                                                                                         |
-| Marcação online (sinal, QR, meus horários)              | `src/modules/booking/booking.ts`, `src/app/[slug]/marcar/`, `src/app/[slug]/meus-horarios/`                              |
-| Testes                                                  | `src/modules/asaas/api.test.ts`, `rules.test.ts`, e os de integração em `tests/integration/`                             |
+| Parte                                                   | Arquivo                                                                                                                                                |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tabelas                                                 | `src/db/schema/asaas.ts`, migrações `drizzle/0036_asaas.sql`, `0037_asaas_client_hold.sql`, `0038_asaas_link_fixes.sql` e `0039_asaas_own_account.sql` |
+| Chamadas ao Asaas (todas aceitam um `fetch` para teste) | `src/modules/asaas/api.ts`                                                                                                                             |
+| Regras puras (15%, mínimo, 24h, pagamento tardio, CPF)  | `src/modules/asaas/rules.ts`                                                                                                                           |
+| Conectar conta, chave Pix, liga e desliga               | `src/modules/asaas/accounts.ts`, `fields.ts`                                                                                                           |
+| Sinal: cobrança, expiração, aviso, cancelamento         | `src/modules/asaas/deposits.ts`                                                                                                                        |
+| Venda "Sinal online"                                    | `src/modules/asaas/deposit-sale.ts`, `src/modules/finance/sales.ts`                                                                                    |
+| Webhook                                                 | `src/app/api/webhooks/asaas/route.ts`                                                                                                                  |
+| Painel (conectar e ligar)                               | `src/app/admin/(painel)/financeiro/sinal-pix/`                                                                                                         |
+| Agenda (status, detalhe, cancelar com devolução)        | `src/app/admin/(painel)/agenda/`                                                                                                                       |
+| Marcação online (sinal, QR, meus horários)              | `src/modules/booking/booking.ts`, `src/app/[slug]/marcar/`, `src/app/[slug]/meus-horarios/`                                                            |
+| Testes                                                  | `src/modules/asaas/api.test.ts`, `rules.test.ts`, e os de integração em `tests/integration/`                                                           |
 
 ## Checklist antes de ligar em produção (sandbox, manual)
 

@@ -106,7 +106,7 @@ export default async function AgendaPage() {
         href="/admin/financeiro/sinal-pix"
         className="font-semibold text-primary underline underline-offset-4"
       >
-        Ver recebimentos
+        Conectar conta
       </Link>
     </p>
   ) : asaasError ? (

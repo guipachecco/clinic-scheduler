@@ -57,8 +57,8 @@ export default async function SinalPixPage() {
             </li>
             <li>Envie seus documentos e espere a aprovação.</li>
             <li>
-              No Asaas, abra Integrações, depois Chaves de API, e clique em
-              Gerar chave.
+              No Asaas, abra Integrações, depois Chaves de API, e crie uma
+              chave.
             </li>
             <li>Cole a chave aqui embaixo.</li>
           </ol>
@@ -117,7 +117,7 @@ export default async function SinalPixPage() {
         </section>
       )}
 
-      {view?.lastError ? (
+      {view && view.status !== "disconnected" && view.lastError ? (
         <p
           role="status"
           className="rounded-xl border border-destructive/40 bg-card p-3 text-sm text-destructive"
