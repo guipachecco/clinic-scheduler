@@ -523,6 +523,81 @@ describe("Asaas webhook", () => {
     ]);
   });
 
+  it("paid after timeout once the appointment time has passed: refunds", async () => {
+    const asaas = fakeAsaas();
+    const { appointmentId, depositId } = await hold({
+      appointment: {
+        status: "cancelled",
+        cancelledAt: NOW,
+        cancelledBy: "system",
+        cancellationReason: "other",
+      },
+      deposit: { status: "expired", closeReason: "timeout" },
+    });
+    paid(asaas, "pay-1", depositId);
+    const later = new Date(STARTS_AT.getTime() + MINUTE);
+    expect(
+      await handleDepositNotification(
+        depositId,
+        "pay-1",
+        asaas.fetchImpl,
+        later,
+      ),
+    ).toBe("refunded");
+    expect(asaas.refunds()).toHaveLength(1);
+    expect(await appointment(appointmentId)).toMatchObject({
+      status: "cancelled",
+      cancelledBy: "system",
+    });
+    expect(await deposit(depositId)).toMatchObject({
+      status: "expired",
+      paymentId: null,
+    });
+    expect(await clinicPayments()).toEqual([]);
+    expect(await autoRefunds()).toEqual([
+      {
+        entityId: appointmentId,
+        changes: { depositId, chargeId: "pay-1", reason: "past" },
+      },
+    ]);
+  });
+
+  it("paid with another amount than the deposit: refunds, records nothing", async () => {
+    const asaas = fakeAsaas();
+    const { appointmentId, depositId } = await hold();
+    asaas.payments.set("pay-1", {
+      status: "RECEIVED",
+      value: 10,
+      externalReference: depositId,
+    });
+    expect(
+      await handleDepositNotification(depositId, "pay-1", asaas.fetchImpl),
+    ).toBe("refunded");
+    expect(asaas.refunds()).toHaveLength(1);
+    expect(asaas.payments.get("pay-1")!.status).toBe("REFUNDED");
+    expect(await appointment(appointmentId)).toMatchObject({
+      status: "requested",
+    });
+    expect(await deposit(depositId)).toMatchObject({
+      status: "pending",
+      paymentId: null,
+      saleId: null,
+    });
+    expect(await clinicPayments()).toEqual([]);
+    expect(await autoRefunds()).toEqual([
+      {
+        entityId: appointmentId,
+        changes: { depositId, chargeId: "pay-1", reason: "amount_mismatch" },
+      },
+    ]);
+
+    // The retried notification now reads REFUNDED and changes nothing.
+    expect(
+      await handleDepositNotification(depositId, "pay-1", asaas.fetchImpl),
+    ).toBe("ignored");
+    expect(asaas.refunds()).toHaveLength(1);
+  });
+
   it("paid after the owner cancelled: refunds, appointment stays cancelled", async () => {
     const asaas = fakeAsaas();
     const { appointmentId, depositId } = await hold({

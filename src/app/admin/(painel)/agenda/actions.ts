@@ -23,6 +23,7 @@ import {
 } from "@/modules/appointments/fields";
 import {
   cancelWithDeposit,
+  paidMeanwhile,
   previewCancellation,
 } from "@/modules/asaas/deposits";
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
@@ -208,9 +209,9 @@ export async function changeStatusAction(
           id,
           "clinic",
         );
-        if (preview?.hasPaidDeposit) {
-          return { ok: false, fieldErrors: { by: "Escolha quem desmarcou." } };
-        }
+        // The client sends `by` whenever the page shows a paid deposit, so
+        // a missing one means the Pix was paid after the page rendered.
+        if (preview?.hasPaidDeposit) return paidMeanwhile();
         by = "clinic";
       }
       return await cancelWithDeposit(

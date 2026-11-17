@@ -294,7 +294,7 @@ export async function sweepExpiredDeposits(
           } catch (error) {
             logger.warn("asaas: cobrança vencida não cancelada", {
               clinicId,
-              code: failureCode(error),
+              asaasCode: failureCode(error),
             });
           }
         }
@@ -315,7 +315,7 @@ export async function sweepBeforePanel(clinicId: string): Promise<void> {
   } catch (error) {
     logger.warn("asaas: sinais vencidos não verificados", {
       clinicId,
-      code: failureCode(error),
+      asaasCode: failureCode(error),
     });
   }
 }
@@ -347,7 +347,7 @@ async function readQr(
   } catch (error) {
     logger.warn("asaas: QR do Pix indisponível", {
       clinicId,
-      code: failureCode(error),
+      asaasCode: failureCode(error),
     });
     return null;
   }
@@ -698,7 +698,8 @@ const REFUND_STATUSES = new Set([
 const REFUND_REASON = "Devolvido pelo Asaas";
 const SALE_CANCEL_REASON = "Sinal devolvido pelo Asaas";
 
-type RefundReason = CloseReason | "slot_taken" | "duplicate_payment";
+type RefundReason =
+  CloseReason | "slot_taken" | "past" | "duplicate_payment" | "amount_mismatch";
 
 type Decision =
   | { kind: "paid" | "ignored" }
@@ -742,8 +743,9 @@ export async function handleDepositNotification(
   if (!PAID_STATUSES.has(payment.status)) return "ignored";
 
   const paidId = payment.id;
+  const paidCents = payment.valueCents;
   const decision = await inClinic(clinicId, (tx) =>
-    decidePaidDeposit(tx, clinicId, depositId, paidId, now),
+    decidePaidDeposit(tx, clinicId, depositId, paidId, paidCents, now),
   );
   if (decision.kind !== "refund") return decision.kind;
 
@@ -811,6 +813,7 @@ async function decidePaidDeposit(
   clinicId: string,
   depositId: string,
   chargeId: string,
+  paidCents: number,
   now: Date,
 ): Promise<Decision> {
   // Same lock order as the sweep: agenda first, then the deposit.
@@ -860,6 +863,9 @@ async function decidePaidDeposit(
       ? { kind: "ignored" }
       : refund("duplicate_payment");
   }
+  // A payment of any other amount than the deposit is never recorded: it
+  // goes back whole, and the deposit stays as it was.
+  if (paidCents !== deposit.amountCents) return refund("amount_mismatch");
 
   let slotFree = true;
   if (deposit.status === "pending") {
@@ -869,6 +875,7 @@ async function decidePaidDeposit(
     deposit.status === "expired" &&
     deposit.closeReason === "timeout"
   ) {
+    if (appointment.startsAt <= now) return refund("past");
     slotFree =
       appointment.status === "cancelled" &&
       appointment.cancelledBy === "system" &&
@@ -1227,6 +1234,14 @@ async function settleDeposit(
 const PAID_MEANWHILE =
   "O sinal acabou de ser pago. Abra o agendamento de novo para escolher quem desmarcou.";
 
+// The deposit got paid after the page rendered: the owner now has to say who
+// called it off, so the page refreshes to ask.
+export const paidMeanwhile = (): AppointmentResult => ({
+  ok: false,
+  formError: PAID_MEANWHILE,
+  stale: true,
+});
+
 // Thrown inside the transaction to roll it back.
 class DepositPaidMeanwhile extends Error {}
 
@@ -1330,7 +1345,7 @@ export async function cancelWithDeposit(
       );
     } catch (error) {
       if (causedBy(error, DepositPaidMeanwhile)) {
-        return { ok: false, formError: PAID_MEANWHILE };
+        return paidMeanwhile();
       }
       throw error;
     }
@@ -1356,7 +1371,7 @@ export async function cancelWithDeposit(
     } catch (error) {
       logger.warn("asaas: sinal não devolvido", {
         clinicId,
-        code: failureCode(error),
+        asaasCode: failureCode(error),
       });
       return refundFailed(refundFailureText(error));
     }

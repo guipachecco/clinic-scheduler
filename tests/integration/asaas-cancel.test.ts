@@ -10,6 +10,7 @@ import {
   vi,
 } from "vitest";
 
+import { changeStatusAction } from "@/app/admin/(painel)/agenda/actions";
 import { db, endPools } from "@/db/owner";
 import {
   appointments,
@@ -41,6 +42,16 @@ import { findSessionInstallment } from "@/modules/finance/sales";
 import { encryptToken, tokenKey } from "@/modules/mercado-pago/crypto";
 
 import { otherClinic } from "../helpers/clinic";
+
+// changeStatusAction runs as the clinic's admin, without a real session.
+const panel = vi.hoisted(() => ({ clinicId: "", userId: "" }));
+vi.mock("@/modules/auth/session", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/modules/auth/session")>()),
+  requireAdmin: async () => ({
+    clinicId: panel.clinicId,
+    user: { id: panel.userId },
+  }),
+}));
 
 // Cancelling from the panel an online booking with a Pix deposit, against a
 // fake Asaas: nothing leaves the machine. A clinic of its own, every record
@@ -624,6 +635,7 @@ describe("cancelling with a deposit", () => {
       ok: false,
       formError:
         "O sinal acabou de ser pago. Abra o agendamento de novo para escolher quem desmarcou.",
+      stale: true,
     });
 
     expect(await appointment(appointmentId)).toMatchObject({
@@ -639,6 +651,33 @@ describe("cancelling with a deposit", () => {
     ).toEqual([null, null]);
     expect(asaas.refunds()).toEqual([]);
     expect(asaas.deletes()).toEqual([]);
+  });
+
+  it("cancel from a page that showed no paid deposit: asks to reopen it", async () => {
+    const asaas = fakeAsaas();
+    vi.stubGlobal("fetch", asaas.fetchImpl);
+    const { appointmentId, depositId } = await paidHold(asaas);
+    panel.clinicId = clinicId;
+    panel.userId = actorId;
+
+    // The page rendered before the Pix arrived: no "Quem desmarcou?".
+    expect(
+      await changeStatusAction({
+        id: appointmentId,
+        to: "cancelled",
+        reason: "clinic_unavailable",
+      }),
+    ).toEqual({
+      ok: false,
+      formError:
+        "O sinal acabou de ser pago. Abra o agendamento de novo para escolher quem desmarcou.",
+      stale: true,
+    });
+    expect(await appointment(appointmentId)).toMatchObject({
+      status: "confirmed",
+    });
+    expect((await deposit(depositId)).status).toBe("paid");
+    expect(asaas.state.refunded).toBe(0);
   });
 
   it("cancelledBy is stored as patient", async () => {

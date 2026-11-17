@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { inClinic, type Tx } from "@/db/client";
 import { asaasAccounts, auditLogs, clinics, paymentMethods } from "@/db/schema";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 import {
   decryptToken,
   encryptToken,
@@ -161,7 +162,7 @@ export async function activateAccount(
       return true;
     });
     if (!saved) {
-      console.error("asaas: subconta criada duas vezes", {
+      logger.error("asaas: subconta criada duas vezes", {
         clinicId,
         accountId: created.id,
       });
@@ -170,7 +171,7 @@ export async function activateAccount(
     return { ok: true };
   } catch {
     // Manual recovery needs the account id (never the key).
-    console.error("asaas: subconta criada mas não gravada", {
+    logger.error("asaas: subconta criada mas não gravada", {
       clinicId,
       accountId: created.id,
     });

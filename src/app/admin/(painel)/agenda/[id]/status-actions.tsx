@@ -117,10 +117,14 @@ export function StatusActions({
     }
     if (!result.ok) {
       const fieldError = result.fieldErrors?.reason;
+      const byFieldError = result.fieldErrors?.by;
       if (fieldError) setReasonError(fieldError);
-      else if (result.fieldErrors?.by) setByError(result.fieldErrors.by);
-      else setFormError(result.formError ?? STATUS_ERROR);
+      // Without the fieldset on the page, its error shows as the form's.
+      else if (byFieldError && depositCancel) setByError(byFieldError);
+      else setFormError(result.formError ?? byFieldError ?? STATUS_ERROR);
       setRefundFailed(Boolean(result.refundFailed));
+      // Paid meanwhile: the refreshed page asks who called it off.
+      if (result.stale) router.refresh();
       return;
     }
     focusMessage.current = true;

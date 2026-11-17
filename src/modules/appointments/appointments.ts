@@ -59,6 +59,9 @@ export type AppointmentResult =
       warnings?: Warning[];
       // Asaas refused to refund the deposit: the owner may cancel without it.
       refundFailed?: boolean;
+      // The page is out of date (a Pix deposit got paid meanwhile): the
+      // client refreshes it.
+      stale?: boolean;
     };
 
 export type AppointmentRecord = {
