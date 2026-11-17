@@ -7,6 +7,8 @@ import { isUniqueViolation } from "@/db/errors";
 import {
   anamneses,
   appointments,
+  asaasCustomers,
+  asaasDeposits,
   auditLogs,
   loyaltyRedemptions,
   patients,
@@ -124,7 +126,7 @@ async function lockPair(tx: Tx, clinicId: string, provisionalId: string) {
 }
 
 // "É a mesma": in one transaction, the provisional record's appointments,
-// quotes, sales, reviews, loyalty rewards and history move to the existing
+// quotes, sales, reviews, loyalty rewards, Pix deposits and history move to the existing
 // record, which takes the client's account; the provisional record is deleted. Refused when the
 // existing record already has an account. An anonymized existing record has
 // no personal data left to match, so it counts as not found.
@@ -202,6 +204,40 @@ export async function confirmLink(
           eq(anamneses.patientId, provisionalId),
         ),
       );
+    // Her Pix deposits follow her (the panel may change only their patient_id
+    // among the identity columns, migration 0038). Her Asaas customer follows
+    // her too, unless the existing record already has one: one per patient,
+    // and the existing one is kept.
+    await tx
+      .update(asaasDeposits)
+      .set({ patientId: existingId, updatedAt: new Date() })
+      .where(
+        and(
+          eq(asaasDeposits.clinicId, clinicId),
+          eq(asaasDeposits.patientId, provisionalId),
+        ),
+      );
+    const [existingCustomer] = await tx
+      .select({ id: asaasCustomers.id })
+      .from(asaasCustomers)
+      .where(
+        and(
+          eq(asaasCustomers.clinicId, clinicId),
+          eq(asaasCustomers.patientId, existingId),
+        ),
+      );
+    const provisionalCustomer = and(
+      eq(asaasCustomers.clinicId, clinicId),
+      eq(asaasCustomers.patientId, provisionalId),
+    );
+    if (existingCustomer) {
+      await tx.delete(asaasCustomers).where(provisionalCustomer);
+    } else {
+      await tx
+        .update(asaasCustomers)
+        .set({ patientId: existingId, updatedAt: new Date() })
+        .where(provisionalCustomer);
+    }
     // Its history (owner edits) now belongs to the existing record. The panel
     // may change only entity_id of audit_logs (migration 0015).
     await tx

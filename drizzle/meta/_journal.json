@@ -267,6 +267,13 @@
       "when": 1794878450010,
       "tag": "0037_asaas_client_hold",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794879050010,
+      "tag": "0038_asaas_link_fixes",
+      "breakpoints": true
     }
   ]
 }

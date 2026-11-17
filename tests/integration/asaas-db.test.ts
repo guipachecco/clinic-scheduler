@@ -131,7 +131,11 @@ describe("asaas tables", () => {
   });
 
   it("app_client has no access to asaas tables", async () => {
-    for (const table of ["asaas_accounts", "asaas_customers", "asaas_deposits"]) {
+    for (const table of [
+      "asaas_accounts",
+      "asaas_customers",
+      "asaas_deposits",
+    ]) {
       const code = await pgCode(
         asClient(
           { clinicId: CLINIC, patientId: patientA, userId: patientA },
@@ -157,6 +161,44 @@ describe("asaas tables", () => {
       });
     expect(await lookup(row!.id)).toBe(CLINIC);
     expect(await lookup("00000000-0000-4000-8000-000000000000")).toBeNull();
+  });
+
+  it("asaas SECURITY DEFINER functions pin search_path to public, pg_temp", async () => {
+    const functions = await db.execute<{
+      proname: string;
+      secdef: boolean;
+      config: string[] | null;
+    }>(sql`
+      select p.proname, p.prosecdef as secdef, p.proconfig as config
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.proname in ('asaas_deposit_clinic', 'asaas_deposit_active')
+      order by 1
+    `);
+    expect(functions.rows).toEqual([
+      {
+        proname: "asaas_deposit_active",
+        secdef: true,
+        config: ["search_path=public, pg_temp"],
+      },
+      {
+        proname: "asaas_deposit_clinic",
+        secdef: true,
+        config: ["search_path=public, pg_temp"],
+      },
+    ]);
+  });
+
+  it("app_panel may move a deposit's and a customer's patient_id, and delete a customer", async () => {
+    await db.insert(asaasDeposits).values(deposit(apptA));
+    await inClinic(CLINIC, (tx) =>
+      tx.execute(
+        sql`update asaas_deposits set patient_id = patient_id, updated_at = now()`,
+      ),
+    );
+    await inClinic(CLINIC, (tx) =>
+      tx.execute(sql`delete from asaas_customers where false`),
+    );
   });
 
   it("one deposit per appointment", async () => {
@@ -198,9 +240,13 @@ describe("asaas tables", () => {
   it("pending deposit cannot carry a payment_id", async () => {
     expect(
       await pgCode(
-        db.insert(asaasDeposits).values(
-          deposit(apptA, { paymentId: "00000000-0000-4000-8000-000000000001" }),
-        ),
+        db
+          .insert(asaasDeposits)
+          .values(
+            deposit(apptA, {
+              paymentId: "00000000-0000-4000-8000-000000000001",
+            }),
+          ),
       ),
     ).toBe("23514");
   });
