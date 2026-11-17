@@ -51,7 +51,13 @@ import { checkWarnings, type Warning } from "./rules";
 // messages; audit `changes` hold ids, ISO instants, durations and codes only.
 
 export type AppointmentResult =
-  | { ok: true; id: string }
+  | {
+      ok: true;
+      id: string;
+      // Asaas accepted the deposit refund, but it waits for the owner's
+      // approval in the Asaas app.
+      refundPending?: boolean;
+    }
   | {
       ok: false;
       fieldErrors?: Record<string, string>;

@@ -15,6 +15,8 @@ import {
 
 import { changeStatusAction } from "../actions";
 
+const REFUND_PENDING =
+  "O reembolso foi pedido e está aguardando sua aprovação no app do Asaas.";
 const STATUS_ERROR = "Não foi possível mudar o status. Tente novamente.";
 
 const ACTION_LABELS: Record<Exclude<Status, "requested">, string> = {
@@ -133,7 +135,11 @@ export function StatusActions({
     setBy("");
     setRefundFailed(false);
     setMessage(
-      to === "cancelled" ? "Agendamento cancelado." : "Status atualizado.",
+      to === "cancelled"
+        ? result.refundPending
+          ? `Agendamento cancelado. ${REFUND_PENDING}`
+          : "Agendamento cancelado."
+        : "Status atualizado.",
     );
     router.refresh();
   }

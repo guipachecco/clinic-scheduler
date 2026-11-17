@@ -518,7 +518,12 @@ describe("Asaas webhook", () => {
     expect(await autoRefunds()).toEqual([
       {
         entityId: appointmentId,
-        changes: { depositId, chargeId: "pay-1", reason: "slot_taken" },
+        changes: {
+          depositId,
+          chargeId: "pay-1",
+          reason: "slot_taken",
+          refundStatus: "REFUNDED",
+        },
       },
     ]);
   });
@@ -557,7 +562,12 @@ describe("Asaas webhook", () => {
     expect(await autoRefunds()).toEqual([
       {
         entityId: appointmentId,
-        changes: { depositId, chargeId: "pay-1", reason: "past" },
+        changes: {
+          depositId,
+          chargeId: "pay-1",
+          reason: "past",
+          refundStatus: "REFUNDED",
+        },
       },
     ]);
   });
@@ -587,7 +597,12 @@ describe("Asaas webhook", () => {
     expect(await autoRefunds()).toEqual([
       {
         entityId: appointmentId,
-        changes: { depositId, chargeId: "pay-1", reason: "amount_mismatch" },
+        changes: {
+          depositId,
+          chargeId: "pay-1",
+          reason: "amount_mismatch",
+          refundStatus: "REFUNDED",
+        },
       },
     ]);
 

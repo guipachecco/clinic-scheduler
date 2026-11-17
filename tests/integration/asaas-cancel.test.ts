@@ -78,6 +78,7 @@ function fakeAsaas() {
   const calls: { method: string; path: string }[] = [];
   const state = {
     refundError: null as null | { status: number; code: string },
+    refundStatus: "REFUNDED",
     refunded: 0,
   };
   const json = (body: unknown, status = 200) =>
@@ -102,7 +103,7 @@ function fakeAsaas() {
       if (charge.status === "REFUNDED") {
         return json({ errors: [{ code: "invalid_action" }] }, 400);
       }
-      charge.status = "REFUNDED";
+      charge.status = state.refundStatus;
       state.refunded += 1;
       return json({ id: refund[1], ...charge });
     }
@@ -468,6 +469,41 @@ describe("cancelling with a deposit", () => {
       true,
     ]);
     expect((await appointment(appointmentId)).status).toBe("cancelled");
+  });
+
+  it("a refund waiting for approval cancels and says so", async () => {
+    const asaas = fakeAsaas();
+    asaas.state.refundStatus = "REFUND_REQUESTED";
+    const { appointmentId, depositId } = await paidHold(asaas);
+    expect(
+      await cancelWithDeposit(
+        clinicId,
+        appointmentId,
+        { by: "patient", reason: "patient_request" },
+        actorId,
+        asaas.fetchImpl,
+        NOW,
+      ),
+    ).toEqual({ ok: true, id: appointmentId, refundPending: true });
+    expect(await appointment(appointmentId)).toMatchObject({
+      status: "cancelled",
+    });
+    expect((await deposit(depositId)).status).toBe("refunded");
+  });
+
+  it("a refund done at once has no pending notice", async () => {
+    const asaas = fakeAsaas();
+    const { appointmentId } = await paidHold(asaas);
+    const result = await cancelWithDeposit(
+      clinicId,
+      appointmentId,
+      { by: "patient", reason: "patient_request" },
+      actorId,
+      asaas.fetchImpl,
+      NOW,
+    );
+    expect(result).toMatchObject({ ok: true });
+    expect(result).not.toHaveProperty("refundPending");
   });
 
   it("clinic cancels 1h before: refunds", async () => {

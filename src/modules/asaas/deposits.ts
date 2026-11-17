@@ -29,7 +29,12 @@ import {
 import { cancelSaleInTx } from "@/modules/finance/sales";
 import { todayLocal } from "@/modules/schedule/time";
 
-import { accountApiKey, asaasEnabled, depositApiKey } from "./accounts";
+import {
+  accountApiKey,
+  asaasEnabled,
+  depositApiKey,
+  markDisconnected,
+} from "./accounts";
 import {
   AsaasError,
   createCustomer,
@@ -335,16 +340,23 @@ function view(
   };
 }
 
+// Asaas refused the key itself (revoked or replaced at Asaas).
+function isRevokedKey(error: unknown): boolean {
+  return error instanceof AsaasError && error.status === 401;
+}
+
 async function readQr(
   clinicId: string,
   chargeId: string,
   fetchImpl: Fetch,
 ): Promise<{ payload: string; encodedImage: string } | null> {
+  let apiKey: string | null = null;
   try {
-    const apiKey = await accountApiKey(clinicId);
+    apiKey = await accountApiKey(clinicId);
     if (!apiKey) return null;
     return await getPixQrCode(apiKey, chargeId, fetchImpl);
   } catch (error) {
+    if (apiKey && isRevokedKey(error)) await markDisconnected(clinicId, apiKey);
     logger.warn("asaas: QR do Pix indisponível", {
       clinicId,
       asaasCode: failureCode(error),
@@ -493,10 +505,17 @@ export async function startDeposit(
   const deposit = opened.row;
   const fail = async (error: unknown) => {
     await closeFailed(clinicId, deposit.id, now);
+    // A revoked key turns the deposit off for the next bookings; this one
+    // follows the permanent-failure path below. Guarded by the key that
+    // failed, so a key replaced meanwhile stays connected.
+    const revoked = isRevokedKey(error);
+    if (revoked) await markDisconnected(clinicId, apiKey);
     return {
       ok: false as const,
       reason: classifyFailure(error),
-      code: failureCode(error),
+      // The caller stores the code as the account's last error: a revoked key
+      // keeps the same code markDisconnected wrote.
+      code: revoked ? "invalid_key" : failureCode(error),
     };
   };
 
@@ -787,7 +806,7 @@ export async function handleDepositNotification(
   );
   if (decision.kind !== "refund") return decision.kind;
 
-  await refundCharge(apiKey, paidId, fetchImpl);
+  const refundStatus = await refundCharge(apiKey, paidId, fetchImpl);
   await inClinic(clinicId, (tx) =>
     tx.insert(auditLogs).values({
       clinicId,
@@ -795,24 +814,31 @@ export async function handleDepositNotification(
       action: "asaas.deposit_auto_refunded",
       entityType: "appointment",
       entityId: decision.appointmentId,
-      changes: { depositId, chargeId: paidId, reason: decision.reason },
+      changes: {
+        depositId,
+        chargeId: paidId,
+        reason: decision.reason,
+        refundStatus,
+      },
     }),
   );
   return "refunded";
 }
 
 // A refund Asaas refuses because it already happened counts as done, so a
-// retried notification never refunds twice.
+// retried notification never refunds twice. Returns the payment status after
+// the refund: "REFUNDED" when done, another refund status while it waits for
+// the owner's approval at Asaas.
 async function refundCharge(
   apiKey: string,
   chargeId: string,
   fetchImpl: Fetch,
-): Promise<void> {
+): Promise<string> {
   try {
-    await refundPayment(apiKey, chargeId, fetchImpl);
+    return (await refundPayment(apiKey, chargeId, fetchImpl)).status;
   } catch (error) {
     const current = await getPayment(apiKey, chargeId, fetchImpl);
-    if (REFUND_STATUSES.has(current.status)) return;
+    if (REFUND_STATUSES.has(current.status)) return current.status;
     throw error;
   }
 }
@@ -1401,12 +1427,14 @@ export async function cancelWithDeposit(
         ? "refunded_outside"
         : "refunded_asaas";
 
+  let refundStatus: string | undefined;
   if (settlement === "refunded_asaas") {
     const apiKey = await accountApiKey(clinicId);
     if (!apiKey) return refundFailed(REFUND_FAILURE_DEFAULT);
     try {
-      await refundCharge(apiKey, paid.chargeId, fetchImpl);
+      refundStatus = await refundCharge(apiKey, paid.chargeId, fetchImpl);
     } catch (error) {
+      if (isRevokedKey(error)) await markDisconnected(clinicId, apiKey);
       logger.warn("asaas: sinal não devolvido", {
         clinicId,
         asaasCode: failureCode(error),
@@ -1415,7 +1443,7 @@ export async function cancelWithDeposit(
     }
   }
 
-  return changeAppointmentStatus(
+  const result = await changeAppointmentStatus(
     clinicId,
     appointmentId,
     change,
@@ -1433,4 +1461,9 @@ export async function cancelWithDeposit(
         now,
       ),
   );
+  // Asaas accepted the refund but it still waits for the owner's approval.
+  if (result.ok && refundStatus !== undefined && refundStatus !== "REFUNDED") {
+    return { ...result, refundPending: true };
+  }
+  return result;
 }

@@ -1,12 +1,14 @@
 import { eq } from "drizzle-orm";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, endPools } from "@/db/owner";
 import { asaasAccounts, auditLogs, paymentMethods, users } from "@/db/schema";
 import { env } from "@/lib/env";
+import { logger } from "@/lib/logger";
 import {
   connectAccount,
   depositApiKey,
+  markDisconnected,
   markAccountError,
   refreshAccount,
   setDepositEnabled,
@@ -226,6 +228,74 @@ describe("connectAccount", () => {
         .from(auditLogs)
         .where(eq(auditLogs.action, "asaas.key_replaced")),
     ).toHaveLength(1);
+  });
+
+  it("finds the Zemana webhook whose url has a trailing slash or other host case", async () => {
+    const asaas = fakeAsaas(
+      "PENDING",
+      [],
+      [
+        {
+          id: "wh-1",
+          url: `${ZEMANA_URL.toUpperCase().replace("/API/WEBHOOKS/ASAAS", "/api/webhooks/asaas")}/`,
+        },
+      ],
+    );
+    expect(await connect(asaas.fetchImpl)).toEqual({ ok: true });
+    const writes = asaas.calls.filter(
+      (c) => c.method !== "GET" && c.path.includes("/webhooks"),
+    );
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({ method: "PUT" });
+    expect(writes[0]!.path.endsWith("/webhooks/wh-1")).toBe(true);
+  });
+
+  it("a failure reading the status after saving still returns ok", async () => {
+    const asaas = fakeAsaas("APPROVED");
+    const failing = (async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).endsWith("/myAccount/status")
+        ? new Response(
+            JSON.stringify({ errors: [{ code: "invalid_access_token" }] }),
+            { status: 401 },
+          )
+        : asaas.fetchImpl(input, init)) as typeof fetch;
+    const original = logger.warn;
+    const spy = vi
+      .spyOn(logger, "warn")
+      .mockImplementation((message, context) => {
+        if (message === "asaas: chave desconectada") throw new Error("boom");
+        return original(message, context);
+      });
+    try {
+      expect(await connect(failing)).toEqual({ ok: true });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(plainKey((await row())!.apiKeyEnc)).toBe(KEY);
+  });
+
+  it("a 401 for an old key does not disconnect a replaced key", async () => {
+    const asaas = fakeAsaas("APPROVED");
+    await connect(asaas.fetchImpl);
+    // While the refresh waits on Asaas with the old key, the owner replaces it.
+    const racing = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/myAccount/status")) {
+        await connect(asaas.fetchImpl, NEW_KEY);
+        return new Response(
+          JSON.stringify({ errors: [{ code: "invalid_access_token" }] }),
+          { status: 401 },
+        );
+      }
+      return asaas.fetchImpl(input, init);
+    }) as typeof fetch;
+    await refreshAccount(CLINIC, racing);
+    expect((await row())!.status).not.toBe("disconnected");
+    expect(plainKey((await row())!.apiKeyEnc)).toBe(NEW_KEY);
+    // Directly: only the key that is stored can disconnect.
+    await markDisconnected(CLINIC, KEY);
+    expect((await row())!.status).not.toBe("disconnected");
+    await markDisconnected(CLINIC, NEW_KEY);
+    expect((await row())!.status).toBe("disconnected");
   });
 
   it("replacing with another account's key is refused", async () => {

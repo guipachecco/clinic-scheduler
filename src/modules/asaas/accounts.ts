@@ -167,8 +167,8 @@ export async function connectAccount(
   // touch the owner's others.
   try {
     const webhookUrl = new URL("/api/webhooks/asaas", env.BETTER_AUTH_URL).href;
-    const ours = (await listWebhooks(apiKey, fetchImpl)).find(
-      (hook) => hook.url === webhookUrl,
+    const ours = (await listWebhooks(apiKey, fetchImpl)).find((hook) =>
+      sameUrl(hook.url, webhookUrl),
     );
     await saveWebhook(
       apiKey,
@@ -227,8 +227,29 @@ export async function connectAccount(
 
   // Reads the approval and the Pix key right away: a reconnected approved
   // account is back to approved in this same call.
-  await refreshAccount(clinicId, fetchImpl);
+  // The connection is already saved: a failure here must not turn it into an
+  // error (the next refresh reads the status again).
+  try {
+    await refreshAccount(clinicId, fetchImpl);
+  } catch {
+    logger.warn("asaas: status não lido após conectar", { clinicId });
+  }
   return { ok: true };
+}
+
+// Compares URLs ignoring host case and a trailing slash (Asaas may store the
+// address a little differently from how it was sent).
+function sameUrl(a: string, b: string): boolean {
+  const normalize = (value: string): string | null => {
+    try {
+      const url = new URL(value);
+      return `${url.protocol}//${url.host.toLowerCase()}${url.pathname.replace(/\/+$/, "")}${url.search}`;
+    } catch {
+      return null;
+    }
+  };
+  const left = normalize(a);
+  return left !== null && left === normalize(b);
 }
 
 function logAsaasFailure(message: string, clinicId: string, error: unknown) {
@@ -240,13 +261,40 @@ function logAsaasFailure(message: string, clinicId: string, error: unknown) {
 }
 
 // The key stopped working at Asaas (revoked or replaced there). Idempotent.
-export async function markDisconnected(clinicId: string): Promise<void> {
-  await inClinic(clinicId, (tx) =>
-    tx
+// `failedKey` is the (decrypted) key that Asaas refused: the account is only
+// disconnected while it still holds that very key, so a late 401 for an old
+// key never undoes a replacement the owner just made. The stored value is
+// encrypted with a random IV, so the match is made on the decrypted key and
+// the update is pinned to the exact row read (apiKeyEnc), which keeps it
+// atomic against a replacement landing in between.
+export async function markDisconnected(
+  clinicId: string,
+  failedKey?: string,
+): Promise<void> {
+  await inClinic(clinicId, async (tx) => {
+    let stillThatKey: string | undefined;
+    if (failedKey !== undefined) {
+      const [current] = await tx
+        .select({ apiKeyEnc: asaasAccounts.apiKeyEnc })
+        .from(asaasAccounts)
+        .where(eq(asaasAccounts.clinicId, clinicId));
+      if (!current || decryptToken(current.apiKeyEnc, key()) !== failedKey) {
+        return;
+      }
+      stillThatKey = current.apiKeyEnc;
+    }
+    await tx
       .update(asaasAccounts)
       .set({ status: "disconnected", lastError: "invalid_key" })
-      .where(eq(asaasAccounts.clinicId, clinicId)),
-  );
+      .where(
+        and(
+          eq(asaasAccounts.clinicId, clinicId),
+          stillThatKey === undefined
+            ? undefined
+            : eq(asaasAccounts.apiKeyEnc, stillThatKey),
+        ),
+      );
+  });
 }
 
 // Pix key statuses that will never become ACTIVE again.
@@ -283,8 +331,9 @@ export async function refreshAccount(
     };
   }
 
+  let apiKey: string | undefined;
   try {
-    const apiKey = decryptToken(row.apiKeyEnc, key());
+    apiKey = decryptToken(row.apiKeyEnc, key());
     const status = mapStatus(
       (await getAccountStatus(apiKey, fetchImpl)).general,
     );
@@ -320,7 +369,7 @@ export async function refreshAccount(
   } catch (error) {
     if (error instanceof AsaasError && error.status === 401) {
       logAsaasFailure("asaas: chave desconectada", clinicId, error);
-      await markDisconnected(clinicId);
+      await markDisconnected(clinicId, apiKey);
       return {
         status: "disconnected",
         pixKeyReady: row.pixKeyReady,

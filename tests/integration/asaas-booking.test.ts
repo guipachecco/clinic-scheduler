@@ -672,6 +672,37 @@ describe("online booking with a Pix deposit", () => {
     });
   });
 
+  it("a revoked key books without deposit and disconnects the account", async () => {
+    const asaas = fakeAsaas();
+    asaas.state.paymentError = { status: 401, code: "invalid_access_token" };
+    const result = await bookOnline(
+      ctx("ana"),
+      { serviceId, startsAt: SLOT, cpf: CPF },
+      asaas.fetchImpl,
+    );
+    expect(result).toMatchObject({ ok: true, deposit: null });
+    const id = (result as { appointmentId: string }).appointmentId;
+    expect(await appointment(id)).toMatchObject({ status: "confirmed" });
+    const [account] = await db
+      .select()
+      .from(asaasAccounts)
+      .where(eq(asaasAccounts.clinicId, clinicId));
+    expect(account).toMatchObject({
+      status: "disconnected",
+      lastError: "invalid_key",
+    });
+    // The next booking does not even ask Asaas for a deposit.
+    expect(await depositQuote(clinicId, serviceId, patient.bia)).toBeNull();
+    const calls = asaas.calls.length;
+    const next = await bookOnline(
+      ctx("bia"),
+      { serviceId, startsAt: local(MONDAY, "11:00") },
+      asaas.fetchImpl,
+    );
+    expect(next).toMatchObject({ ok: true, deposit: null });
+    expect(asaas.calls).toHaveLength(calls);
+  });
+
   it("getDepositView never shows another patient's deposit", async () => {
     const asaas = fakeAsaas();
     const result = await bookOnline(
