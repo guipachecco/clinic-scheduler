@@ -1,20 +1,24 @@
 import "server-only";
 
-import { and, eq, gt, lte } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { DateTime } from "luxon";
 
-import { inClinic, type Tx } from "@/db/client";
+import { inClinic, panelDb, type Tx } from "@/db/client";
 import {
+  ACTIVE_APPOINTMENT_STATUSES,
   appointments,
   asaasAccounts,
   asaasCustomers,
   asaasDeposits,
   auditLogs,
   clinics,
+  installments,
+  payments,
   services,
 } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { lockAgenda } from "@/modules/appointments/appointments";
+import { todayLocal } from "@/modules/schedule/time";
 
 import { accountApiKey, asaasEnabled, depositApiKey } from "./accounts";
 import {
@@ -23,13 +27,18 @@ import {
   createPixPayment,
   deletePayment,
   type Fetch,
+  getPayment,
   getPixQrCode,
+  refundPayment,
 } from "./api";
+import { createDepositSale } from "./deposit-sale";
 import {
+  type CloseReason,
   type DepositStatus,
   depositFor,
   HOLD_MINUTES,
   isValidCpfCnpj,
+  lateArrival,
 } from "./rules";
 
 // The Pix deposit of an online booking. Everything here runs as app_panel
@@ -648,5 +657,361 @@ export async function confirmWithoutDeposit(
         reason: "deposit_refused",
       },
     });
+  });
+}
+
+// ------------------------------------------------------------ notifications
+
+export type NotificationResult = "paid" | "refunded" | "ignored" | "unknown";
+
+const PAID_STATUSES = new Set(["RECEIVED", "CONFIRMED"]);
+// A refund Asaas already accepted, finished or not.
+const REFUND_STATUSES = new Set([
+  "REFUNDED",
+  "REFUND_REQUESTED",
+  "REFUND_IN_PROGRESS",
+]);
+const REFUND_REASON = "Devolvido pelo Asaas";
+
+type RefundReason = CloseReason | "slot_taken" | "duplicate_payment";
+
+type Decision =
+  | { kind: "paid" | "ignored" }
+  | { kind: "refund"; reason: RefundReason; appointmentId: string };
+
+// Called by the webhook once its token checks out. It never trusts the
+// notification itself: it reads the payment from Asaas with the clinic's
+// subaccount key (whether or not the deposit is still turned on) and acts on
+// what Asaas says. Running it twice for the same news changes nothing. A
+// payment that cannot keep its booking is refunded at Asaas, outside the
+// transaction; a failure there throws, so the webhook asks for a retry.
+export async function handleDepositNotification(
+  depositId: string,
+  chargeId: string,
+  fetchImpl: Fetch = fetch,
+  now: Date = new Date(),
+): Promise<NotificationResult> {
+  if (!UUID_PATTERN.test(depositId)) return "unknown";
+  const lookup = await panelDb.execute<{ clinic_id: string | null }>(
+    sql`select asaas_deposit_clinic(${depositId}::uuid) as clinic_id`,
+  );
+  const clinicId = lookup.rows[0]?.clinic_id;
+  if (!clinicId) return "unknown";
+  const apiKey = await accountApiKey(clinicId);
+  if (!apiKey) return "unknown";
+
+  let payment;
+  try {
+    payment = await getPayment(apiKey, chargeId, fetchImpl);
+  } catch (error) {
+    if (error instanceof AsaasError && error.status === 404) return "unknown";
+    throw error;
+  }
+  if (payment.id !== chargeId || payment.externalReference !== depositId) {
+    return "ignored";
+  }
+
+  if (payment.status === "REFUNDED") {
+    return reverseRefundedDeposit(clinicId, depositId, payment.id, now);
+  }
+  if (!PAID_STATUSES.has(payment.status)) return "ignored";
+
+  const paidId = payment.id;
+  const decision = await inClinic(clinicId, (tx) =>
+    decidePaidDeposit(tx, clinicId, depositId, paidId, now),
+  );
+  if (decision.kind !== "refund") return decision.kind;
+
+  await refundCharge(apiKey, paidId, fetchImpl);
+  await inClinic(clinicId, (tx) =>
+    tx.insert(auditLogs).values({
+      clinicId,
+      actorType: "system",
+      action: "asaas.deposit_auto_refunded",
+      entityType: "appointment",
+      entityId: decision.appointmentId,
+      changes: { depositId, chargeId: paidId, reason: decision.reason },
+    }),
+  );
+  return "refunded";
+}
+
+// A refund Asaas refuses because it already happened counts as done, so a
+// retried notification never refunds twice.
+async function refundCharge(
+  apiKey: string,
+  chargeId: string,
+  fetchImpl: Fetch,
+): Promise<void> {
+  try {
+    await refundPayment(apiKey, chargeId, fetchImpl);
+  } catch (error) {
+    const current = await getPayment(apiKey, chargeId, fetchImpl);
+    if (REFUND_STATUSES.has(current.status)) return;
+    throw error;
+  }
+}
+
+// True when another active appointment of the same professional overlaps
+// the range ('[)', like appointments_no_overlap).
+async function slotTaken(
+  tx: Tx,
+  clinicId: string,
+  appointment: {
+    id: string;
+    professionalId: string;
+    occupiedFrom: Date;
+    occupiedUntil: Date;
+  },
+): Promise<boolean> {
+  const [other] = await tx
+    .select({ id: appointments.id })
+    .from(appointments)
+    .where(
+      and(
+        eq(appointments.clinicId, clinicId),
+        eq(appointments.professionalId, appointment.professionalId),
+        inArray(appointments.status, [...ACTIVE_APPOINTMENT_STATUSES]),
+        lt(appointments.occupiedFrom, appointment.occupiedUntil),
+        gt(appointments.occupiedUntil, appointment.occupiedFrom),
+        ne(appointments.id, appointment.id),
+      ),
+    )
+    .limit(1);
+  return Boolean(other);
+}
+
+async function decidePaidDeposit(
+  tx: Tx,
+  clinicId: string,
+  depositId: string,
+  chargeId: string,
+  now: Date,
+): Promise<Decision> {
+  // Same lock order as the sweep: agenda first, then the deposit.
+  await lockAgenda(tx, clinicId);
+  const [row] = await tx
+    .select({
+      deposit: asaasDeposits,
+      appointment: {
+        id: appointments.id,
+        status: appointments.status,
+        cancelledBy: appointments.cancelledBy,
+        professionalId: appointments.professionalId,
+        serviceId: appointments.serviceId,
+        serviceName: appointments.serviceName,
+        startsAt: appointments.startsAt,
+        occupiedFrom: appointments.occupiedFrom,
+        occupiedUntil: appointments.occupiedUntil,
+      },
+    })
+    .from(asaasDeposits)
+    .innerJoin(
+      appointments,
+      and(
+        eq(appointments.clinicId, asaasDeposits.clinicId),
+        eq(appointments.id, asaasDeposits.appointmentId),
+      ),
+    )
+    .where(
+      and(
+        eq(asaasDeposits.id, depositId),
+        eq(asaasDeposits.clinicId, clinicId),
+      ),
+    )
+    .for("update", { of: asaasDeposits });
+  if (!row) return { kind: "ignored" };
+  const { deposit, appointment } = row;
+  const refund = (reason: RefundReason): Decision => ({
+    kind: "refund",
+    reason,
+    appointmentId: appointment.id,
+  });
+
+  // The deposit already has its payment: the same one again is a repeat;
+  // any other (an old QR paid twice) goes back to the patient.
+  if (deposit.paymentId !== null) {
+    return deposit.chargeId === chargeId
+      ? { kind: "ignored" }
+      : refund("duplicate_payment");
+  }
+
+  let slotFree = true;
+  if (deposit.status === "pending") {
+    // Still holding the slot, unless the owner decided first.
+    slotFree = appointment.status === "requested";
+  } else if (
+    deposit.status === "expired" &&
+    deposit.closeReason === "timeout"
+  ) {
+    slotFree =
+      appointment.status === "cancelled" &&
+      appointment.cancelledBy === "system" &&
+      !(await slotTaken(tx, clinicId, appointment));
+  }
+  const action = lateArrival({
+    status: deposit.status,
+    closeReason: deposit.closeReason,
+    slotFree,
+  });
+  if (action === "ignore") return { kind: "ignored" };
+
+  if (action === "refund") {
+    if (deposit.status === "pending") {
+      // The owner cancelled or confirmed the hold before the Pix arrived.
+      const closeReason: CloseReason =
+        appointment.status === "cancelled"
+          ? "clinic_cancelled"
+          : "manual_confirm";
+      await tx
+        .update(asaasDeposits)
+        .set({ status: "closed", closeReason, updatedAt: now })
+        .where(eq(asaasDeposits.id, deposit.id));
+      return refund(closeReason);
+    }
+    if (deposit.status === "expired" && deposit.closeReason === "timeout") {
+      return refund("slot_taken");
+    }
+    return refund(deposit.closeReason ?? "charge_failed");
+  }
+
+  await tx
+    .update(appointments)
+    .set({
+      status: "confirmed",
+      confirmedAt: now,
+      cancelledAt: null,
+      cancelledBy: null,
+      cancellationReason: null,
+    })
+    .where(eq(appointments.id, appointment.id));
+  await tx.insert(auditLogs).values({
+    clinicId,
+    actorType: "system",
+    action: "appointment.status_changed",
+    entityType: "appointment",
+    entityId: appointment.id,
+    changes: {
+      from: appointment.status,
+      to: "confirmed",
+      reason: "deposit_paid",
+    },
+  });
+
+  const [service] = await tx
+    .select({ priceCents: services.priceCents })
+    .from(services)
+    .where(
+      and(
+        eq(services.id, appointment.serviceId),
+        eq(services.clinicId, clinicId),
+      ),
+    );
+  const sale = await createDepositSale(tx, {
+    clinicId,
+    appointmentId: appointment.id,
+    patientId: deposit.patientId,
+    serviceId: appointment.serviceId,
+    serviceName: appointment.serviceName,
+    priceCents: service?.priceCents ?? deposit.amountCents,
+    depositCents: deposit.amountCents,
+    startsAt: appointment.startsAt,
+    paidOn: todayLocal(),
+  });
+  await tx
+    .update(asaasDeposits)
+    .set({
+      status: "paid",
+      closeReason: null,
+      chargeId,
+      paymentId: sale.paymentId,
+      saleId: sale.saleId,
+      updatedAt: now,
+    })
+    .where(eq(asaasDeposits.id, deposit.id));
+  await tx.insert(auditLogs).values({
+    clinicId,
+    actorType: "system",
+    action: "payment.received",
+    entityType: "payment",
+    entityId: sale.paymentId,
+    changes: {
+      saleId: sale.saleId,
+      amountCents: deposit.amountCents,
+      depositId: deposit.id,
+    },
+  });
+  return { kind: "paid" };
+}
+
+// Refunded from the Asaas app: the deposit payment is reversed here and the
+// rest of the sale, still unpaid, is cancelled. The appointment stays as it
+// is; the owner decides about it.
+async function reverseRefundedDeposit(
+  clinicId: string,
+  depositId: string,
+  chargeId: string,
+  now: Date,
+): Promise<NotificationResult> {
+  return inClinic(clinicId, async (tx): Promise<NotificationResult> => {
+    const [deposit] = await tx
+      .select()
+      .from(asaasDeposits)
+      .where(
+        and(
+          eq(asaasDeposits.id, depositId),
+          eq(asaasDeposits.clinicId, clinicId),
+        ),
+      )
+      .for("update");
+    if (
+      !deposit ||
+      deposit.status !== "paid" ||
+      deposit.chargeId !== chargeId ||
+      !deposit.paymentId
+    ) {
+      return "ignored";
+    }
+    await tx
+      .update(payments)
+      .set({ reversedAt: now, reversalReason: REFUND_REASON })
+      .where(
+        and(
+          eq(payments.id, deposit.paymentId),
+          eq(payments.clinicId, clinicId),
+          isNull(payments.reversedAt),
+        ),
+      );
+    if (deposit.saleId) {
+      // Explicit names: Drizzle writes columns unqualified inside sql``.
+      await tx
+        .update(installments)
+        .set({ cancelledAt: now })
+        .where(
+          and(
+            eq(installments.clinicId, clinicId),
+            eq(installments.saleId, deposit.saleId),
+            eq(installments.appointmentId, deposit.appointmentId),
+            isNull(installments.cancelledAt),
+            sql`not exists (
+              select 1 from payments p
+              where p.installment_id = "installments"."id"
+                and p.reversed_at is null)`,
+          ),
+        );
+    }
+    await tx
+      .update(asaasDeposits)
+      .set({ status: "refunded", updatedAt: now })
+      .where(eq(asaasDeposits.id, deposit.id));
+    await tx.insert(auditLogs).values({
+      clinicId,
+      actorType: "system",
+      action: "payment.reversed",
+      entityType: "payment",
+      entityId: deposit.paymentId,
+      changes: { depositId: deposit.id, amountCents: deposit.amountCents },
+    });
+    return "refunded";
   });
 }
