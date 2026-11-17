@@ -107,7 +107,7 @@ export function isValidCpfCnpj(digits: string): boolean {
   return false;
 }
 
-// Asaas reports the subaccount's general status; only APPROVED accepts charges.
+// Asaas reports the account's general status; only APPROVED accepts charges.
 export function accountReady(status: { general: string }): boolean {
   return status.general === "APPROVED";
 }

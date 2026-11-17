@@ -5,6 +5,7 @@ import {
   asaasEnabled,
   getAccountView,
   refreshAccount,
+  REFUND_PENDING_APPROVAL,
 } from "@/modules/asaas/accounts";
 import { DEPOSIT_PERCENT } from "@/modules/asaas/rules";
 import { requireModule } from "@/modules/auth/session";
@@ -108,7 +109,7 @@ export default async function SinalPixPage() {
               <p className="font-medium">Conta conectada: {view.accountName}</p>
               <p>
                 {view.status === "pending"
-                  ? "Confira o e-mail do Asaas para enviar seus documentos."
+                  ? "Sua conta está em análise no Asaas. Confira o e-mail do Asaas para enviar seus documentos."
                   : "Falta a chave Pix ficar ativa no Asaas. Abra esta tela de novo em instantes."}
               </p>
             </>
@@ -122,8 +123,9 @@ export default async function SinalPixPage() {
           role="status"
           className="rounded-xl border border-destructive/40 bg-card p-3 text-sm text-destructive"
         >
-          O Asaas não respondeu como esperado ({view.lastError}). Tente de novo
-          em instantes.
+          {view.lastError === REFUND_PENDING_APPROVAL
+            ? "Um reembolso automático de sinal está aguardando sua aprovação no app do Asaas."
+            : `O Asaas não respondeu como esperado (${view.lastError}). Tente de novo em instantes.`}
         </p>
       ) : null}
     </div>

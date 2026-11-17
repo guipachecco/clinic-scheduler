@@ -33,7 +33,9 @@ import {
   accountApiKey,
   asaasEnabled,
   depositApiKey,
+  markAccountError,
   markDisconnected,
+  REFUND_PENDING_APPROVAL,
 } from "./accounts";
 import {
   AsaasError,
@@ -82,7 +84,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MINUTE = 60_000;
 
-// Asaas codes that will not pass by trying again: the subaccount cannot take
+// Asaas codes that will not pass by trying again: the owner's account cannot take
 // Pix charges (not approved, evaluation limit, blocked). Seen in the sandbox:
 // invalid_billingType, invalid_action. Add others as they show up.
 const PERMANENT_CODES = new Set(["invalid_billingType", "invalid_action"]);
@@ -778,8 +780,8 @@ type Decision =
   | { kind: "refund"; reason: RefundReason; appointmentId: string };
 
 // Called by the webhook once its token checks out. It never trusts the
-// notification itself: it reads the payment from Asaas with the clinic's
-// subaccount key (whether or not the deposit is still turned on) and acts on
+// notification itself: it reads the payment from Asaas with
+// the clinic owner's key (whether or not the deposit is still turned on) and acts on
 // what Asaas says. Running it twice for the same news changes nothing. A
 // payment that cannot keep its booking is refunded at Asaas, outside the
 // transaction; a failure there throws, so the webhook asks for a retry.
@@ -803,6 +805,9 @@ export async function handleDepositNotification(
     payment = await getPayment(apiKey, chargeId, fetchImpl);
   } catch (error) {
     if (error instanceof AsaasError && error.status === 404) return "unknown";
+    // Revoked key: disconnect, but still throw so Asaas retries the
+    // notification once the owner has pasted a new key.
+    if (isRevokedKey(error)) await disconnectQuietly(clinicId, apiKey);
     throw error;
   }
   if (payment.id !== chargeId || payment.externalReference !== depositId) {
@@ -821,7 +826,13 @@ export async function handleDepositNotification(
   );
   if (decision.kind !== "refund") return decision.kind;
 
-  const refundStatus = await refundCharge(apiKey, paidId, fetchImpl);
+  let refundStatus: string;
+  try {
+    refundStatus = await refundCharge(apiKey, paidId, fetchImpl);
+  } catch (error) {
+    if (isRevokedKey(error)) await disconnectQuietly(clinicId, apiKey);
+    throw error;
+  }
   await inClinic(clinicId, (tx) =>
     tx.insert(auditLogs).values({
       clinicId,
@@ -837,6 +848,10 @@ export async function handleDepositNotification(
       },
     }),
   );
+  // The refund waits for the owner's approval in the Asaas app: tell her.
+  if (refundStatus === "REFUND_REQUESTED") {
+    await markAccountError(clinicId, REFUND_PENDING_APPROVAL);
+  }
   return "refunded";
 }
 

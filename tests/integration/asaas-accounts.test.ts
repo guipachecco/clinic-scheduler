@@ -338,6 +338,28 @@ describe("connectAccount", () => {
     expect(asaas.calls).toHaveLength(before);
   });
 
+  it("replacing the key of an approved account keeps it approved when the follow-up refresh fails", async () => {
+    const asaas = fakeAsaas("APPROVED");
+    await connect(asaas.fetchImpl);
+    expect(await row()).toMatchObject({
+      status: "approved",
+      pixKeyReady: true,
+    });
+    const failingStatus = (async (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) =>
+      String(input).endsWith("/myAccount/status")
+        ? new Response("{}", { status: 503 })
+        : asaas.fetchImpl(input, init)) as typeof fetch;
+    expect(await connect(failingStatus, NEW_KEY)).toEqual({ ok: true });
+    expect(await row()).toMatchObject({
+      status: "approved",
+      pixKeyReady: true,
+    });
+    expect(await depositApiKey(CLINIC)).toBe(NEW_KEY);
+  });
+
   it("replacing the key reconnects a disconnected account", async () => {
     const asaas = fakeAsaas("APPROVED");
     await connect(asaas.fetchImpl);

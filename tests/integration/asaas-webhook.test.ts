@@ -61,7 +61,11 @@ type FakePayment = { status: string; value: number; externalReference: string };
 function fakeAsaas() {
   const payments = new Map<string, FakePayment>();
   const calls: { method: string; path: string }[] = [];
-  const state = { refundError: null as null | number };
+  const state = {
+    refundError: null as null | number,
+    refundStatus: "REFUNDED",
+    readError: null as null | number,
+  };
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,
@@ -81,11 +85,17 @@ function fakeAsaas() {
       if (payment.status === "REFUNDED") {
         return json({ errors: [{ code: "invalid_action" }] }, 400);
       }
-      payment.status = "REFUNDED";
+      payment.status = state.refundStatus;
       return json({ id: refund[1], ...payment });
     }
     const read = /\/payments\/([^/]+)$/.exec(url.pathname);
     if (read && method === "GET") {
+      if (state.readError) {
+        return json(
+          { errors: [{ code: "invalid_access_token" }] },
+          state.readError,
+        );
+      }
       const payment = payments.get(read[1]!);
       if (!payment) return json({ errors: [{ code: "not_found" }] }, 404);
       return json({ id: read[1], ...payment });
@@ -287,13 +297,21 @@ beforeAll(async () => {
   });
 });
 
+async function accountRow() {
+  const [row] = await db
+    .select()
+    .from(asaasAccounts)
+    .where(eq(asaasAccounts.clinicId, clinicId));
+  return row!;
+}
+
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   await clearAgenda();
   await db
     .update(asaasAccounts)
-    .set({ depositEnabled: true })
+    .set({ depositEnabled: true, status: "approved", lastError: null })
     .where(eq(asaasAccounts.clinicId, clinicId));
 });
 
@@ -705,6 +723,62 @@ describe("Asaas webhook", () => {
       chargeId: "pay-2",
       reason: "duplicate_payment",
     });
+  });
+
+  it("a refund waiting for the owner's approval leaves a note on the account", async () => {
+    const asaas = fakeAsaas();
+    asaas.state.refundStatus = "REFUND_REQUESTED";
+    const { depositId } = await hold({
+      deposit: { status: "closed", closeReason: "manual_confirm" },
+      appointment: { status: "confirmed", confirmedAt: NOW },
+    });
+    paid(asaas, "pay-1", depositId);
+    expect(
+      await handleDepositNotification(depositId, "pay-1", asaas.fetchImpl),
+    ).toBe("refunded");
+    expect(await accountRow()).toMatchObject({
+      status: "approved",
+      lastError: "refund_pending_approval",
+    });
+  });
+
+  it("a refund that completes leaves no note on the account", async () => {
+    const asaas = fakeAsaas();
+    const { depositId } = await hold({
+      deposit: { status: "closed", closeReason: "manual_confirm" },
+      appointment: { status: "confirmed", confirmedAt: NOW },
+    });
+    paid(asaas, "pay-1", depositId);
+    await handleDepositNotification(depositId, "pay-1", asaas.fetchImpl);
+    expect((await accountRow()).lastError).toBeNull();
+  });
+
+  it("a revoked key (401) on the payment read disconnects the account and still throws", async () => {
+    const asaas = fakeAsaas();
+    const { depositId } = await hold();
+    paid(asaas, "pay-1", depositId);
+    asaas.state.readError = 401;
+    await expect(
+      handleDepositNotification(depositId, "pay-1", asaas.fetchImpl),
+    ).rejects.toThrow();
+    expect(await accountRow()).toMatchObject({
+      status: "disconnected",
+      lastError: "invalid_key",
+    });
+  });
+
+  it("a revoked key (401) on the refund disconnects the account and still throws", async () => {
+    const asaas = fakeAsaas();
+    const { depositId } = await hold({
+      deposit: { status: "closed", closeReason: "manual_confirm" },
+      appointment: { status: "confirmed", confirmedAt: NOW },
+    });
+    paid(asaas, "pay-1", depositId);
+    asaas.state.refundError = 401;
+    await expect(
+      handleDepositNotification(depositId, "pay-1", asaas.fetchImpl),
+    ).rejects.toThrow();
+    expect(await accountRow()).toMatchObject({ status: "disconnected" });
   });
 
   it("a refund that fails asks for a retry, and the retry refunds once", async () => {

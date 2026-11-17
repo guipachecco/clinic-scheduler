@@ -19,8 +19,8 @@ import { appointments, clinics, patients } from "./clinic";
 import { createdAt, updatedAt } from "./columns";
 import { payments, sales } from "./finance";
 
-// Pix deposit ("sinal") on Asaas. Each clinic has its own Asaas subaccount and
-// the money goes straight to it. The subaccount API key is stored encrypted,
+// Pix deposit ("sinal") on Asaas. Each clinic owner connects her own Asaas
+// account and the money goes straight to it. Her API key is stored encrypted,
 // never in plain text. The enum values mirror DepositStatus and CloseReason in
 // src/modules/asaas/rules.ts.
 

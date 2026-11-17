@@ -6,7 +6,11 @@ import {
   listAppointmentsInRange,
   listRequestedFrom,
 } from "@/modules/appointments/appointments";
-import { asaasEnabled, getAccountView } from "@/modules/asaas/accounts";
+import {
+  asaasEnabled,
+  getAccountView,
+  REFUND_PENDING_APPROVAL,
+} from "@/modules/asaas/accounts";
 import { sweepBeforePanel } from "@/modules/asaas/deposits";
 import { requireAdmin } from "@/modules/auth/session";
 import { listActiveProfessionals } from "@/modules/professionals/professionals";
@@ -107,6 +111,20 @@ export default async function AgendaPage() {
         className="font-semibold text-primary underline underline-offset-4"
       >
         Conectar conta
+      </Link>
+    </p>
+  ) : asaasError === REFUND_PENDING_APPROVAL ? (
+    <p
+      role="status"
+      className="rounded-lg border border-destructive/40 bg-card p-4 text-sm text-destructive"
+    >
+      Um reembolso automático de sinal está aguardando sua aprovação no app do
+      Asaas.{" "}
+      <Link
+        href="/admin/financeiro/sinal-pix"
+        className="font-semibold text-primary underline underline-offset-4"
+      >
+        Ver recebimentos
       </Link>
     </p>
   ) : asaasError ? (

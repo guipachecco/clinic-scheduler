@@ -32,6 +32,10 @@ import { accountReady, baseUrlEnvironment, keyEnvironment } from "./rules";
 
 export const PIX_ONLINE_METHOD = "Pix online";
 
+// lastError while an automatic refund waits for the owner's approval in the
+// Asaas app. The next successful refresh clears it, like any lastError.
+export const REFUND_PENDING_APPROVAL = "refund_pending_approval";
+
 let cachedKey: Buffer | undefined;
 function key(): Buffer {
   cachedKey ??= tokenKey(env.BETTER_AUTH_SECRET, "asaas-api-keys");
@@ -155,7 +159,11 @@ export async function connectAccount(
 
   const [existing] = await inClinic(clinicId, (tx) =>
     tx
-      .select({ walletId: asaasAccounts.walletId })
+      .select({
+        walletId: asaasAccounts.walletId,
+        status: asaasAccounts.status,
+        pixKeyReady: asaasAccounts.pixKeyReady,
+      })
       .from(asaasAccounts)
       .where(eq(asaasAccounts.clinicId, clinicId)),
   );
@@ -191,8 +199,14 @@ export async function connectAccount(
         apiKeyEnc: encryptToken(apiKey, key()),
         walletId,
         accountName: info.name,
-        status: "pending" as const,
-        pixKeyReady: false,
+        // Same account, new key: keep what is known (a failed follow-up
+        // refresh must not downgrade an approved account). A disconnected
+        // account starts over as pending.
+        status:
+          existing && existing.status !== "disconnected"
+            ? existing.status
+            : ("pending" as const),
+        pixKeyReady: existing ? existing.pixKeyReady : false,
         lastError: null,
         activatedByUserId: actorUserId,
       };

@@ -4,8 +4,8 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { handleDepositNotification } from "@/modules/asaas/deposits";
 
-// Asaas's notifications for the clinics' subaccounts (set up with each
-// subaccount: PAYMENT_RECEIVED, PAYMENT_CONFIRMED, PAYMENT_REFUNDED...). Only
+// Asaas's notifications for the clinics' own accounts (registered in each
+// owner's account when she connects it: PAYMENT_RECEIVED, PAYMENT_CONFIRMED, PAYMENT_REFUNDED...). Only
 // notifications carrying our token are read, and only the payment id and its
 // externalReference (the deposit id) are taken from them:
 // handleDepositNotification fetches the payment itself before acting.
