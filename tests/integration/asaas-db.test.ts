@@ -185,9 +185,24 @@ describe("asaas tables", () => {
     expect(code).toBe("42501");
     await inClinic(CLINIC, (tx) =>
       tx.execute(
+        sql`update asaas_deposits set charge_id = 'pay_123', updated_at = now()`,
+      ),
+    );
+    await inClinic(CLINIC, (tx) =>
+      tx.execute(
         sql`update asaas_deposits set status = 'closed', close_reason = 'timeout', updated_at = now()`,
       ),
     );
+  });
+
+  it("pending deposit cannot carry a payment_id", async () => {
+    expect(
+      await pgCode(
+        db.insert(asaasDeposits).values(
+          deposit(apptA, { paymentId: "00000000-0000-4000-8000-000000000001" }),
+        ),
+      ),
+    ).toBe("23514");
   });
 
   it("close_reason only with expired or closed", async () => {

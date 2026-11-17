@@ -72,7 +72,7 @@ CREATE POLICY asaas_customers_panel ON asaas_customers FOR ALL TO app_panel
   USING (clinic_id = nullif(current_setting('app.clinic_id', true), '')::uuid)
   WITH CHECK (clinic_id = nullif(current_setting('app.clinic_id', true), '')::uuid);--> statement-breakpoint
 GRANT SELECT, INSERT ON asaas_deposits TO app_panel;--> statement-breakpoint
-GRANT UPDATE (status, close_reason, payment_id, sale_id, updated_at) ON asaas_deposits TO app_panel;--> statement-breakpoint
+GRANT UPDATE (charge_id, status, close_reason, payment_id, sale_id, updated_at) ON asaas_deposits TO app_panel;--> statement-breakpoint
 ALTER TABLE asaas_deposits ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE POLICY asaas_deposits_panel ON asaas_deposits FOR ALL TO app_panel
   USING (clinic_id = nullif(current_setting('app.clinic_id', true), '')::uuid)
