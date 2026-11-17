@@ -231,8 +231,8 @@ export async function connectAccount(
   // error (the next refresh reads the status again).
   try {
     await refreshAccount(clinicId, fetchImpl);
-  } catch {
-    logger.warn("asaas: status não lido após conectar", { clinicId });
+  } catch (error) {
+    logAsaasFailure("asaas: status não lido após conectar", clinicId, error);
   }
   return { ok: true };
 }
@@ -266,12 +266,13 @@ function logAsaasFailure(message: string, clinicId: string, error: unknown) {
 // key never undoes a replacement the owner just made. The stored value is
 // encrypted with a random IV, so the match is made on the decrypted key and
 // the update is pinned to the exact row read (apiKeyEnc), which keeps it
-// atomic against a replacement landing in between.
+// atomic against a replacement landing in between. Returns true only when it
+// updated the row.
 export async function markDisconnected(
   clinicId: string,
   failedKey?: string,
-): Promise<void> {
-  await inClinic(clinicId, async (tx) => {
+): Promise<boolean> {
+  return inClinic(clinicId, async (tx) => {
     let stillThatKey: string | undefined;
     if (failedKey !== undefined) {
       const [current] = await tx
@@ -279,11 +280,11 @@ export async function markDisconnected(
         .from(asaasAccounts)
         .where(eq(asaasAccounts.clinicId, clinicId));
       if (!current || decryptToken(current.apiKeyEnc, key()) !== failedKey) {
-        return;
+        return false;
       }
       stillThatKey = current.apiKeyEnc;
     }
-    await tx
+    const changed = await tx
       .update(asaasAccounts)
       .set({ status: "disconnected", lastError: "invalid_key" })
       .where(
@@ -293,7 +294,9 @@ export async function markDisconnected(
             ? undefined
             : eq(asaasAccounts.apiKeyEnc, stillThatKey),
         ),
-      );
+      )
+      .returning({ clinicId: asaasAccounts.clinicId });
+    return changed.length > 0;
   });
 }
 
@@ -369,7 +372,23 @@ export async function refreshAccount(
   } catch (error) {
     if (error instanceof AsaasError && error.status === 401) {
       logAsaasFailure("asaas: chave desconectada", clinicId, error);
-      await markDisconnected(clinicId, apiKey);
+      if (!(await markDisconnected(clinicId, apiKey))) {
+        // The key was replaced meanwhile: the account is as the owner left it.
+        const [current] = await inClinic(clinicId, (tx) =>
+          tx
+            .select()
+            .from(asaasAccounts)
+            .where(eq(asaasAccounts.clinicId, clinicId)),
+        );
+        const now = current ?? row;
+        return {
+          status: now.status,
+          pixKeyReady: now.pixKeyReady,
+          depositEnabled: now.depositEnabled,
+          lastError: now.lastError,
+          accountName: now.accountName,
+        };
+      }
       return {
         status: "disconnected",
         pixKeyReady: row.pixKeyReady,

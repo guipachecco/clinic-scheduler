@@ -76,6 +76,7 @@ function fakeAsaas() {
   const state = {
     paymentError: null as null | { status: number; code?: string },
     qrError: false,
+    qrUnauthorized: false,
     nextPayment: 1,
   };
   const json = (body: unknown, status = 200) =>
@@ -109,6 +110,9 @@ function fakeAsaas() {
     if (url.pathname.endsWith("/pixQrCode")) {
       // As the sandbox answered on 17/11/2026 for an account without a
       // working Pix key.
+      if (state.qrUnauthorized) {
+        return json({ errors: [{ code: "invalid_access_token" }] }, 401);
+      }
       if (state.qrError) {
         return json({ errors: [{ code: "invalid_action" }] }, 400);
       }
@@ -701,6 +705,60 @@ describe("online booking with a Pix deposit", () => {
     );
     expect(next).toMatchObject({ ok: true, deposit: null });
     expect(asaas.calls).toHaveLength(calls);
+  });
+
+  it("a revoked key on the QR read disconnects the account and undoes the booking", async () => {
+    const asaas = fakeAsaas();
+    asaas.state.qrUnauthorized = true;
+    const result = await bookOnline(
+      ctx("ana"),
+      { serviceId, startsAt: SLOT, cpf: CPF },
+      asaas.fetchImpl,
+    );
+    expect(result).toEqual({ ok: false, reason: "unavailable" });
+    const [account] = await db
+      .select()
+      .from(asaasAccounts)
+      .where(eq(asaasAccounts.clinicId, clinicId));
+    expect(account).toMatchObject({
+      status: "disconnected",
+      lastError: "invalid_key",
+    });
+    expect(await depositQuote(clinicId, serviceId, patient.bia)).toBeNull();
+  });
+
+  it("a failure while disconnecting never breaks the booking", async () => {
+    const asaas = fakeAsaas();
+    asaas.state.paymentError = { status: 401, code: "invalid_access_token" };
+    const [saved] = await db
+      .select({ apiKeyEnc: asaasAccounts.apiKeyEnc })
+      .from(asaasAccounts)
+      .where(eq(asaasAccounts.clinicId, clinicId));
+    // The stored key stops being readable just as Asaas refuses the charge,
+    // so markDisconnected itself throws.
+    const breaking = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const response = await asaas.fetchImpl(input, init);
+      if (response.status === 401)
+        await setAccount({ apiKeyEnc: "nao-decifra" });
+      return response;
+    }) as typeof fetch;
+    let result;
+    try {
+      result = await bookOnline(
+        ctx("ana"),
+        { serviceId, startsAt: SLOT, cpf: CPF },
+        breaking,
+      );
+    } finally {
+      await setAccount({ apiKeyEnc: saved!.apiKeyEnc });
+    }
+    expect(result).toMatchObject({ ok: true, deposit: null });
+    const [account] = await db
+      .select()
+      .from(asaasAccounts)
+      .where(eq(asaasAccounts.clinicId, clinicId));
+    expect(account!.status).toBe("approved");
+    expect(account!.lastError).toBe("invalid_access_token");
   });
 
   it("getDepositView never shows another patient's deposit", async () => {

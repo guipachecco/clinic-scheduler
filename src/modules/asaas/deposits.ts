@@ -345,6 +345,20 @@ function isRevokedKey(error: unknown): boolean {
   return error instanceof AsaasError && error.status === 401;
 }
 
+// markDisconnected from inside an error handler: it must never turn a
+// "no deposit" outcome into an error. True only when it disconnected.
+async function disconnectQuietly(
+  clinicId: string,
+  apiKey: string,
+): Promise<boolean> {
+  try {
+    return await markDisconnected(clinicId, apiKey);
+  } catch {
+    logger.warn("asaas: conta não desconectada", { clinicId });
+    return false;
+  }
+}
+
 async function readQr(
   clinicId: string,
   chargeId: string,
@@ -356,7 +370,8 @@ async function readQr(
     if (!apiKey) return null;
     return await getPixQrCode(apiKey, chargeId, fetchImpl);
   } catch (error) {
-    if (apiKey && isRevokedKey(error)) await markDisconnected(clinicId, apiKey);
+    if (apiKey && isRevokedKey(error))
+      await disconnectQuietly(clinicId, apiKey);
     logger.warn("asaas: QR do Pix indisponível", {
       clinicId,
       asaasCode: failureCode(error),
@@ -508,8 +523,8 @@ export async function startDeposit(
     // A revoked key turns the deposit off for the next bookings; this one
     // follows the permanent-failure path below. Guarded by the key that
     // failed, so a key replaced meanwhile stays connected.
-    const revoked = isRevokedKey(error);
-    if (revoked) await markDisconnected(clinicId, apiKey);
+    const revoked =
+      isRevokedKey(error) && (await disconnectQuietly(clinicId, apiKey));
     return {
       ok: false as const,
       reason: classifyFailure(error),
@@ -1434,7 +1449,7 @@ export async function cancelWithDeposit(
     try {
       refundStatus = await refundCharge(apiKey, paid.chargeId, fetchImpl);
     } catch (error) {
-      if (isRevokedKey(error)) await markDisconnected(clinicId, apiKey);
+      if (isRevokedKey(error)) await disconnectQuietly(clinicId, apiKey);
       logger.warn("asaas: sinal não devolvido", {
         clinicId,
         asaasCode: failureCode(error),
@@ -1462,7 +1477,8 @@ export async function cancelWithDeposit(
       ),
   );
   // Asaas accepted the refund but it still waits for the owner's approval.
-  if (result.ok && refundStatus !== undefined && refundStatus !== "REFUNDED") {
+  // (REFUND_IN_PROGRESS is already processing, nothing to approve.)
+  if (result.ok && refundStatus === "REFUND_REQUESTED") {
     return { ...result, refundPending: true };
   }
   return result;

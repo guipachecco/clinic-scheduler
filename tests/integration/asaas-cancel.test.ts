@@ -491,6 +491,50 @@ describe("cancelling with a deposit", () => {
     expect((await deposit(depositId)).status).toBe("refunded");
   });
 
+  it("a refund already in progress has no pending notice", async () => {
+    const asaas = fakeAsaas();
+    asaas.state.refundStatus = "REFUND_IN_PROGRESS";
+    const { appointmentId } = await paidHold(asaas);
+    const result = await cancelWithDeposit(
+      clinicId,
+      appointmentId,
+      { by: "patient", reason: "patient_request" },
+      actorId,
+      asaas.fetchImpl,
+      NOW,
+    );
+    expect(result).toMatchObject({ ok: true });
+    expect(result).not.toHaveProperty("refundPending");
+  });
+
+  it("a revoked key on the refund disconnects the account and says why it failed", async () => {
+    const asaas = fakeAsaas();
+    const { appointmentId } = await paidHold(asaas);
+    asaas.state.refundError = { status: 401, code: "invalid_access_token" };
+    expect(
+      await cancelWithDeposit(
+        clinicId,
+        appointmentId,
+        { by: "clinic", reason: "clinic_unavailable" },
+        actorId,
+        asaas.fetchImpl,
+        NOW,
+      ),
+    ).toEqual({
+      ok: false,
+      formError: "O Asaas não conseguiu devolver: tente de novo mais tarde.",
+      refundFailed: true,
+    });
+    const [account] = await db
+      .select()
+      .from(asaasAccounts)
+      .where(eq(asaasAccounts.clinicId, clinicId));
+    expect(account).toMatchObject({
+      status: "disconnected",
+      lastError: "invalid_key",
+    });
+  });
+
   it("a refund done at once has no pending notice", async () => {
     const asaas = fakeAsaas();
     const { appointmentId } = await paidHold(asaas);
