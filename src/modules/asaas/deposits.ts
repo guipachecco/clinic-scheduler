@@ -40,7 +40,7 @@ import {
   getPixQrCode,
   refundPayment,
 } from "./api";
-import { createDepositSale } from "./deposit-sale";
+import { cancelChargeQuietly, createDepositSale } from "./deposit-sale";
 import {
   cancellationOutcome,
   type CloseReason,
@@ -543,6 +543,14 @@ export async function startDeposit(
       ),
   );
   const qr = await readQr(clinicId, chargeId, fetchImpl);
+  if (!qr) {
+    // Without the QR and its "copia e cola" she cannot pay: holding the slot
+    // for 30 minutes would only block it. The charge goes too, so nothing at
+    // Asaas can be paid for a booking that was undone.
+    await closeFailed(clinicId, deposit.id, now);
+    await cancelChargeQuietly(clinicId, chargeId, fetchImpl);
+    return { ok: false, reason: "transient", code: "qr_unavailable" };
+  }
   return { ok: true, deposit: view(deposit, qr, now) };
 }
 

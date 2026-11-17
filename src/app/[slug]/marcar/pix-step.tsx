@@ -138,12 +138,16 @@ export function PixCode({
 }) {
   const [copied, setCopied] = useState(false);
 
+  const [copyFailed, setCopyFailed] = useState(false);
+
   async function copy() {
     try {
       await navigator.clipboard.writeText(payload);
       setCopied(true);
+      setCopyFailed(false);
     } catch {
       setCopied(false);
+      setCopyFailed(true);
     }
   }
 
@@ -163,13 +167,21 @@ export function PixCode({
       <p className="text-sm text-muted-foreground">
         Ou copie o código e cole no app do seu banco:
       </p>
-      <p className="rounded-xl bg-muted p-3 font-mono text-xs break-all">
+      {/* One tap selects the whole code, for when the copy button can't
+          reach the clipboard. */}
+      <p className="rounded-xl bg-muted p-3 font-mono text-xs break-all select-all">
         {payload}
       </p>
       <Button type="button" size="lg" variant="outline" onClick={copy}>
         <Icon name="copy" />
         {copied ? "Código copiado" : "Copiar código Pix"}
       </Button>
+      {copyFailed ? (
+        <p role="alert" className="text-sm text-muted-foreground">
+          Não deu para copiar sozinho. Toque no código acima para selecionar e
+          copie.
+        </p>
+      ) : null}
     </div>
   );
 }

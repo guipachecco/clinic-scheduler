@@ -74,6 +74,7 @@ function fakeAsaas() {
   const calls: Call[] = [];
   const state = {
     paymentError: null as null | { status: number; code?: string },
+    qrError: false,
     nextPayment: 1,
   };
   const json = (body: unknown, status = 200) =>
@@ -105,6 +106,11 @@ function fakeAsaas() {
       });
     }
     if (url.pathname.endsWith("/pixQrCode")) {
+      // As the sandbox answered on 17/11/2026 for an account without a
+      // working Pix key.
+      if (state.qrError) {
+        return json({ errors: [{ code: "invalid_action" }] }, 400);
+      }
       return json({
         payload: "pix-copia-e-cola-ficticio",
         encodedImage: "aW1hZ2VtLWZpY3RpY2lh",
@@ -531,6 +537,30 @@ describe("online booking with a Pix deposit", () => {
       .from(asaasAccounts)
       .where(eq(asaasAccounts.clinicId, clinicId));
     expect(account!.lastError).toBeNull();
+  });
+
+  it("a charge whose QR cannot be read is deleted and the slot freed", async () => {
+    const asaas = fakeAsaas();
+    asaas.state.qrError = true;
+    const result = await bookOnline(
+      ctx("ana"),
+      { serviceId, startsAt: SLOT, cpf: CPF },
+      asaas.fetchImpl,
+    );
+    expect(result).toEqual({ ok: false, reason: "unavailable" });
+    const [row] = await db
+      .select()
+      .from(appointments)
+      .where(eq(appointments.clinicId, clinicId));
+    expect(row).toMatchObject({ status: "cancelled", cancelledBy: "system" });
+    const [deposit] = await deposits();
+    expect(deposit).toMatchObject({
+      status: "closed",
+      closeReason: "charge_failed",
+    });
+    // Nobody can pay a charge whose code she never saw.
+    expect(asaas.count("DELETE", /\/payments\/pay-1$/)).toBe(1);
+    expect(await listFreeSlots(ctx("bia"), serviceId, MONDAY)).toContain(SLOT);
   });
 
   it("an unexpected error after the hold lets the slot go", async () => {

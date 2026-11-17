@@ -202,6 +202,11 @@ function AppointmentList({
                   qrImageBase64={deposit.qrImageBase64}
                 />
               </div>
+            ) : deposit ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                O código do Pix não carregou agora. Recarregue a página em
+                instantes; se continuar, fale com a clínica.
+              </p>
             ) : null}
             {reviewsOn && item.status === "completed" ? (
               <Button
