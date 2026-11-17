@@ -92,13 +92,9 @@ describe("parseServerEnv", () => {
 });
 
 describe("parseServerEnv Asaas", () => {
-  it("requires ASAAS_API_KEY and ASAAS_WEBHOOK_TOKEN together", () => {
-    expect(() => parseServerEnv({ ...valid, ASAAS_API_KEY: "k" })).toThrowError(
-      /ASAAS_WEBHOOK_TOKEN/,
-    );
-    expect(
-      parseServerEnv({ ...valid, ASAAS_API_KEY: "k", ASAAS_WEBHOOK_TOKEN: "t" })
-        .ASAAS_API_KEY,
-    ).toBe("k");
+  it("keeps the webhook token and no longer knows a root API key", () => {
+    const parsed = parseServerEnv({ ...valid, ASAAS_WEBHOOK_TOKEN: "t" });
+    expect(parsed.ASAAS_WEBHOOK_TOKEN).toBe("t");
+    expect(parsed).not.toHaveProperty("ASAAS_API_KEY");
   });
 });

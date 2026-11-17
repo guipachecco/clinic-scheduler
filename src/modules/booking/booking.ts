@@ -452,7 +452,7 @@ export async function listDaysWithSlots(
 // appointment is held as 'requested' instead, a pending deposit opens for 30
 // minutes and the Pix charge is made at Asaas. Holds that ran out are swept
 // first, as app_panel under their own agenda lock (app_client cannot change
-// other patients' rows). Without ASAAS_API_KEY nothing of that runs.
+// other patients' rows). Without ASAAS_WEBHOOK_TOKEN nothing of that runs.
 export async function bookOnline(
   ctx: BookingContext,
   input: { serviceId: string; startsAt: string | Date; cpf?: string },

@@ -2,44 +2,50 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db, endPools } from "@/db/owner";
-import { asaasAccounts, paymentMethods, users } from "@/db/schema";
+import { asaasAccounts, auditLogs, paymentMethods, users } from "@/db/schema";
 import { env } from "@/lib/env";
 import {
-  activateAccount,
+  connectAccount,
   depositApiKey,
   markAccountError,
   refreshAccount,
   setDepositEnabled,
 } from "@/modules/asaas/accounts";
-import type { ActivationValues } from "@/modules/asaas/fields";
 import { decryptToken, tokenKey } from "@/modules/mercado-pago/crypto";
 
-import { CLINIC } from "../helpers/clinic";
+import { CLINIC, otherClinic } from "../helpers/clinic";
 
-// The clinic's Asaas subaccount, with a fake Asaas: nothing leaves the
+// The clinic's own Asaas account, with a fake Asaas: nothing leaves the
 // machine. Every record is fictitious.
 
-const VALUES: ActivationValues = {
-  name: "Clínica Fictícia Ltda",
-  email: "dona@example.com",
-  cpfCnpj: "52998224725",
-  birthDate: "1990-05-20",
-  mobilePhone: "11999990000",
-  incomeValue: 5000,
-  postalCode: "01310100",
-  address: "Avenida Fictícia",
-  addressNumber: "100",
-  province: "Centro",
-};
+const KEY = "$aact_hmlg_abc";
+const NEW_KEY = "$aact_hmlg_nova";
+const ZEMANA_URL = new URL("/api/webhooks/asaas", env.BETTER_AUTH_URL).href;
+
+const WRONG_ENV =
+  "Essa chave é de produção, mas a Zemana está no ambiente de testes.";
+const REFUSED = "O Asaas não aceitou essa chave. Gere uma nova e cole de novo.";
+const OTHER_ACCOUNT =
+  "Essa chave é de outra conta do Asaas. Use uma chave da conta já conectada.";
+const OTHER_CLINIC = "Essa conta do Asaas já está conectada em outra clínica.";
 
 type Call = { method: string; path: string; body: unknown; key?: string };
+type Hook = { id: string; url: string; interrupted?: boolean };
 
 function fakeAsaas(
   general = "PENDING",
   keys: { id: string; status: string }[] = [],
+  hooks: Hook[] = [],
 ) {
   const calls: Call[] = [];
-  const state = { general, keys: [...keys] };
+  const state = {
+    general,
+    keys: [...keys],
+    hooks: [...hooks],
+    wallet: "wal-1",
+    name: "Clínica Fictícia Ltda",
+    revoked: new Set<string>(["revogada"]),
+  };
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,
@@ -51,8 +57,14 @@ function fakeAsaas(
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     const key = new Headers(init?.headers).get("access_token") ?? undefined;
     calls.push({ method, path: url.pathname, body, key });
-    if (url.pathname.endsWith("/accounts") && method === "POST") {
-      return json({ id: "acc-1", walletId: "wal-1", apiKey: "sub-key" });
+    if (key === undefined || state.revoked.has(key)) {
+      return json({ errors: [{ code: "invalid_access_token" }] }, 401);
+    }
+    if (url.pathname.endsWith("/wallets")) {
+      return json({ data: [{ id: state.wallet }] });
+    }
+    if (url.pathname.endsWith("/myAccount/commercialInfo")) {
+      return json({ name: state.name, email: "dona@example.com" });
     }
     if (url.pathname.endsWith("/myAccount/status")) {
       return json({
@@ -61,6 +73,15 @@ function fakeAsaas(
         commercialInfo: "APPROVED",
         bankAccountInfo: "APPROVED",
       });
+    }
+    if (url.pathname.endsWith("/webhooks") && method === "GET") {
+      return json({ data: state.hooks });
+    }
+    if (url.pathname.endsWith("/webhooks") && method === "POST") {
+      return json({ id: "wh-new" });
+    }
+    if (url.pathname.includes("/webhooks/") && method === "PUT") {
+      return json({ id: url.pathname.split("/").pop() });
     }
     if (url.pathname.endsWith("/pix/addressKeys") && method === "GET") {
       return json({ data: state.keys });
@@ -76,9 +97,14 @@ function fakeAsaas(
 
 let actor: string;
 
+const connect = (fetchImpl: typeof fetch, apiKey = KEY, clinic = CLINIC) =>
+  connectAccount(clinic, { apiKey }, actor, fetchImpl);
+
 beforeEach(async () => {
   await db.delete(asaasAccounts);
   await db.delete(paymentMethods).where(eq(paymentMethods.name, "Pix online"));
+  await db.delete(auditLogs).where(eq(auditLogs.action, "asaas.connected"));
+  await db.delete(auditLogs).where(eq(auditLogs.action, "asaas.key_replaced"));
   await db.delete(users).where(eq(users.email, "admin-asaas@example.com"));
   const [user] = await db
     .insert(users)
@@ -109,48 +135,158 @@ async function pixOnline() {
     .where(eq(paymentMethods.name, "Pix online"));
 }
 
-describe("activateAccount", () => {
-  it("activation stores the encrypted key, never the plain one", async () => {
+function plainKey(enc: string) {
+  return decryptToken(enc, tokenKey(env.BETTER_AUTH_SECRET, "asaas-api-keys"));
+}
+
+describe("connectAccount", () => {
+  it("connect stores the encrypted key, the wallet and the account name", async () => {
     const asaas = fakeAsaas();
-    const result = await activateAccount(
-      CLINIC,
-      VALUES,
-      actor,
-      asaas.fetchImpl,
-    );
-    expect(result).toEqual({ ok: true });
+    expect(await connect(asaas.fetchImpl)).toEqual({ ok: true });
     const saved = (await row())!;
-    expect(saved.accountId).toBe("acc-1");
     expect(saved.walletId).toBe("wal-1");
+    expect(saved.accountName).toBe("Clínica Fictícia Ltda");
+    expect(saved.accountId).toBeNull();
     expect(saved.status).toBe("pending");
-    expect(saved.apiKeyEnc).not.toBe("sub-key");
-    expect(
-      decryptToken(
-        saved.apiKeyEnc,
-        tokenKey(env.BETTER_AUTH_SECRET, "asaas-api-keys"),
-      ),
-    ).toBe("sub-key");
-    const create = asaas.calls.find((c) => c.method === "POST")!;
-    expect(create.key).toBe(env.ASAAS_API_KEY);
-    expect(JSON.stringify(create.body)).toContain("/api/webhooks/asaas");
+    expect(plainKey(saved.apiKeyEnc)).toBe(KEY);
+    expect(JSON.stringify(saved)).not.toContain(KEY);
+    const [log] = await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.action, "asaas.connected"));
+    expect(log!.changes).toEqual({ walletId: "wal-1" });
+    expect(JSON.stringify(log)).not.toContain(KEY);
   });
 
-  it("activation twice is refused", async () => {
+  it("trims the pasted key", async () => {
     const asaas = fakeAsaas();
-    await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
-    const again = await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
-    expect(again).toEqual({
+    await connect(asaas.fetchImpl, " $aact_hmlg_abc \n");
+    expect(plainKey((await row())!.apiKeyEnc)).toBe(KEY);
+  });
+
+  it("refuses a production key in the sandbox without calling Asaas", async () => {
+    const asaas = fakeAsaas();
+    expect(await connect(asaas.fetchImpl, "$aact_prod_x")).toEqual({
       ok: false,
-      formError: "Os recebimentos já foram ativados.",
+      formError: WRONG_ENV,
     });
-    expect(asaas.calls.filter((c) => c.method === "POST")).toHaveLength(1);
+    expect(asaas.calls).toHaveLength(0);
+    expect(await row()).toBeUndefined();
+  });
+
+  it("a refused key shows the refused text", async () => {
+    const asaas = fakeAsaas();
+    expect(await connect(asaas.fetchImpl, "revogada")).toEqual({
+      ok: false,
+      formError: REFUSED,
+    });
+    expect(await row()).toBeUndefined();
+  });
+
+  it("creates the Zemana webhook with the token", async () => {
+    const asaas = fakeAsaas();
+    await connect(asaas.fetchImpl);
+    const posts = asaas.calls.filter(
+      (c) => c.method === "POST" && c.path.endsWith("/webhooks"),
+    );
+    expect(posts).toHaveLength(1);
+    expect(posts[0]!.body).toMatchObject({
+      name: "Zemana",
+      url: ZEMANA_URL,
+      authToken: env.ASAAS_WEBHOOK_TOKEN,
+      email: "dona@example.com",
+      enabled: true,
+      interrupted: false,
+    });
+  });
+
+  it("replacing the key updates the existing webhook, even a paused one", async () => {
+    const asaas = fakeAsaas(
+      "PENDING",
+      [],
+      [
+        { id: "wh-1", url: ZEMANA_URL, interrupted: true },
+        { id: "wh-2", url: "https://outro.example" },
+      ],
+    );
+    await connect(asaas.fetchImpl);
+    asaas.calls.length = 0;
+    expect(await connect(asaas.fetchImpl, NEW_KEY)).toEqual({ ok: true });
+    const writes = asaas.calls.filter(
+      (c) => c.method !== "GET" && c.path.includes("/webhooks"),
+    );
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({ method: "PUT" });
+    expect(writes[0]!.path.endsWith("/webhooks/wh-1")).toBe(true);
+    expect(writes[0]!.body).toMatchObject({ interrupted: false });
+    expect(plainKey((await row())!.apiKeyEnc)).toBe(NEW_KEY);
+    expect(
+      await db
+        .select()
+        .from(auditLogs)
+        .where(eq(auditLogs.action, "asaas.key_replaced")),
+    ).toHaveLength(1);
+  });
+
+  it("replacing with another account's key is refused", async () => {
+    const asaas = fakeAsaas();
+    await connect(asaas.fetchImpl);
+    asaas.state.wallet = "wal-2";
+    expect(await connect(asaas.fetchImpl, NEW_KEY)).toEqual({
+      ok: false,
+      formError: OTHER_ACCOUNT,
+    });
+    const saved = (await row())!;
+    expect(saved.walletId).toBe("wal-1");
+    expect(plainKey(saved.apiKeyEnc)).toBe(KEY);
+  });
+
+  it("the same Asaas account cannot connect two clinics", async () => {
+    const asaas = fakeAsaas();
+    await connect(asaas.fetchImpl);
+    const clinicB = await otherClinic();
+    expect(await connect(asaas.fetchImpl, NEW_KEY, clinicB)).toEqual({
+      ok: false,
+      formError: OTHER_CLINIC,
+    });
+    expect(await db.select().from(asaasAccounts)).toHaveLength(1);
+  });
+
+  it("a revoked key marks the account disconnected", async () => {
+    const asaas = fakeAsaas("APPROVED");
+    await connect(asaas.fetchImpl);
+    expect(await depositApiKey(CLINIC)).toBe(KEY);
+    asaas.state.revoked.add(KEY);
+    expect(await refreshAccount(CLINIC, asaas.fetchImpl)).toMatchObject({
+      status: "disconnected",
+    });
+    expect((await row())!.lastError).toBe("invalid_key");
+    expect(await depositApiKey(CLINIC)).toBeNull();
+    // A disconnected account is not read again.
+    const before = asaas.calls.length;
+    await refreshAccount(CLINIC, asaas.fetchImpl);
+    expect(asaas.calls).toHaveLength(before);
+  });
+
+  it("replacing the key reconnects a disconnected account", async () => {
+    const asaas = fakeAsaas("APPROVED");
+    await connect(asaas.fetchImpl);
+    asaas.state.revoked.add(KEY);
+    await refreshAccount(CLINIC, asaas.fetchImpl);
+    expect(await connect(asaas.fetchImpl, NEW_KEY)).toEqual({ ok: true });
+    expect(await row()).toMatchObject({
+      status: "approved",
+      pixKeyReady: true,
+      lastError: null,
+    });
+    expect(await depositApiKey(CLINIC)).toBe(NEW_KEY);
   });
 });
 
 describe("refreshAccount", () => {
   it("no Pix online method before approval", async () => {
     const asaas = fakeAsaas("PENDING");
-    await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
+    await connect(asaas.fetchImpl);
     const view = await refreshAccount(CLINIC, asaas.fetchImpl);
     expect(view).toMatchObject({ status: "pending", pixKeyReady: false });
     expect(await pixOnline()).toHaveLength(0);
@@ -161,7 +297,7 @@ describe("refreshAccount", () => {
 
   it("refresh creates the EVP key once approved and adds Pix online", async () => {
     const asaas = fakeAsaas("PENDING");
-    await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
+    await connect(asaas.fetchImpl);
     asaas.state.general = "APPROVED";
     const view = await refreshAccount(CLINIC, asaas.fetchImpl);
     expect(view).toMatchObject({ status: "approved", pixKeyReady: true });
@@ -172,12 +308,12 @@ describe("refreshAccount", () => {
       (c) => c.method === "POST" && c.path.endsWith("/pix/addressKeys"),
     );
     expect(created).toHaveLength(1);
-    expect(created[0]!.key).toBe("sub-key");
+    expect(created[0]!.key).toBe(KEY);
   });
 
   it("keeps an existing active key instead of creating one", async () => {
     const asaas = fakeAsaas("APPROVED", [{ id: "k", status: "ACTIVE" }]);
-    await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
+    await connect(asaas.fetchImpl);
     await refreshAccount(CLINIC, asaas.fetchImpl);
     expect(
       asaas.calls.some(
@@ -191,7 +327,7 @@ describe("refreshAccount", () => {
     const asaas = fakeAsaas("APPROVED", [
       { id: "k", status: "AWAITING_ACTIVATION" },
     ]);
-    await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
+    await connect(asaas.fetchImpl);
     expect(await refreshAccount(CLINIC, asaas.fetchImpl)).toMatchObject({
       status: "approved",
       pixKeyReady: false,
@@ -211,10 +347,10 @@ describe("refreshAccount", () => {
     ).toBe(false);
   });
 
-  it("maps a rejected account and null without a subaccount", async () => {
+  it("maps a rejected account and null without a connected account", async () => {
     expect(await refreshAccount(CLINIC, fakeAsaas().fetchImpl)).toBeNull();
     const asaas = fakeAsaas("REJECTED");
-    await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
+    await connect(asaas.fetchImpl);
     expect(await refreshAccount(CLINIC, asaas.fetchImpl)).toMatchObject({
       status: "rejected",
     });
@@ -225,15 +361,15 @@ describe("depositApiKey", () => {
   it("is null when disabled, pending or without Pix key", async () => {
     const asaas = fakeAsaas("PENDING");
     expect(await depositApiKey(CLINIC)).toBeNull();
-    await activateAccount(CLINIC, VALUES, actor, asaas.fetchImpl);
+    await connect(asaas.fetchImpl);
     expect(await depositApiKey(CLINIC)).toBeNull();
     asaas.state.general = "APPROVED";
     await refreshAccount(CLINIC, asaas.fetchImpl);
-    expect(await depositApiKey(CLINIC)).toBe("sub-key");
+    expect(await depositApiKey(CLINIC)).toBe(KEY);
     await setDepositEnabled(CLINIC, false, actor);
     expect(await depositApiKey(CLINIC)).toBeNull();
     await setDepositEnabled(CLINIC, true, actor);
-    expect(await depositApiKey(CLINIC)).toBe("sub-key");
+    expect(await depositApiKey(CLINIC)).toBe(KEY);
     await db
       .update(asaasAccounts)
       .set({ pixKeyReady: false })
@@ -244,7 +380,7 @@ describe("depositApiKey", () => {
 
 describe("markAccountError", () => {
   it("records a code and clears it with null", async () => {
-    await activateAccount(CLINIC, VALUES, actor, fakeAsaas().fetchImpl);
+    await connect(fakeAsaas().fetchImpl);
     await markAccountError(CLINIC, "limit_exceeded");
     expect((await row())!.lastError).toBe("limit_exceeded");
     await markAccountError(CLINIC, null);

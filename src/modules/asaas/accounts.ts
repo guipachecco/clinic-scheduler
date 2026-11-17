@@ -3,7 +3,8 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { inClinic, type Tx } from "@/db/client";
-import { asaasAccounts, auditLogs, clinics, paymentMethods } from "@/db/schema";
+import { isUniqueViolation } from "@/db/errors";
+import { asaasAccounts, auditLogs, paymentMethods } from "@/db/schema";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import {
@@ -16,14 +17,18 @@ import {
   AsaasError,
   createEvpKey,
   getAccountStatus,
+  getCommercialInfo,
+  getWalletId,
   listPixKeys,
+  listWebhooks,
+  saveWebhook,
   type Fetch,
 } from "./api";
-import type { ActivationValues } from "./fields";
-import { accountReady } from "./rules";
+import type { ConnectValues } from "./fields";
+import { accountReady, baseUrlEnvironment, keyEnvironment } from "./rules";
 
-// The Asaas subaccount each clinic gets. The subaccount API key lives
-// encrypted in asaas_accounts; the Zemana root key only creates subaccounts.
+// The Asaas account of each clinic: the owner pastes the API key of her own
+// account. The key lives encrypted in asaas_accounts.
 
 export const PIX_ONLINE_METHOD = "Pix online";
 
@@ -34,7 +39,7 @@ function key(): Buffer {
 }
 
 export function asaasEnabled(): boolean {
-  return env.ASAAS_API_KEY !== undefined;
+  return env.ASAAS_WEBHOOK_TOKEN !== undefined;
 }
 
 export type AccountView = {
@@ -42,10 +47,11 @@ export type AccountView = {
   pixKeyReady: boolean;
   depositEnabled: boolean;
   lastError: string | null;
+  accountName: string | null;
 };
 
 // The clinic's "Pix online" form of payment, created (or turned back on) when
-// the subaccount is approved. The deposit payments are recorded with it.
+// the account is approved. The deposit payments are recorded with it.
 export async function ensurePixOnlineMethod(
   tx: Tx,
   clinicId: string,
@@ -74,6 +80,7 @@ const ACTIVE_FIELDS = {
   pixKeyReady: asaasAccounts.pixKeyReady,
   depositEnabled: asaasAccounts.depositEnabled,
   lastError: asaasAccounts.lastError,
+  accountName: asaasAccounts.accountName,
 };
 
 export async function getAccountView(
@@ -88,92 +95,158 @@ export async function getAccountView(
   return row ?? null;
 }
 
-export async function activateAccount(
+const WRONG_ENV_PRODUCTION =
+  "Essa chave é do ambiente de testes do Asaas. Gere uma chave na sua conta de verdade.";
+const WRONG_ENV_SANDBOX =
+  "Essa chave é de produção, mas a Zemana está no ambiente de testes.";
+const REFUSED_KEY =
+  "O Asaas não aceitou essa chave. Gere uma nova e cole de novo.";
+const NO_ANSWER = "O Asaas não respondeu. Tente de novo em instantes.";
+const OTHER_ACCOUNT =
+  "Essa chave é de outra conta do Asaas. Use uma chave da conta já conectada.";
+const OTHER_CLINIC = "Essa conta do Asaas já está conectada em outra clínica.";
+
+type Outcome = { ok: true } | { ok: false; formError: string };
+
+// The owner pastes the API key of her own Asaas account: first connection
+// and key replacement alike (a clinic that already has a row is replacing).
+// The key is checked at Asaas, the Zemana webhook is registered in her account
+// and the key is saved encrypted. It never reaches a log.
+export async function connectAccount(
   clinicId: string,
-  values: ActivationValues,
+  values: ConnectValues,
   actorUserId: string,
   fetchImpl: Fetch = fetch,
-): Promise<{ ok: true } | { ok: false; formError: string }> {
-  void fetchImpl; // Temporary until Task 3.
-  const rootKey = env.ASAAS_API_KEY;
-  if (rootKey === undefined || env.ASAAS_WEBHOOK_TOKEN === undefined) {
+): Promise<Outcome> {
+  const webhookToken = env.ASAAS_WEBHOOK_TOKEN;
+  if (webhookToken === undefined) {
     return {
       ok: false,
       formError: "O sinal por Pix ainda não está disponível.",
     };
   }
-  if (await getAccountView(clinicId)) {
-    return { ok: false, formError: "Os recebimentos já foram ativados." };
-  }
+  const apiKey = values.apiKey.trim();
 
-  let created: { id: string; walletId: string; apiKey: string };
-  try {
-    // Temporary: Task 3 rewrites this file to connect the owner's own key.
-    throw new Error("substituído na Task 3");
-  } catch (error) {
-    logger.warn("asaas: subconta recusada", {
-      clinicId,
-      status: error instanceof AsaasError ? error.status : undefined,
-      asaasCodes: error instanceof AsaasError ? error.codes : undefined,
-    });
-    if (error instanceof AsaasError && error.status === 400) {
-      return {
-        ok: false,
-        formError:
-          "O Asaas não aceitou os dados. Confira o CPF/CNPJ, o e-mail e o endereço.",
-      };
-    }
+  const keyEnv = keyEnvironment(apiKey);
+  const zemanaEnv = baseUrlEnvironment(env.ASAAS_BASE_URL);
+  if (keyEnv !== "unknown" && keyEnv !== zemanaEnv) {
     return {
       ok: false,
-      formError: "O Asaas não respondeu. Tente de novo em instantes.",
+      formError:
+        keyEnv === "sandbox" ? WRONG_ENV_PRODUCTION : WRONG_ENV_SANDBOX,
     };
   }
 
-  // The key only comes once: save it in the same step the answer arrives.
+  let walletId: string;
+  let info: { name: string; email: string };
   try {
-    const saved = await inClinic(clinicId, async (tx) => {
-      const rows = await tx
-        .insert(asaasAccounts)
-        .values({
-          clinicId,
-          accountId: created.id,
-          walletId: created.walletId,
-          apiKeyEnc: encryptToken(created.apiKey, key()),
-          activatedByUserId: actorUserId,
-        })
-        .onConflictDoNothing({ target: asaasAccounts.clinicId })
-        .returning({ clinicId: asaasAccounts.clinicId });
-      if (rows.length === 0) return false;
+    walletId = await getWalletId(apiKey, fetchImpl);
+    info = await getCommercialInfo(apiKey, fetchImpl);
+  } catch (error) {
+    logAsaasFailure("asaas: chave não aceita", clinicId, error);
+    return {
+      ok: false,
+      formError:
+        error instanceof AsaasError && error.status === 401
+          ? REFUSED_KEY
+          : NO_ANSWER,
+    };
+  }
+
+  const [existing] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ walletId: asaasAccounts.walletId })
+      .from(asaasAccounts)
+      .where(eq(asaasAccounts.clinicId, clinicId)),
+  );
+  if (existing && existing.walletId !== walletId) {
+    return { ok: false, formError: OTHER_ACCOUNT };
+  }
+
+  // The Zemana webhook: reuse (and re-enable) the one already there, never
+  // touch the owner's others.
+  try {
+    const webhookUrl = new URL("/api/webhooks/asaas", env.BETTER_AUTH_URL).href;
+    const ours = (await listWebhooks(apiKey, fetchImpl)).find(
+      (hook) => hook.url === webhookUrl,
+    );
+    await saveWebhook(
+      apiKey,
+      {
+        id: ours?.id,
+        url: webhookUrl,
+        email: info.email,
+        authToken: webhookToken,
+      },
+      fetchImpl,
+    );
+  } catch (error) {
+    logAsaasFailure("asaas: webhook não registrado", clinicId, error);
+    return { ok: false, formError: NO_ANSWER };
+  }
+
+  try {
+    await inClinic(clinicId, async (tx) => {
+      const fields = {
+        apiKeyEnc: encryptToken(apiKey, key()),
+        walletId,
+        accountName: info.name,
+        status: "pending" as const,
+        pixKeyReady: false,
+        lastError: null,
+        activatedByUserId: actorUserId,
+      };
+      if (existing) {
+        await tx
+          .update(asaasAccounts)
+          .set(fields)
+          .where(eq(asaasAccounts.clinicId, clinicId));
+      } else {
+        await tx.insert(asaasAccounts).values({ clinicId, ...fields });
+      }
       await tx.insert(auditLogs).values({
         clinicId,
         actorType: "admin",
         actorUserId,
-        action: "asaas.activated",
+        action: existing ? "asaas.key_replaced" : "asaas.connected",
         entityType: "clinic",
         entityId: clinicId,
-        changes: { accountId: created.id },
+        changes: { walletId },
       });
-      return true;
     });
-    if (!saved) {
-      logger.error("asaas: subconta criada duas vezes", {
-        clinicId,
-        accountId: created.id,
-      });
-      return { ok: false, formError: "Os recebimentos já foram ativados." };
+  } catch (error) {
+    if (isUniqueViolation(error, "asaas_accounts_wallet_unique")) {
+      return { ok: false, formError: OTHER_CLINIC };
     }
-    return { ok: true };
-  } catch {
-    // Manual recovery needs the account id (never the key).
-    logger.error("asaas: subconta criada mas não gravada", {
-      clinicId,
-      accountId: created.id,
-    });
+    logger.error("asaas: conta não gravada", { clinicId });
     return {
       ok: false,
       formError: "Não foi possível salvar. Fale com o suporte da Zemana.",
     };
   }
+
+  // Reads the approval and the Pix key right away: a reconnected approved
+  // account is back to approved in this same call.
+  await refreshAccount(clinicId, fetchImpl);
+  return { ok: true };
+}
+
+function logAsaasFailure(message: string, clinicId: string, error: unknown) {
+  logger.warn(message, {
+    clinicId,
+    status: error instanceof AsaasError ? error.status : undefined,
+    asaasCodes: error instanceof AsaasError ? error.codes : undefined,
+  });
+}
+
+// The key stopped working at Asaas (revoked or replaced there). Idempotent.
+export async function markDisconnected(clinicId: string): Promise<void> {
+  await inClinic(clinicId, (tx) =>
+    tx
+      .update(asaasAccounts)
+      .set({ status: "disconnected", lastError: "invalid_key" })
+      .where(eq(asaasAccounts.clinicId, clinicId)),
+  );
 }
 
 // Pix key statuses that will never become ACTIVE again.
@@ -189,7 +262,7 @@ function mapStatus(general: string): AccountView["status"] {
   return general === "REJECTED" ? "rejected" : "pending";
 }
 
-// Reads the status at Asaas. Once approved, makes sure the subaccount has an
+// Reads the status at Asaas. Once approved, makes sure the account has an
 // active random Pix key, then turns on the "Pix online" payment method.
 export async function refreshAccount(
   clinicId: string,
@@ -199,6 +272,16 @@ export async function refreshAccount(
     tx.select().from(asaasAccounts).where(eq(asaasAccounts.clinicId, clinicId)),
   );
   if (!row) return null;
+  // A disconnected account stays so until the owner pastes a new key.
+  if (row.status === "disconnected") {
+    return {
+      status: "disconnected",
+      pixKeyReady: row.pixKeyReady,
+      depositEnabled: row.depositEnabled,
+      lastError: row.lastError,
+      accountName: row.accountName,
+    };
+  }
 
   try {
     const apiKey = decryptToken(row.apiKeyEnc, key());
@@ -232,8 +315,20 @@ export async function refreshAccount(
       pixKeyReady,
       depositEnabled: row.depositEnabled,
       lastError: null,
+      accountName: row.accountName,
     };
   } catch (error) {
+    if (error instanceof AsaasError && error.status === 401) {
+      logAsaasFailure("asaas: chave desconectada", clinicId, error);
+      await markDisconnected(clinicId);
+      return {
+        status: "disconnected",
+        pixKeyReady: row.pixKeyReady,
+        depositEnabled: row.depositEnabled,
+        lastError: "invalid_key",
+        accountName: row.accountName,
+      };
+    }
     const code =
       error instanceof AsaasError
         ? (error.codes[0] ?? `http_${error.status}`)
@@ -244,6 +339,7 @@ export async function refreshAccount(
       pixKeyReady: row.pixKeyReady,
       depositEnabled: row.depositEnabled,
       lastError: code,
+      accountName: row.accountName,
     };
   }
 }
@@ -271,7 +367,7 @@ export async function setDepositEnabled(
   });
 }
 
-// The subaccount key, only while deposits can be charged: approved, with a
+// The owner's key, only while deposits can be charged: approved, with a
 // Pix key, and turned on by the clinic.
 export async function depositApiKey(clinicId: string): Promise<string | null> {
   const [row] = await inClinic(clinicId, (tx) =>
@@ -292,7 +388,7 @@ export async function depositApiKey(clinicId: string): Promise<string | null> {
   return decryptToken(row.apiKeyEnc, key());
 }
 
-// The subaccount key whatever its state, to read or cancel charges already
+// The owner's key whatever its state, to read or cancel charges already
 // made (a QR still showing, a hold that expired after the deposit was turned
 // off). Never for new charges: those use depositApiKey.
 export async function accountApiKey(clinicId: string): Promise<string | null> {
@@ -316,31 +412,4 @@ export async function markAccountError(
       .set({ lastError: code })
       .where(eq(asaasAccounts.clinicId, clinicId)),
   );
-}
-
-// What the clinic already has, to pre-fill the activation form. Empty where
-// the clinic has nothing.
-export async function activationDefaults(clinicId: string): Promise<{
-  name: string;
-  email: string;
-  mobilePhone: string;
-  address: string;
-}> {
-  const [row] = await inClinic(clinicId, (tx) =>
-    tx
-      .select({
-        name: clinics.name,
-        email: clinics.contactEmail,
-        phone: clinics.whatsappPhone,
-        address: clinics.address,
-      })
-      .from(clinics)
-      .where(eq(clinics.id, clinicId)),
-  );
-  return {
-    name: row?.name ?? "",
-    email: row?.email ?? "",
-    mobilePhone: row?.phone ?? "",
-    address: row?.address ?? "",
-  };
 }

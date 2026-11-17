@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import {
-  activationDefaults,
   asaasEnabled,
   getAccountView,
   refreshAccount,
@@ -43,7 +42,7 @@ export default async function SinalPixPage() {
             do Asaas, sem taxa da Zemana. Preencha seus dados uma vez: a Zemana
             cria a conta para você.
           </p>
-          <ActivationForm defaults={await activationDefaults(clinicId)} />
+          <ActivationForm />
         </section>
       ) : view.status === "pending" ? (
         <section className={BOX}>

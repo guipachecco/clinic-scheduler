@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import {
-  activateAccount,
+  connectAccount,
   asaasEnabled,
   refreshAccount,
   setDepositEnabled,
 } from "@/modules/asaas/accounts";
-import { activationSchema, type ActivationInput } from "@/modules/asaas/fields";
+import { connectSchema, type ConnectInput } from "@/modules/asaas/fields";
 import { MODULE_OFF_ERROR } from "@/modules/clinics/modules";
 import { issuesToFieldErrors } from "@/modules/finance/fields";
 
@@ -34,21 +34,17 @@ async function session() {
 
 const OFF: SinalActionResult = { ok: false, formError: MODULE_OFF_ERROR };
 
-export async function activateAction(
-  input: ActivationInput,
+export async function connectAction(
+  input: ConnectInput,
 ): Promise<SinalActionResult> {
   const ctx = await session();
   if (!ctx) return OFF;
-  const parsed = activationSchema.safeParse(input);
+  const parsed = connectSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, fieldErrors: issuesToFieldErrors(parsed.error.issues) };
   }
   try {
-    const result = await activateAccount(
-      ctx.clinicId,
-      parsed.data,
-      ctx.user.id,
-    );
+    const result = await connectAccount(ctx.clinicId, parsed.data, ctx.user.id);
     if (result.ok) revalidatePath("/admin/financeiro/sinal-pix");
     return result.ok
       ? { ok: true }
