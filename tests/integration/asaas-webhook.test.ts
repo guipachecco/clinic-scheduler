@@ -25,6 +25,7 @@ import {
   quoteItems,
   quotes,
   saleItems,
+  saleRevisions,
   sales,
   serviceCategories,
   services,
@@ -32,7 +33,11 @@ import {
 import { env } from "@/lib/env";
 import { PIX_ONLINE_METHOD } from "@/modules/asaas/accounts";
 import { handleDepositNotification } from "@/modules/asaas/deposits";
-import { findSessionInstallment } from "@/modules/finance/sales";
+import {
+  findSessionInstallment,
+  getSale,
+  listSales,
+} from "@/modules/finance/sales";
 import { encryptToken, tokenKey } from "@/modules/mercado-pago/crypto";
 
 import { otherClinic } from "../helpers/clinic";
@@ -96,6 +101,7 @@ async function clearAgenda() {
   await db.delete(asaasDeposits).where(eq(asaasDeposits.clinicId, clinicId));
   await db.delete(payments).where(eq(payments.clinicId, clinicId));
   await db.delete(installments).where(eq(installments.clinicId, clinicId));
+  await db.delete(saleRevisions).where(eq(saleRevisions.clinicId, clinicId));
   await db.delete(saleItems).where(eq(saleItems.clinicId, clinicId));
   await db.delete(sales).where(eq(sales.clinicId, clinicId));
   await db.delete(quoteItems).where(eq(quoteItems.clinicId, clinicId));
@@ -692,9 +698,32 @@ describe("Asaas webhook", () => {
       .from(installments)
       .where(eq(installments.saleId, row.saleId!))
       .orderBy(asc(installments.number));
-    expect(parts[0]!.cancelledAt).toBeNull();
+    // The patient got it all back: the whole sale is cancelled.
+    expect(parts[0]!.cancelledAt).not.toBeNull();
     expect(parts[1]!.cancelledAt).not.toBeNull();
+    const [sale] = await db
+      .select()
+      .from(sales)
+      .where(eq(sales.id, row.saleId!));
+    expect(sale!.cancelledAt).not.toBeNull();
+    expect(sale!.cancellationReason).toBe("Sinal devolvido pelo Asaas");
+    // A week later nothing shows as owed or overdue.
+    const detail = await getSale(clinicId, row.saleId!, "2033-03-08");
+    expect(detail).toMatchObject({ paidCents: 0, outstandingCents: 0 });
+    expect(detail!.installments.map((part) => part.state)).toEqual([
+      "cancelled",
+      "cancelled",
+    ]);
+    const listed = (await listSales(clinicId, { patientId })).find(
+      (item) => item.id === row.saleId,
+    );
+    expect(listed).toMatchObject({
+      paidCents: 0,
+      outstandingCents: 0,
+      cancelled: true,
+    });
     expect(await findSessionInstallment(clinicId, appointmentId)).toBeNull();
+    expect((await appointment(appointmentId)).status).toBe("confirmed");
     // Asaas repeating the notice changes nothing.
     expect(
       await handleDepositNotification(depositId, "pay-1", asaas.fetchImpl),

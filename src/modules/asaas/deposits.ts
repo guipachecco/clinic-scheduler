@@ -12,12 +12,12 @@ import {
   asaasDeposits,
   auditLogs,
   clinics,
-  installments,
   payments,
   services,
 } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { lockAgenda } from "@/modules/appointments/appointments";
+import { cancelSaleInTx } from "@/modules/finance/sales";
 import { todayLocal } from "@/modules/schedule/time";
 
 import { accountApiKey, asaasEnabled, depositApiKey } from "./accounts";
@@ -672,6 +672,7 @@ const REFUND_STATUSES = new Set([
   "REFUND_IN_PROGRESS",
 ]);
 const REFUND_REASON = "Devolvido pelo Asaas";
+const SALE_CANCEL_REASON = "Sinal devolvido pelo Asaas";
 
 type RefundReason = CloseReason | "slot_taken" | "duplicate_payment";
 
@@ -945,8 +946,8 @@ async function decidePaidDeposit(
 }
 
 // Refunded from the Asaas app: the deposit payment is reversed here and the
-// rest of the sale, still unpaid, is cancelled. The appointment stays as it
-// is; the owner decides about it.
+// sale is cancelled. The appointment stays as it is; the owner decides
+// about it.
 async function reverseRefundedDeposit(
   clinicId: string,
   depositId: string,
@@ -983,22 +984,16 @@ async function reverseRefundedDeposit(
         ),
       );
     if (deposit.saleId) {
-      // Explicit names: Drizzle writes columns unqualified inside sql``.
-      await tx
-        .update(installments)
-        .set({ cancelledAt: now })
-        .where(
-          and(
-            eq(installments.clinicId, clinicId),
-            eq(installments.saleId, deposit.saleId),
-            eq(installments.appointmentId, deposit.appointmentId),
-            isNull(installments.cancelledAt),
-            sql`not exists (
-              select 1 from payments p
-              where p.installment_id = "installments"."id"
-                and p.reversed_at is null)`,
-          ),
-        );
+      // The patient got everything back: the sale goes as cancelSale does it
+      // (every installment with nothing paid is cancelled).
+      await cancelSaleInTx(
+        tx,
+        clinicId,
+        deposit.saleId,
+        { reason: SALE_CANCEL_REASON, cancelFutureSessions: false },
+        null,
+        now,
+      );
     }
     await tx
       .update(asaasDeposits)
