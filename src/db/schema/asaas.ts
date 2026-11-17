@@ -88,10 +88,7 @@ export const asaasCustomers = pgTable(
       foreignColumns: [patients.clinicId, patients.id],
     }).onDelete("restrict"),
     unique("asaas_customers_clinic_patient_unique").on(t.clinicId, t.patientId),
-    check(
-      "asaas_customers_last4_check",
-      sql`${t.cpfCnpjLast4} ~ '^[0-9]{4}$'`,
-    ),
+    check("asaas_customers_last4_check", sql`${t.cpfCnpjLast4} ~ '^[0-9]{4}$'`),
   ],
 );
 

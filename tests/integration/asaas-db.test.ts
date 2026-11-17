@@ -240,13 +240,11 @@ describe("asaas tables", () => {
   it("pending deposit cannot carry a payment_id", async () => {
     expect(
       await pgCode(
-        db
-          .insert(asaasDeposits)
-          .values(
-            deposit(apptA, {
-              paymentId: "00000000-0000-4000-8000-000000000001",
-            }),
-          ),
+        db.insert(asaasDeposits).values(
+          deposit(apptA, {
+            paymentId: "00000000-0000-4000-8000-000000000001",
+          }),
+        ),
       ),
     ).toBe("23514");
   });

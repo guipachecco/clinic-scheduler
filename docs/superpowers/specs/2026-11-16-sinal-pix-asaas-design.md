@@ -213,14 +213,14 @@ subconta** e só então age. Em uma transação, com o sinal travado:
 **Pix que chega quando o sinal não está mais aguardando** **(proposta)**.
 O webhook decide pelo estado do sinal, nunca só pelo horário:
 
-| Estado do sinal quando o Pix chega                          | O que acontece                                        |
-| ----------------------------------------------------------- | ----------------------------------------------------- |
-| `pending` dentro do prazo                                   | Confirma (fluxo normal)                               |
-| `expired` só pelo prazo, horário ainda livre                | Reabre e confirma, como se tivesse pago a tempo       |
-| `expired` só pelo prazo, horário ocupado                    | Estorna sozinho; status `refunded`, motivo "horário indisponível" |
-| Agendamento cancelado pela dona antes do Pix                | Estorna sozinho; nunca reativa o que ela cancelou     |
-| Dona confirmou na mão (fluxo 7)                             | Estorna sozinho; ela já recebeu por fora              |
-| Já `paid` (segundo pagamento, ex.: QR antigo)               | Estorna sozinho o pagamento repetido                  |
+| Estado do sinal quando o Pix chega            | O que acontece                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------- |
+| `pending` dentro do prazo                     | Confirma (fluxo normal)                                           |
+| `expired` só pelo prazo, horário ainda livre  | Reabre e confirma, como se tivesse pago a tempo                   |
+| `expired` só pelo prazo, horário ocupado      | Estorna sozinho; status `refunded`, motivo "horário indisponível" |
+| Agendamento cancelado pela dona antes do Pix  | Estorna sozinho; nunca reativa o que ela cancelou                 |
+| Dona confirmou na mão (fluxo 7)               | Estorna sozinho; ela já recebeu por fora                          |
+| Já `paid` (segundo pagamento, ex.: QR antigo) | Estorna sozinho o pagamento repetido                              |
 
 Para distinguir "expirou pelo prazo" de "cancelado pela dona", o sinal
 guarda o motivo do fechamento. Todo estorno automático aparece para a dona
@@ -246,12 +246,12 @@ A tela de cancelar que existe ganha, **só quando há sinal pago**, a
 pergunta "Quem desmarcou?" (A cliente / A clínica) e mostra o efeito antes
 de confirmar:
 
-| Situação                                  | Sinal                                | Restante               |
-| ----------------------------------------- | ------------------------------------ | ---------------------- |
-| Cliente, mais de 24h antes do início      | Estornado no Asaas e no financeiro   | Parcela cancelada      |
-| Cliente, 24h ou menos antes               | Fica com a dona (pagamento mantido)  | Parcela cancelada      |
-| Clínica, a qualquer momento               | Estornado no Asaas e no financeiro   | Parcela cancelada      |
-| Falta (`no_show`)                         | Fica com a dona                      | Parcela cancelada      |
+| Situação                             | Sinal                               | Restante          |
+| ------------------------------------ | ----------------------------------- | ----------------- |
+| Cliente, mais de 24h antes do início | Estornado no Asaas e no financeiro  | Parcela cancelada |
+| Cliente, 24h ou menos antes          | Fica com a dona (pagamento mantido) | Parcela cancelada |
+| Clínica, a qualquer momento          | Estornado no Asaas e no financeiro  | Parcela cancelada |
+| Falta (`no_show`)                    | Fica com a dona                     | Parcela cancelada |
 
 - 24h contadas a partir do **início** do atendimento até o momento em que a
   dona registra o cancelamento. **(proposta: o momento do registro, não o

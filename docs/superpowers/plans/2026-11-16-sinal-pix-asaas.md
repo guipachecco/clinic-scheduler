@@ -41,12 +41,14 @@
 ### Task 1: Configuração e cliente HTTP do Asaas
 
 **Files:**
+
 - Modify: `src/lib/env.ts` (junto às variáveis `MP_*`)
 - Modify: `.env.example` (acrescentar `ASAAS_WEBHOOK_TOKEN`)
 - Create: `src/modules/asaas/api.ts`
 - Test: `src/modules/asaas/api.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `env.ASAAS_API_KEY?: string`, `env.ASAAS_BASE_URL: string` (padrão `https://api-sandbox.asaas.com/v3`), `env.ASAAS_WEBHOOK_TOKEN?: string`. Validação: `ASAAS_API_KEY` e `ASAAS_WEBHOOK_TOKEN` definidas juntas.
   - `type Fetch = typeof fetch`
@@ -88,10 +90,12 @@ it("deletePayment treats 404 as already gone", ...)
 ### Task 2: Regras puras do sinal
 
 **Files:**
+
 - Create: `src/modules/asaas/rules.ts`
 - Test: `src/modules/asaas/rules.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `DEPOSIT_PERCENT = 15`, `HOLD_MINUTES = 30`, `REFUND_WINDOW_HOURS = 24`, `MIN_DEPOSIT_CENTS = 500`
   - `depositFor(service: { priceCents: number | null; priceDisplay: "fixed" | "starting_at" | "on_request" | "hidden" }): number | null` (centavos ou null = sem sinal)
@@ -107,23 +111,65 @@ it("deletePayment treats 404 as already gone", ...)
 ```ts
 expect(depositFor({ priceCents: 8000, priceDisplay: "fixed" })).toBe(1200);
 expect(depositFor({ priceCents: 8001, priceDisplay: "fixed" })).toBe(1201); // 1200,15 -> para cima
-expect(depositFor({ priceCents: 8000, priceDisplay: "starting_at" })).toBe(1200);
+expect(depositFor({ priceCents: 8000, priceDisplay: "starting_at" })).toBe(
+  1200,
+);
 expect(depositFor({ priceCents: null, priceDisplay: "on_request" })).toBeNull();
 expect(depositFor({ priceCents: 8000, priceDisplay: "hidden" })).toBeNull();
 expect(depositFor({ priceCents: 3000, priceDisplay: "fixed" })).toBeNull(); // 450 < 500
 
 const start = new Date("2026-11-20T17:00:00Z");
-expect(cancellationOutcome({ by: "patient", startsAt: start, now: new Date("2026-11-19T16:59:59Z") })).toBe("refund");
-expect(cancellationOutcome({ by: "patient", startsAt: start, now: new Date("2026-11-19T17:00:00Z") })).toBe("keep"); // exatamente 24h = fica
-expect(cancellationOutcome({ by: "clinic", startsAt: start, now: new Date("2026-11-20T16:00:00Z") })).toBe("refund");
+expect(
+  cancellationOutcome({
+    by: "patient",
+    startsAt: start,
+    now: new Date("2026-11-19T16:59:59Z"),
+  }),
+).toBe("refund");
+expect(
+  cancellationOutcome({
+    by: "patient",
+    startsAt: start,
+    now: new Date("2026-11-19T17:00:00Z"),
+  }),
+).toBe("keep"); // exatamente 24h = fica
+expect(
+  cancellationOutcome({
+    by: "clinic",
+    startsAt: start,
+    now: new Date("2026-11-20T16:00:00Z"),
+  }),
+).toBe("refund");
 
-expect(lateArrival({ status: "pending", closeReason: null, slotFree: true })).toBe("confirm");
-expect(lateArrival({ status: "expired", closeReason: "timeout", slotFree: true })).toBe("confirm");
-expect(lateArrival({ status: "expired", closeReason: "timeout", slotFree: false })).toBe("refund");
-expect(lateArrival({ status: "closed", closeReason: "clinic_cancelled", slotFree: true })).toBe("refund");
-expect(lateArrival({ status: "closed", closeReason: "manual_confirm", slotFree: true })).toBe("refund");
-expect(lateArrival({ status: "paid", closeReason: null, slotFree: true })).toBe("refund"); // 2º pagamento
-expect(lateArrival({ status: "refunded", closeReason: null, slotFree: true })).toBe("ignore");
+expect(
+  lateArrival({ status: "pending", closeReason: null, slotFree: true }),
+).toBe("confirm");
+expect(
+  lateArrival({ status: "expired", closeReason: "timeout", slotFree: true }),
+).toBe("confirm");
+expect(
+  lateArrival({ status: "expired", closeReason: "timeout", slotFree: false }),
+).toBe("refund");
+expect(
+  lateArrival({
+    status: "closed",
+    closeReason: "clinic_cancelled",
+    slotFree: true,
+  }),
+).toBe("refund");
+expect(
+  lateArrival({
+    status: "closed",
+    closeReason: "manual_confirm",
+    slotFree: true,
+  }),
+).toBe("refund");
+expect(lateArrival({ status: "paid", closeReason: null, slotFree: true })).toBe(
+  "refund",
+); // 2º pagamento
+expect(
+  lateArrival({ status: "refunded", closeReason: null, slotFree: true }),
+).toBe("ignore");
 
 expect(isValidCpfCnpj("52998224725")).toBe(true);
 expect(isValidCpfCnpj("11111111111")).toBe(false);
@@ -137,11 +183,13 @@ expect(isValidCpfCnpj("11111111111")).toBe(false);
 ### Task 3: Tabelas, migração 0036 e isolamento
 
 **Files:**
+
 - Create: `src/db/schema/asaas.ts`; Modify: `src/db/schema/index.ts`
 - Create: `drizzle/0036_asaas.sql` (gerado com `npm run db:generate` e completado à mão com grants, RLS e função)
 - Test: `tests/integration/asaas-db.test.ts`
 
 **Interfaces:**
+
 - Produces (Drizzle):
   - `asaasAccounts` (PK `clinic_id`): `accountId`, `walletId`, `apiKeyEnc`, `status` (enum `asaas_account_status`: `pending`, `approved`, `rejected`), `pixKeyReady boolean default false`, `depositEnabled boolean default true`, `lastError text null` (código curto do Asaas, ex. `"limit_exceeded"`), `activatedByUserId`, `createdAt`, `updatedAt`.
   - `asaasCustomers`: `id`, `clinicId`, `patientId`, `customerId` (Asaas), `cpfCnpjLast4 text` (só para mostrar "CPF final 4725"; o CPF inteiro não é guardado), unique `(clinic_id, patient_id)`.
@@ -166,6 +214,7 @@ it("paid deposit requires payment_id", ...)                  // check constraint
 ### Task 4: Subconta da clínica e tela de ativação
 
 **Files:**
+
 - Modify: `src/modules/mercado-pago/crypto.ts` (`tokenKey(secret, info = "mercado-pago-tokens")`; o Asaas usa `info = "asaas-api-keys"`. Mesmo formato, chaves diferentes.)
 - Create: `src/modules/asaas/accounts.ts`, `src/modules/asaas/fields.ts` (zod do formulário)
 - Create: `src/app/admin/(painel)/financeiro/sinal-pix/page.tsx`, `actions.ts`, `activation-form.tsx`
@@ -173,6 +222,7 @@ it("paid deposit requires payment_id", ...)                  // check constraint
 - Test: `tests/integration/asaas-accounts.test.ts`
 
 **Interfaces:**
+
 - Consumes: Tarefa 1 (`createSubaccount`, `getAccountStatus`, `createEvpKey`, `listPixKeys`), Tarefa 2 (`accountReady`), Tarefa 3 (tabelas).
 - Produces:
   - `asaasEnabled(): boolean` (`env.ASAAS_API_KEY !== undefined`)
@@ -203,6 +253,7 @@ it("only the owner can activate", ...) // na action: papel diferente de admin ->
 ### Task 5: Marcar com sinal (cobrança, QR, expiração)
 
 **Files:**
+
 - Create: `src/modules/asaas/deposits.ts`
 - Modify: `src/modules/booking/booking.ts` (`bookOnline`, `listFreeSlots`, `listDaysWithSlots`, `BookingResult`)
 - Modify: `src/app/[slug]/marcar/actions.ts`, `confirm-sheet.tsx`, `booking-flow.tsx`; Create: `src/app/[slug]/marcar/pix-step.tsx`
@@ -210,6 +261,7 @@ it("only the owner can activate", ...) // na action: papel diferente de admin ->
 - Test: `tests/integration/asaas-booking.test.ts`
 
 **Interfaces:**
+
 - Consumes: Tarefas 1, 2 e 4 (`depositApiKey`, `markAccountError`).
 - Produces:
   - `depositQuote(clinicId, serviceId): Promise<{ amountCents: number; needsCpf: boolean; cpfLast4: string | null } | null>` (null = esta marcação não cobra sinal). `needsCpf` vem de `asaasCustomers` da paciente.
@@ -249,12 +301,14 @@ it("getDepositView never shows another patient's deposit", ...)
 ### Task 6: Webhook, confirmação e venda automática
 
 **Files:**
+
 - Create: `src/modules/asaas/deposit-sale.ts`
 - Modify: `src/modules/asaas/deposits.ts` (handler)
 - Create: `src/app/api/webhooks/asaas/route.ts`
 - Test: `tests/integration/asaas-webhook.test.ts`
 
 **Interfaces:**
+
 - Consumes: Tarefas 1–5; `PIX_ONLINE_METHOD`/`ensurePixOnlineMethod`; `todayLocal` (`src/modules/schedule/time`).
 - Produces:
   - `createDepositSale(tx: Tx, input: { clinicId; appointmentId; patientId; serviceId; serviceName; priceCents; depositCents; startsAt: Date; paidOn: string }): Promise<{ saleId: string; paymentId: string }>`. Cria um **orçamento já aprovado** (as telas de vendas fazem join obrigatório com `quotes`), a venda `paymentPlan: "installments"` com um item e duas parcelas: nº 1 = sinal (vence `paidOn`) e nº 2 = restante (`priceCents - depositCents`, vence no dia local de `startsAt`, com `appointmentId` e `saleItemId` preenchidos, o que faz o "Receber agora" de `findSessionInstallment` aparecer sozinho). Registra o pagamento da parcela 1 com a forma "Pix online" e a nota "Sinal pago por Pix (Asaas)". Venda e orçamento marcados com a nota "Sinal online".
@@ -289,12 +343,14 @@ it("REFUNDED from the Asaas app reverses the payment here", ...)
 ### Task 7: Agenda do painel com sinal
 
 **Files:**
+
 - Modify: `src/modules/appointments/appointments.ts` (`getAppointment`, `listAppointmentsInRange`, `listRequestedFrom`, `countRequestedFrom`, `changeAppointmentStatus`, `rescheduleAppointment`)
 - Modify: `src/app/admin/(painel)/agenda/[id]/page.tsx`, `status-actions.tsx`, componentes da grade da agenda
 - Create: `syncDepositSale(tx, clinicId, appointmentId)` em `src/modules/asaas/deposit-sale.ts`
 - Test: `tests/integration/asaas-agenda.test.ts`
 
 **Interfaces:**
+
 - Consumes: Tarefas 3, 5 e 6.
 - Produces:
   - `getAppointment(...)` ganha `deposit: { status: DepositStatus; amountCents: number; expiresAt: Date } | null`.
@@ -322,12 +378,14 @@ it("manual confirm closes the pending deposit and deletes the charge", ...)
 ### Task 8: Cancelar com regra de devolução
 
 **Files:**
+
 - Modify: `src/modules/appointments/appointments.ts` (`changeAppointmentStatus` aceita `cancelledBy?: "clinic" | "patient"`, padrão `"clinic"`)
 - Create: `cancelWithDeposit` em `src/modules/asaas/deposits.ts`
 - Modify: `src/app/admin/(painel)/agenda/actions.ts`, `agenda/[id]/status-actions.tsx`
 - Test: `tests/integration/asaas-cancel.test.ts`
 
 **Interfaces:**
+
 - Consumes: `cancellationOutcome` (Tarefa 2), `syncDepositSale` (Tarefa 7), `reversePayment` (`src/modules/finance/sales.ts:634`), `cancelSale` (`sales.ts:683`).
 - Produces:
   - `previewCancellation(clinicId, appointmentId, by: "patient" | "clinic", now?): Promise<{ hasPaidDeposit: boolean; outcome: "refund" | "keep"; amountCents: number } | null>` (para o texto antes de confirmar)
@@ -356,6 +414,7 @@ it("cancelledBy is stored as patient", ...)
 ### Task 9: Documentação e verificação final
 
 **Files:**
+
 - Create: `docs/asaas.md` (no formato de `docs/mercado-pago.md`: fluxo, regras garantidas, configuração, teste local com túnel, onde está o código, como ligar em produção depois do CNPJ, pontos a conferir no sandbox)
 - Modify: `docs/mercado-pago.md` ("O que ainda não existe": sinal agora pelo Asaas) e `docs/financeiro.md` (venda "Sinal online")
 - Test: `e2e/asaas-deposit.spec.ts` (só roda com `ASAAS_API_KEY` de teste; marca/paga com Asaas falso via rota de teste já usada nos e2e, se existir; senão, fica fora e é registrado no doc)
