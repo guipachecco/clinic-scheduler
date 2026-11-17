@@ -28,7 +28,11 @@ import {
   type ClinicEditValues,
   type ClinicFormInput,
 } from "./fields";
-import { CLINIC_MODULES, modulesSchema, type ClinicModule } from "./modules";
+import {
+  DEFAULT_CLINIC_MODULES,
+  modulesSchema,
+  type ClinicModule,
+} from "./modules";
 
 // Data functions for the clinics themselves. Only root creates or changes
 // clinics (as app_platform); every other module receives a clinicId and stays
@@ -167,7 +171,9 @@ export async function createClinic(
           name: values.name,
           slug: values.slug,
           businessType: values.businessType ?? "clinic",
-          modules: modulesSchema.parse(values.modules ?? CLINIC_MODULES),
+          modules: modulesSchema.parse(
+            values.modules ?? DEFAULT_CLINIC_MODULES,
+          ),
           theme: { paletteId: resolvePalette(values.slug, undefined).id },
           displayName: CLINIC_BRANDING[values.slug]?.displayName ?? null,
           areaLabel: CLINIC_BRANDING[values.slug]?.areaLabel ?? null,

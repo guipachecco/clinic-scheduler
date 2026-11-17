@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import {
   connectAccount,
-  asaasEnabled,
+  pixDepositOn,
   refreshAccount,
   setDepositEnabled,
 } from "@/modules/asaas/accounts";
@@ -28,7 +28,7 @@ const GENERIC_ERROR = "Não foi possível salvar. Tente novamente.";
 
 async function session() {
   const ctx = await requireAdmin();
-  if (!asaasEnabled() || !moduleActive(ctx, "finance")) return null;
+  if (!pixDepositOn(ctx.clinic) || !moduleActive(ctx, "finance")) return null;
   return ctx;
 }
 

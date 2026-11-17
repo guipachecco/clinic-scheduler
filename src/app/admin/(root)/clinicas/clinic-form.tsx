@@ -14,7 +14,7 @@ import {
   BUSINESS_TYPE_LABELS,
   BUSINESS_TYPES,
 } from "@/modules/business-type/vocabulary";
-import { CLINIC_MODULES } from "@/modules/clinics/modules";
+import { DEFAULT_CLINIC_MODULES } from "@/modules/clinics/modules";
 import {
   clinicFormSchema,
   type ClinicFormInput,
@@ -30,7 +30,7 @@ const EMPTY: ClinicFormInput = {
   name: "",
   slug: "",
   businessType: "clinic",
-  modules: [...CLINIC_MODULES],
+  modules: [...DEFAULT_CLINIC_MODULES],
 };
 
 // Creates a clinic. The address (slug) is suggested from the name until the

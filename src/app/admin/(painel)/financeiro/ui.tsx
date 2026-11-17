@@ -4,11 +4,13 @@ import Link from "next/link";
 import { Icon, type IconName } from "@/components/icon";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
-import { asaasEnabled } from "@/modules/asaas/accounts";
+import { pixDepositOn } from "@/modules/asaas/accounts";
+import { getPanelContext } from "@/modules/auth/session";
 import { MERCADO_PAGO_VISIBLE } from "@/modules/mercado-pago/visible";
 import { formatCents } from "@/modules/services/fields";
 
-// Display helpers shared by the financial pages. Server-safe and client-safe.
+// Display helpers shared by the financial pages (server only: FinanceTabs
+// reads the panel session).
 
 export const money = (cents: number) => formatCents(cents);
 
@@ -34,11 +36,14 @@ const TABS = [
   { href: "/admin/financeiro/sinal-pix", label: "Sinal por Pix" },
 ] as const;
 
-export function FinanceTabs({
+export async function FinanceTabs({
   current,
 }: {
   current: (typeof TABS)[number]["href"];
 }) {
+  // The Sinal por Pix tab follows the clinic's pix_deposit module.
+  const ctx = await getPanelContext();
+  const pixDeposit = ctx !== null && pixDepositOn(ctx.clinic);
   return (
     <nav aria-label="Financeiro" className="-mx-1 overflow-x-auto">
       <ul className="flex gap-1 p-1">
@@ -46,7 +51,7 @@ export function FinanceTabs({
           (tab) =>
             (MERCADO_PAGO_VISIBLE ||
               tab.href !== "/admin/financeiro/mercado-pago") &&
-            (asaasEnabled() || tab.href !== "/admin/financeiro/sinal-pix"),
+            (pixDeposit || tab.href !== "/admin/financeiro/sinal-pix"),
         ).map((tab) => (
           <li key={tab.href} className="shrink-0">
             <Link

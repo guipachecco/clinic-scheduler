@@ -7,8 +7,8 @@ import {
   listRequestedFrom,
 } from "@/modules/appointments/appointments";
 import {
-  asaasEnabled,
   getAccountView,
+  pixDepositOn,
   REFUND_PENDING_APPROVAL,
 } from "@/modules/asaas/accounts";
 import { sweepBeforePanel } from "@/modules/asaas/deposits";
@@ -56,7 +56,7 @@ const isActive = (status: string) =>
   (ACTIVE_APPOINTMENT_STATUSES as readonly string[]).includes(status);
 
 export default async function AgendaPage() {
-  const { clinicId } = await requireAdmin();
+  const { clinicId, clinic } = await requireAdmin();
   const now = new Date();
   const today = todayLocal();
   const { startsAt, endsAt } = localDayRange(today, today);
@@ -81,7 +81,10 @@ export default async function AgendaPage() {
     ),
     listActiveProfessionals(clinicId),
   ]);
-  const asaasView = asaasEnabled() ? await getAccountView(clinicId) : null;
+  // The notices link to the Sinal por Pix screen, so they follow its module.
+  const asaasView = pixDepositOn(clinic)
+    ? await getAccountView(clinicId)
+    : null;
   const asaasDisconnected = asaasView?.status === "disconnected";
   const asaasError = asaasView?.lastError ?? null;
   const hasServices = services.length > 0;

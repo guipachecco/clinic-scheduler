@@ -9,6 +9,7 @@ export const CLINIC_MODULES = [
   "loyalty",
   "anamnesis",
   "reviews",
+  "pix_deposit",
 ] as const;
 
 export type ClinicModule = (typeof CLINIC_MODULES)[number];
@@ -20,7 +21,13 @@ export const CLINIC_MODULE_LABELS: Record<ClinicModule, string> = {
   loyalty: "Fidelidade",
   anamnesis: "Anamnese",
   reviews: "Avaliações",
+  pix_deposit: "Sinal por Pix",
 };
+
+// What a new clinic gets: every module but the Pix deposit, which root turns
+// on clinic by clinic (migration 0040 leaves it off for every clinic).
+export const DEFAULT_CLINIC_MODULES: readonly ClinicModule[] =
+  CLINIC_MODULES.filter((key) => key !== "pix_deposit");
 
 export const MODULE_OFF_ERROR = "Este recurso não está ativo para a clínica.";
 
