@@ -38,7 +38,7 @@ export function asaasEnabled(): boolean {
 }
 
 export type AccountView = {
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "rejected" | "disconnected";
   pixKeyReady: boolean;
   depositEnabled: boolean;
   lastError: string | null;

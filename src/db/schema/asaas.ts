@@ -28,6 +28,7 @@ export const asaasAccountStatus = pgEnum("asaas_account_status", [
   "pending",
   "approved",
   "rejected",
+  "disconnected",
 ]);
 
 export const asaasDepositStatus = pgEnum("asaas_deposit_status", [
@@ -46,25 +47,31 @@ export const asaasCloseReason = pgEnum("asaas_close_reason", [
   "charge_failed",
 ]);
 
-// The subaccount of a clinic. One per clinic.
-export const asaasAccounts = pgTable("asaas_accounts", {
-  clinicId: uuid("clinic_id")
-    .primaryKey()
-    .references(() => clinics.id, { onDelete: "restrict" }),
-  accountId: text("account_id").notNull(),
-  walletId: text("wallet_id").notNull(),
-  apiKeyEnc: text("api_key_enc").notNull(),
-  status: asaasAccountStatus("status").notNull().default("pending"),
-  pixKeyReady: boolean("pix_key_ready").notNull().default(false),
-  depositEnabled: boolean("deposit_enabled").notNull().default(true),
-  // Short Asaas code of the last failure (for example "limit_exceeded").
-  lastError: text("last_error"),
-  activatedByUserId: uuid("activated_by_user_id").references(() => users.id, {
-    onDelete: "set null",
-  }),
-  createdAt: createdAt(),
-  updatedAt: updatedAt(),
-});
+// The Asaas account of a clinic: the owner pastes her own API key. One per
+// clinic, and one wallet connects to one clinic only.
+export const asaasAccounts = pgTable(
+  "asaas_accounts",
+  {
+    clinicId: uuid("clinic_id")
+      .primaryKey()
+      .references(() => clinics.id, { onDelete: "restrict" }),
+    accountId: text("account_id"),
+    accountName: text("account_name"),
+    walletId: text("wallet_id").notNull(),
+    apiKeyEnc: text("api_key_enc").notNull(),
+    status: asaasAccountStatus("status").notNull().default("pending"),
+    pixKeyReady: boolean("pix_key_ready").notNull().default(false),
+    depositEnabled: boolean("deposit_enabled").notNull().default(true),
+    // Short Asaas code of the last failure (for example "limit_exceeded").
+    lastError: text("last_error"),
+    activatedByUserId: uuid("activated_by_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [unique("asaas_accounts_wallet_unique").on(t.walletId)],
+);
 
 // The Asaas customer made for a patient. The full CPF is never stored, only
 // its last 4 digits, to show "CPF final 4725".

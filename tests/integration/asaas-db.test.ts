@@ -130,6 +130,44 @@ describe("asaas tables", () => {
     expect(seenB.deposits).toEqual([]);
   });
 
+  it("a wallet connects to one clinic only", async () => {
+    await db.insert(asaasAccounts).values({
+      clinicId: CLINIC,
+      accountId: "acc-a",
+      walletId: "wal-x",
+      apiKeyEnc: "enc",
+      status: "approved",
+    });
+    const code = await pgCode(
+      db.insert(asaasAccounts).values({
+        clinicId: clinicB,
+        accountId: "acc-b",
+        walletId: "wal-x",
+        apiKeyEnc: "enc",
+        status: "approved",
+      }),
+    );
+    expect(code).toBe("23505");
+  });
+
+  it("accepts the disconnected status and no account id", async () => {
+    await db.insert(asaasAccounts).values({
+      clinicId: CLINIC,
+      accountId: null,
+      accountName: null,
+      walletId: "wal-y",
+      apiKeyEnc: "enc",
+      status: "approved",
+    });
+    await db
+      .update(asaasAccounts)
+      .set({ status: "disconnected" })
+      .where(sql`clinic_id = ${CLINIC}`);
+    const [row] = await db.select().from(asaasAccounts);
+    expect(row!.status).toBe("disconnected");
+    expect(row!.accountId).toBeNull();
+  });
+
   it("app_client has no access to asaas tables", async () => {
     for (const table of [
       "asaas_accounts",
