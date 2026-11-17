@@ -253,6 +253,13 @@
       "when": 1794845183308,
       "tag": "0035_appointment_services",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794877742369,
+      "tag": "0036_asaas",
+      "breakpoints": true
     }
   ]
 }
