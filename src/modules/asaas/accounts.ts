@@ -7,6 +7,7 @@ import { isUniqueViolation } from "@/db/errors";
 import { asaasAccounts, auditLogs, paymentMethods } from "@/db/schema";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { hasModule } from "@/modules/clinics/modules";
 import {
   decryptToken,
   encryptToken,
@@ -44,6 +45,13 @@ function key(): Buffer {
 
 export function asaasEnabled(): boolean {
   return env.ASAAS_WEBHOOK_TOKEN !== undefined;
+}
+
+// Whether this clinic offers the Pix deposit: Asaas configured and the
+// pix_deposit module on (root turns it on per clinic). Turning it off stops
+// new deposits; those already pending still finish through the webhook.
+export function pixDepositOn(clinic: { modules: readonly string[] }): boolean {
+  return asaasEnabled() && hasModule(clinic, "pix_deposit");
 }
 
 export type AccountView = {

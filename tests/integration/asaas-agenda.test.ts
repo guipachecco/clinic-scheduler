@@ -43,7 +43,7 @@ import {
 import { findSessionInstallment } from "@/modules/finance/sales";
 import { encryptToken, tokenKey } from "@/modules/mercado-pago/crypto";
 
-import { otherClinic } from "../helpers/clinic";
+import { otherClinic, setPixDepositModule } from "../helpers/clinic";
 
 // The panel agenda with Pix deposits, against a fake Asaas: nothing leaves
 // the machine. A clinic of its own, every record fictitious.
@@ -189,6 +189,7 @@ async function saleParts(saleId: string) {
 beforeAll(async () => {
   await cleanup();
   clinicId = await otherClinic(SLUG);
+  await setPixDepositModule(clinicId, true);
   const [category] = await db
     .insert(serviceCategories)
     .values({ clinicId, name: "Categoria agenda", slug: "categoria-agenda" })

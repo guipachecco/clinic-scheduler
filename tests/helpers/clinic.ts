@@ -71,3 +71,16 @@ export async function defaultProfessional(clinicId: string = CLINIC) {
     .limit(1);
   return row!;
 }
+
+// Turns the pix_deposit module on or off (it starts off, migration 0040).
+export async function setPixDepositModule(clinicId: string, on: boolean) {
+  const [row] = await db
+    .select({ modules: clinics.modules })
+    .from(clinics)
+    .where(eq(clinics.id, clinicId));
+  const rest = row!.modules.filter((key) => key !== "pix_deposit");
+  await db
+    .update(clinics)
+    .set({ modules: on ? [...rest, "pix_deposit"] : rest })
+    .where(eq(clinics.id, clinicId));
+}

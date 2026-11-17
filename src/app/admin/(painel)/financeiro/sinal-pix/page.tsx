@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import {
-  asaasEnabled,
   getAccountView,
+  pixDepositOn,
   refreshAccount,
   REFUND_PENDING_APPROVAL,
 } from "@/modules/asaas/accounts";
@@ -21,8 +21,8 @@ export const metadata: Metadata = { title: "Sinal por Pix" };
 const BOX = "grid gap-3 rounded-2xl border bg-card p-4";
 
 export default async function SinalPixPage() {
-  const { clinicId } = await requireModule("finance");
-  if (!asaasEnabled()) notFound();
+  const { clinicId, clinic } = await requireModule("finance");
+  if (!pixDepositOn(clinic)) notFound();
 
   // Opening the screen reads the status at Asaas until the account is
   // approved and its Pix key is ready.

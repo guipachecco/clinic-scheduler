@@ -35,6 +35,7 @@ import {
   depositApiKey,
   markAccountError,
   markDisconnected,
+  pixDepositOn,
   REFUND_PENDING_APPROVAL,
 } from "./accounts";
 import {
@@ -117,7 +118,8 @@ export function validCpf(cpf: string): boolean {
 }
 
 // The deposit this booking would take, or null when it takes none: Asaas off,
-// the clinic's deposit not active, or a service without a price.
+// the pix_deposit module off, the clinic's deposit not active, or a service
+// without a price.
 export async function depositQuote(
   clinicId: string,
   serviceId: string,
@@ -128,6 +130,11 @@ export async function depositQuote(
     return null;
   }
   return inClinic(clinicId, async (tx) => {
+    const [clinic] = await tx
+      .select({ modules: clinics.modules })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId));
+    if (!clinic || !pixDepositOn(clinic)) return null;
     const [account] = await tx
       .select({
         status: asaasAccounts.status,

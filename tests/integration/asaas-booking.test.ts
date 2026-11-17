@@ -38,7 +38,7 @@ import {
 import { registerClientPatient } from "@/modules/clients/context";
 import { encryptToken, tokenKey } from "@/modules/mercado-pago/crypto";
 
-import { otherClinic } from "../helpers/clinic";
+import { otherClinic, setPixDepositModule } from "../helpers/clinic";
 
 // Online booking with a Pix deposit, against a fake Asaas: nothing leaves the
 // machine. A clinic of its own, every record fictitious. The e-mails end in
@@ -206,6 +206,7 @@ async function deposits() {
 beforeAll(async () => {
   await cleanup();
   clinicId = await otherClinic(SLUG);
+  await setPixDepositModule(clinicId, true);
   await db
     .update(clinics)
     .set({
@@ -324,6 +325,26 @@ describe("online booking with a Pix deposit", () => {
     expect(await appointment(id)).toMatchObject({ status: "confirmed" });
     expect(asaas.calls).toEqual([]);
     expect(await deposits()).toEqual([]);
+  });
+
+  it("clinic without the pix_deposit module books confirmed, as today", async () => {
+    await setPixDepositModule(clinicId, false);
+    try {
+      const asaas = fakeAsaas();
+      expect(await depositQuote(clinicId, serviceId, patient.ana)).toBeNull();
+      const result = await bookOnline(
+        ctx("ana"),
+        { serviceId, startsAt: SLOT },
+        asaas.fetchImpl,
+      );
+      expect(result).toMatchObject({ ok: true, deposit: null });
+      const id = (result as { appointmentId: string }).appointmentId;
+      expect(await appointment(id)).toMatchObject({ status: "confirmed" });
+      expect(asaas.calls).toEqual([]);
+      expect(await deposits()).toEqual([]);
+    } finally {
+      await setPixDepositModule(clinicId, true);
+    }
   });
 
   it("service without price books confirmed without deposit", async () => {

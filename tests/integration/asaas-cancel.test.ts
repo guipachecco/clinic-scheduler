@@ -41,7 +41,7 @@ import { changeAppointmentStatus } from "@/modules/appointments/appointments";
 import { findSessionInstallment } from "@/modules/finance/sales";
 import { encryptToken, tokenKey } from "@/modules/mercado-pago/crypto";
 
-import { otherClinic } from "../helpers/clinic";
+import { otherClinic, setPixDepositModule } from "../helpers/clinic";
 
 // changeStatusAction runs as the clinic's admin, without a real session.
 const panel = vi.hoisted(() => ({ clinicId: "", userId: "" }));
@@ -261,6 +261,7 @@ async function expectRefundedLocally(depositId: string, reason: string) {
 beforeAll(async () => {
   await cleanup();
   clinicId = await otherClinic(SLUG);
+  await setPixDepositModule(clinicId, true);
   const [category] = await db
     .insert(serviceCategories)
     .values({

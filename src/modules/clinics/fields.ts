@@ -2,7 +2,7 @@ import * as z from "zod";
 
 import { BUSINESS_TYPES } from "@/modules/business-type/vocabulary";
 
-import { CLINIC_MODULES, modulesSchema } from "./modules";
+import { DEFAULT_CLINIC_MODULES, modulesSchema } from "./modules";
 
 // Client-safe validation for the clinic form (root only).
 
@@ -44,7 +44,7 @@ const businessTypeField = z.enum(BUSINESS_TYPES);
 export const clinicFormSchema = z.object({
   name: nameField,
   businessType: businessTypeField.default("clinic"),
-  modules: modulesSchema.default([...CLINIC_MODULES]),
+  modules: modulesSchema.default([...DEFAULT_CLINIC_MODULES]),
   slug: z
     .string()
     .trim()

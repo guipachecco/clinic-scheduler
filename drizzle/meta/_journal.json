@@ -281,6 +281,13 @@
       "when": 1794917526584,
       "tag": "0039_asaas_own_account",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1794937586003,
+      "tag": "0040_pix_deposit_module",
+      "breakpoints": true
     }
   ]
 }

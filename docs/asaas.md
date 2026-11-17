@@ -44,6 +44,8 @@ Variáveis de ambiente (também no `.env.example`):
 - `ASAAS_WEBHOOK_TOKEN`: um valor aleatório (32+ caracteres). **Sem ele, o recurso fica desligado.** O Asaas devolve esse token em cada aviso; ele é registrado no webhook "Zemana" da conta de cada dona quando ela conecta.
 - `ASAAS_BASE_URL`: `https://api-sandbox.asaas.com/v3` no sandbox (padrão), `https://api.asaas.com/v3` em produção. Chave `$aact_prod_` só vale com a URL de produção, e `$aact_hmlg_` só com a de sandbox.
 
+**Por clínica:** o sinal é o módulo "Sinal por Pix" (`pix_deposit`), que o root liga em Clínicas → editar → Módulos. Começa desligado em toda clínica (migração 0040). Sem ele a aba some, a agenda não mostra os avisos do Asaas e a marcação online sai sem sinal; sinais já pendentes terminam normalmente pelo webhook. A aba também exige o módulo Financeiro.
+
 Não há webhook para cadastrar à mão no painel do Asaas: ao conectar, a Zemana registra o webhook "Zemana" na conta da dona, apontando para `BETTER_AUTH_URL` + `/api/webhooks/asaas`. Os outros webhooks dela nunca são alterados.
 
 **Banco:** as migrações `0036_asaas.sql`, `0037_asaas_client_hold.sql`, `0038_asaas_link_fixes.sql` e `0039_asaas_own_account.sql` só acrescentam ou relaxam (o código antigo roda com elas aplicadas). Rode o `db:migrate` de produção **antes** de mesclar, senão a página da clínica dá 500.
@@ -56,7 +58,8 @@ Não há webhook para cadastrar à mão no painel do Asaas: ao conectar, a Zeman
 2. Definir `ASAAS_BASE_URL=https://api.asaas.com/v3` (produção).
 3. Rodar o `db:migrate` de produção, com as migrações 0036 a 0039, **antes** do merge.
 4. Mesclar.
-5. A dona (Greice) conecta a conta em `/admin/financeiro/sinal-pix`, colando a chave de API da conta Asaas de produção dela. Fazer uma marcação de teste com o menor valor possível (serviço de pelo menos R$ 33,34) e conferir o reembolso.
+5. Ligar o módulo "Sinal por Pix" na clínica (migração 0040 rodada antes do merge que a traz).
+6. A dona (Greice) conecta a conta em `/admin/financeiro/sinal-pix`, colando a chave de API da conta Asaas de produção dela. Fazer uma marcação de teste com o menor valor possível (serviço de pelo menos R$ 33,34) e conferir o reembolso.
 
 ## Riscos a confirmar no teste com a dona
 

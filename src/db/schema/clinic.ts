@@ -309,7 +309,7 @@ export const clinics = pgTable(
     ),
     check(
       "clinics_modules_check",
-      sql`${t.modules} <@ ARRAY['products', 'finance', 'online_booking', 'loyalty', 'anamnesis', 'reviews']::text[]`,
+      sql`${t.modules} <@ ARRAY['products', 'finance', 'online_booking', 'loyalty', 'anamnesis', 'reviews', 'pix_deposit']::text[]`,
     ),
     check(
       "clinics_maps_url_check",
