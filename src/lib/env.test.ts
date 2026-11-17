@@ -20,6 +20,7 @@ describe("parseServerEnv", () => {
       ...valid,
       LOG_LEVEL: "info",
       EMAIL_OUTBOX_DIR: ".emails",
+      ASAAS_BASE_URL: "https://api-sandbox.asaas.com/v3",
     });
   });
 
@@ -87,5 +88,17 @@ describe("parseServerEnv", () => {
       DATABASE_URL: "postgres://owner:segredo@db.example.com:5432/app",
     });
     expect(parsed).not.toHaveProperty("DATABASE_URL");
+  });
+});
+
+describe("parseServerEnv Asaas", () => {
+  it("requires ASAAS_API_KEY and ASAAS_WEBHOOK_TOKEN together", () => {
+    expect(() => parseServerEnv({ ...valid, ASAAS_API_KEY: "k" })).toThrowError(
+      /ASAAS_WEBHOOK_TOKEN/,
+    );
+    expect(
+      parseServerEnv({ ...valid, ASAAS_API_KEY: "k", ASAAS_WEBHOOK_TOKEN: "t" })
+        .ASAAS_API_KEY,
+    ).toBe("k");
   });
 });

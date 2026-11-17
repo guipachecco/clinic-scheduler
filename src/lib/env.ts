@@ -63,6 +63,15 @@ export const serverEnvSchema = z
     // Signs the notifications (Webhooks > Configurar notificações, in the
     // application). Without it, every notification is refused.
     MP_WEBHOOK_SECRET: optionalText(),
+    // Asaas (Pix deposit on online bookings). Without ASAAS_API_KEY the
+    // feature stays hidden. The key is the Zemana's root account key; each
+    // clinic gets its own subaccount.
+    ASAAS_API_KEY: optionalText(),
+    ASAAS_BASE_URL: optionalText().transform(
+      (value) => value ?? "https://api-sandbox.asaas.com/v3",
+    ),
+    // Sent back by Asaas in the asaas-access-token header of every webhook.
+    ASAAS_WEBHOOK_TOKEN: optionalText(),
   })
   .refine(
     (env) =>
@@ -70,6 +79,15 @@ export const serverEnvSchema = z
     {
       error: "defina MP_CLIENT_ID e MP_CLIENT_SECRET juntas",
       path: ["MP_CLIENT_SECRET"],
+    },
+  )
+  .refine(
+    (env) =>
+      (env.ASAAS_API_KEY === undefined) ===
+      (env.ASAAS_WEBHOOK_TOKEN === undefined),
+    {
+      error: "defina ASAAS_API_KEY e ASAAS_WEBHOOK_TOKEN juntas",
+      path: ["ASAAS_WEBHOOK_TOKEN"],
     },
   )
   .refine(
