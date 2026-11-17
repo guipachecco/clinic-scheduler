@@ -1224,6 +1224,41 @@ async function settleDeposit(
   });
 }
 
+const PAID_MEANWHILE =
+  "O sinal acabou de ser pago. Abra o agendamento de novo para escolher quem desmarcou.";
+
+// Thrown inside the transaction to roll it back.
+class DepositPaidMeanwhile extends Error {}
+
+function causedBy(error: unknown, kind: new () => Error): boolean {
+  let current: unknown = error;
+  while (current instanceof Error) {
+    if (current instanceof kind) return true;
+    current = (current as Error).cause;
+  }
+  return false;
+}
+
+async function refuseIfPaidMeanwhile(
+  tx: Tx,
+  clinicId: string,
+  appointmentId: string,
+): Promise<void> {
+  const [row] = await tx
+    .select({ status: asaasDeposits.status })
+    .from(asaasDeposits)
+    .where(
+      and(
+        eq(asaasDeposits.clinicId, clinicId),
+        eq(asaasDeposits.appointmentId, appointmentId),
+      ),
+    )
+    .for("update");
+  if (row?.status === "paid" || row?.status === "kept") {
+    throw new DepositPaidMeanwhile();
+  }
+}
+
 // Cancels from the panel an appointment that may have a Pix deposit.
 // - Paid, and the rule says refund: the refund goes to Asaas first, outside
 //   any transaction. If Asaas refuses, nothing changes and the owner reads
@@ -1250,6 +1285,8 @@ export async function cancelWithDeposit(
   actorUserId: string,
   fetchImpl: Fetch = fetch,
   now: Date = new Date(),
+  // Test seam: runs between the unlocked read and the transaction.
+  beforeTx?: () => Promise<void>,
 ): Promise<AppointmentResult> {
   if (!UUID_PATTERN.test(appointmentId)) {
     return { ok: false, formError: NOT_FOUND };
@@ -1275,14 +1312,28 @@ export async function cancelWithDeposit(
     Object.hasOwn(CANCELLATION_REASON_LABELS, input.reason) &&
     canTransition(paid.appointmentStatus, "cancelled", paid.startsAt, now).ok;
   if (!paid || !valid) {
-    return changeAppointmentStatus(
-      clinicId,
-      appointmentId,
-      change,
-      actorUserId,
-      now,
-      fetchImpl,
-    );
+    // The read above took no lock: a Pix the webhook confirms in between
+    // must not be cancelled as if there were no deposit (its money would be
+    // kept with no refund). Under the lock, a deposit now paid aborts it all.
+    if (beforeTx) await beforeTx();
+    try {
+      return await changeAppointmentStatus(
+        clinicId,
+        appointmentId,
+        change,
+        actorUserId,
+        now,
+        fetchImpl,
+        asaasEnabled()
+          ? (tx) => refuseIfPaidMeanwhile(tx, clinicId, appointmentId)
+          : undefined,
+      );
+    } catch (error) {
+      if (causedBy(error, DepositPaidMeanwhile)) {
+        return { ok: false, formError: PAID_MEANWHILE };
+      }
+      throw error;
+    }
   }
 
   const outcome = cancellationOutcome({

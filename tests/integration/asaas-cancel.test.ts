@@ -592,6 +592,55 @@ describe("cancelling with a deposit", () => {
     expect(asaas.refunds()).toEqual([]);
   });
 
+  it("a Pix paid between the read and the transaction aborts the cancel", async () => {
+    const asaas = fakeAsaas();
+    const { appointmentId, depositId } = await hold();
+    asaas.charges.set("pay-1", {
+      status: "RECEIVED",
+      value: 12,
+      externalReference: depositId,
+    });
+
+    expect(
+      await cancelWithDeposit(
+        clinicId,
+        appointmentId,
+        { by: "clinic", reason: "clinic_unavailable" },
+        actorId,
+        asaas.fetchImpl,
+        NOW,
+        // The webhook confirms the Pix right after the unlocked read.
+        async () => {
+          expect(
+            await handleDepositNotification(
+              depositId,
+              "pay-1",
+              asaas.fetchImpl,
+            ),
+          ).toBe("paid");
+        },
+      ),
+    ).toEqual({
+      ok: false,
+      formError:
+        "O sinal acabou de ser pago. Abra o agendamento de novo para escolher quem desmarcou.",
+    });
+
+    expect(await appointment(appointmentId)).toMatchObject({
+      status: "confirmed",
+      cancelledAt: null,
+    });
+    const row = await deposit(depositId);
+    expect(row.status).toBe("paid");
+    expect((await payment(row.paymentId!)).reversedAt).toBeNull();
+    expect((await sale(row.saleId!)).cancelledAt).toBeNull();
+    expect(
+      (await saleParts(row.saleId!)).map((part) => part.cancelledAt),
+    ).toEqual([null, null]);
+    expect(asaas.refunds()).toEqual([]);
+    expect(asaas.deletes()).toEqual([]);
+  });
+
   it("cancelledBy is stored as patient", async () => {
     // An ordinary booking, no deposit: the plain cancel, with who cancelled.
     const [row] = await db
