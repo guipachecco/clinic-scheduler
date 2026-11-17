@@ -2,7 +2,7 @@
 
 Construído em 16/11/2026 a partir do [desenho aprovado](superpowers/specs/2026-11-16-sinal-pix-asaas-design.md). Quem marca pela página da clínica paga um sinal de 15% do serviço por Pix, e o horário só vira confirmado quando o Pix cai. O dinheiro vai para uma **subconta Asaas da clínica**: a Zemana não recebe nem repassa nada. O Mercado Pago (veja [mercado-pago.md](mercado-pago.md)) continua só para cobrar parcelas no financeiro.
 
-**Situação: pronto, mas desligado em produção.** Só conta Asaas com CNPJ cria subconta, e a Zemana ainda não tem CNPJ. Sem `ASAAS_API_KEY` no ambiente, nenhuma tela, status ou texto novo aparece, e a marcação online e o financeiro funcionam como antes. Tudo foi construído e testado com um Asaas falso e no sandbox; a produção espera o CNPJ (veja "Ligar em produção").
+**Situação: pronto, mas desligado em produção.** Só conta Asaas com CNPJ cria subconta, e a Zemana ainda não tem CNPJ. Sem `ASAAS_API_KEY` no ambiente, nenhuma tela, status ou texto novo aparece, e a marcação online e o financeiro funcionam como antes. Os testes automáticos usam um Asaas falso. No sandbox foram conferidas só chamadas soltas: o valor mínimo da cobrança Pix, as chaves Pix, a criação de subconta, a recusa de Pix enquanto a subconta não é aprovada e a exigência de CPF. O fluxo inteiro (subconta aprovada, Pix pago, aviso no webhook) **não foi testado de ponta a ponta** no sandbox (veja o checklist). A produção espera o CNPJ (veja "Ligar em produção").
 
 ## O fluxo
 
@@ -28,7 +28,7 @@ As 24h contam do início do atendimento até o momento em que a dona registra o 
 - **Sinal mínimo.** O Asaas recusa cobrança Pix abaixo de **R$ 5,00** (confirmado no sandbox). Como o sinal é 15%, serviço abaixo de **R$ 33,34** marca sem sinal. Também não há sinal para serviço sem preço ou com exibição "sob consulta" ou oculta. O valor é 15% arredondado para cima ao centavo.
 - **O aviso não é confiável, a cobrança é.** O webhook só lê o id do pagamento e a referência externa (o id do sinal). O status vem sempre de uma consulta ao Asaas com a chave da subconta. O token do aviso é comparado em tempo constante.
 - **Uma baixa por cobrança.** O sinal fica travado durante o processamento e guarda o pagamento que gerou, então aviso repetido não muda nada.
-- **Pix que chega fora de hora é devolvido sozinho**: horário que já foi ocupado por outra pessoa, agendamento cancelado pela dona, confirmado na mão, ou segundo pagamento do mesmo sinal (QR antigo). Se o prazo passou mas o horário continua livre, o sinal reabre e confirma. Nunca reativa o que a dona cancelou. O estorno automático fica registrado na auditoria (`asaas.deposit_auto_refunded`) e o sinal continua "expirado/fechado", já que nenhum pagamento chegou a ser lançado aqui.
+- **Pix que chega fora de hora é devolvido sozinho**: horário que já foi ocupado por outra pessoa, agendamento cancelado pela dona, confirmado na mão, segundo pagamento do mesmo sinal (QR antigo), ou pagamento de valor diferente do sinal. Se o prazo passou mas o horário continua livre e ainda não começou, o sinal reabre e confirma; se o horário já passou, o Pix é devolvido. Nunca reativa o que a dona cancelou. O estorno automático fica registrado na auditoria (`asaas.deposit_auto_refunded`) e o sinal continua "expirado/fechado", já que nenhum pagamento chegou a ser lançado aqui.
 - **Estorno feito no app do Asaas** cancela a venda aqui sozinho, como no Mercado Pago.
 - **Se o Asaas falhar ao criar a cobrança**, o agendamento é desfeito na hora e a cliente vê "não conseguimos gerar o Pix agora". Se recusar por motivo que não passa sozinho (limite do período de avaliação, subconta bloqueada), a marcação segue **sem sinal** e a dona vê um aviso fixo na agenda e na tela do sinal. A clínica nunca fica sem marcação online por causa do Asaas.
 - **Cliente não confirma sozinha.** Uma política de linha (migração `0037`) deixa a cliente criar o agendamento "solicitado" só quando a clínica tem o sinal ativo (função `asaas_deposit_active`); sem isso continua valendo a regra antiga de só criar confirmado.
@@ -48,7 +48,7 @@ No `.env` local, a chave do Asaas começa com `$` (`$aact_...`), e o Next expand
 
 Não há webhook para cadastrar à mão no painel do Asaas: cada subconta recebe o dela na criação, apontando para `BETTER_AUTH_URL` + `/api/webhooks/asaas`.
 
-**Banco:** as migrações `0036_asaas.sql` e `0037_asaas_client_hold.sql` só acrescentam (o código antigo roda com elas aplicadas). Rode o `db:migrate` de produção **antes** de mesclar, senão a página da clínica dá 500.
+**Banco:** as migrações `0036_asaas.sql`, `0037_asaas_client_hold.sql` e `0038_asaas_link_fixes.sql` só acrescentam (o código antigo roda com elas aplicadas). Rode o `db:migrate` de produção **antes** de mesclar, senão a página da clínica dá 500.
 
 **Testar no computador:** o Asaas só chama endereço público com HTTPS. Rode um túnel (ngrok ou cloudflared), use o endereço dele em `BETTER_AUTH_URL` e crie a subconta depois disso (o webhook dela nasce com esse endereço). A conta principal do sandbox precisa ser PJ (CNPJ): conta em CPF recebe 403 ao criar subconta.
 
@@ -56,25 +56,25 @@ Não há webhook para cadastrar à mão no painel do Asaas: cada subconta recebe
 
 1. Abrir a conta Asaas de produção da Zemana com o CNPJ.
 2. Gerar a chave de API e definir `ASAAS_API_KEY`, `ASAAS_BASE_URL` (produção) e `ASAAS_WEBHOOK_TOKEN` no ambiente.
-3. Conferir que as migrações 0036 e 0037 já estão aplicadas em produção.
+3. Conferir que as migrações 0036, 0037 e 0038 já estão aplicadas em produção (o `db:migrate` de produção roda antes do merge).
 4. Passar pelo checklist abaixo no sandbox antes de ligar, se ainda não foi feito.
-5. Ativar uma clínica de verdade pelo painel e fazer uma marcação de teste com o menor valor possível.
+5. Ativar uma clínica de verdade em `/admin/financeiro/sinal-pix`. Depois que o Asaas aprovar a subconta, a chave Pix é criada sozinha pela Zemana (ninguém cria chave no painel do Asaas) e o sinal liga. Fazer uma marcação de teste com o menor valor possível.
 
 ## Onde o código está
 
-| Parte                                                   | Arquivo                                                                                              |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Tabelas                                                 | `src/db/schema/asaas.ts`, migrações `drizzle/0036_asaas.sql` e `drizzle/0037_asaas_client_hold.sql`  |
-| Chamadas ao Asaas (todas aceitam um `fetch` para teste) | `src/modules/asaas/api.ts`                                                                           |
-| Regras puras (15%, mínimo, 24h, pagamento tardio, CPF)  | `src/modules/asaas/rules.ts`                                                                         |
-| Subconta, chave Pix, liga e desliga                     | `src/modules/asaas/accounts.ts`, `fields.ts`                                                         |
-| Sinal: cobrança, expiração, aviso, cancelamento         | `src/modules/asaas/deposits.ts`                                                                      |
-| Venda "Sinal online"                                    | `src/modules/asaas/deposit-sale.ts`, `src/modules/finance/sales.ts`                                  |
-| Webhook                                                 | `src/app/api/webhooks/asaas/route.ts`                                                                |
-| Painel (ativar e ligar)                                 | `src/app/admin/(painel)/financeiro/sinal-pix/`                                                       |
-| Agenda (status, detalhe, cancelar com devolução)        | `src/app/admin/(painel)/agenda/`                                                                     |
-| Marcação online (sinal, QR, meus horários)              | `src/modules/booking/booking.ts`, `src/app/[slug]/marcar/`, `src/app/[slug]/meus-horarios/`          |
-| Testes                                                  | `src/modules/asaas/api.test.ts`, `rules.test.ts`, e os de integração em `tests/integration/`         |
+| Parte                                                   | Arquivo                                                                                                                  |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Tabelas                                                 | `src/db/schema/asaas.ts`, migrações `drizzle/0036_asaas.sql`, `0037_asaas_client_hold.sql` e `0038_asaas_link_fixes.sql` |
+| Chamadas ao Asaas (todas aceitam um `fetch` para teste) | `src/modules/asaas/api.ts`                                                                                               |
+| Regras puras (15%, mínimo, 24h, pagamento tardio, CPF)  | `src/modules/asaas/rules.ts`                                                                                             |
+| Subconta, chave Pix, liga e desliga                     | `src/modules/asaas/accounts.ts`, `fields.ts`                                                                             |
+| Sinal: cobrança, expiração, aviso, cancelamento         | `src/modules/asaas/deposits.ts`                                                                                          |
+| Venda "Sinal online"                                    | `src/modules/asaas/deposit-sale.ts`, `src/modules/finance/sales.ts`                                                      |
+| Webhook                                                 | `src/app/api/webhooks/asaas/route.ts`                                                                                    |
+| Painel (ativar e ligar)                                 | `src/app/admin/(painel)/financeiro/sinal-pix/`                                                                           |
+| Agenda (status, detalhe, cancelar com devolução)        | `src/app/admin/(painel)/agenda/`                                                                                         |
+| Marcação online (sinal, QR, meus horários)              | `src/modules/booking/booking.ts`, `src/app/[slug]/marcar/`, `src/app/[slug]/meus-horarios/`                              |
+| Testes                                                  | `src/modules/asaas/api.test.ts`, `rules.test.ts`, e os de integração em `tests/integration/`                             |
 
 ## Checklist antes de ligar em produção (sandbox, manual)
 
