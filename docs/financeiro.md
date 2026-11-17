@@ -11,6 +11,10 @@ Construído em 04/11/2026 a partir do [desenho aprovado](superpowers/specs/2026-
 5. **Atender e dar baixa**: "Receber" em cada parcela, na lista "A receber" ou, na sessão de um pacote por sessão, direto na página do atendimento ("Receber agora").
 6. **Acompanhar**: o resumo mostra o que entrou hoje e no mês, o que saiu, o saldo, as parcelas atrasadas e o total a receber. O caixa lista os lançamentos do mês, e as despesas têm tela própria.
 
+## Venda "Sinal online"
+
+Quando a cliente paga o sinal por Pix ao marcar pela página da clínica (veja [asaas.md](asaas.md)), nasce sozinha uma venda marcada como "Sinal online", ligada ao agendamento. Ela vem de um orçamento aprovado criado automaticamente e tem duas parcelas: o sinal (15%, já pago na forma "Pix online") e o restante, que vence no dia do atendimento e é recebido como qualquer parcela. Se o sinal é estornado, a venda é cancelada; se fica com a dona, a venda segue com o sinal pago e o restante cancelado.
+
 ## Regras que o sistema garante
 
 - **Dinheiro em centavos.** A soma das parcelas é sempre igual ao total, e os centavos que sobram de uma divisão vão para as primeiras partes, um em cada.
