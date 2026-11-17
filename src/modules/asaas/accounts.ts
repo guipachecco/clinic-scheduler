@@ -122,6 +122,11 @@ export async function activateAccount(
       fetchImpl,
     );
   } catch (error) {
+    logger.warn("asaas: subconta recusada", {
+      clinicId,
+      status: error instanceof AsaasError ? error.status : undefined,
+      asaasCodes: error instanceof AsaasError ? error.codes : undefined,
+    });
     if (error instanceof AsaasError && error.status === 400) {
       return {
         ok: false,

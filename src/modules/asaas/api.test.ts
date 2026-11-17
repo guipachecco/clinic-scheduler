@@ -104,6 +104,7 @@ describe("asaas api", () => {
         postalCode: "01001000",
         webhookUrl: "https://x.test/api/webhooks/asaas",
         webhookToken: "tok",
+        webhookEmail: "dona@b.com",
       },
       impl,
     );
@@ -112,6 +113,14 @@ describe("asaas api", () => {
       authToken: string;
       events: string[];
     }[];
+    // The sandbox refuses a webhook without these (checked 17/11/2026).
+    expect(webhooks[0]).toMatchObject({
+      name: "Zemana",
+      email: "dona@b.com",
+      enabled: true,
+      interrupted: false,
+      apiVersion: 3,
+    });
     expect(webhooks[0].authToken).toBe("tok");
     expect(webhooks[0].url).toBe("https://x.test/api/webhooks/asaas");
     expect(webhooks[0].events).toContain("PAYMENT_RECEIVED");

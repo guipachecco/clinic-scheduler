@@ -84,8 +84,8 @@ export type SubaccountInput = {
   postalCode: string;
   webhookUrl: string;
   webhookToken: string;
-  // Where Asaas warns about a paused webhook queue. Omitted when unset.
-  webhookEmail?: string;
+  // Where Asaas warns about a paused webhook queue. Asaas requires it.
+  webhookEmail: string;
 };
 
 export async function createSubaccount(
@@ -102,10 +102,16 @@ export async function createSubaccount(
       method: "POST",
       body: {
         ...account,
+        // Asaas refuses the account when the webhook lacks name, email,
+        // enabled, interrupted or apiVersion (sandbox, 17/11/2026).
         webhooks: [
           {
+            name: "Zemana",
             url: webhookUrl,
-            ...(webhookEmail === undefined ? {} : { email: webhookEmail }),
+            email: webhookEmail,
+            enabled: true,
+            interrupted: false,
+            apiVersion: 3,
             sendType: "SEQUENTIALLY",
             authToken: webhookToken,
             events: WEBHOOK_EVENTS,
