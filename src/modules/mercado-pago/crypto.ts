@@ -11,10 +11,12 @@ import {
 
 const VERSION = "v1";
 
-export function tokenKey(secret: string): Buffer {
-  return Buffer.from(
-    hkdfSync("sha256", secret, "zemana", "mercado-pago-tokens", 32),
-  );
+// `info` separates the keys of each integration: same format, different keys.
+export function tokenKey(
+  secret: string,
+  info: string = "mercado-pago-tokens",
+): Buffer {
+  return Buffer.from(hkdfSync("sha256", secret, "zemana", info, 32));
 }
 
 export function encryptToken(plain: string, key: Buffer): string {
@@ -32,7 +34,7 @@ export function encryptToken(plain: string, key: Buffer): string {
 export function decryptToken(sealed: string, key: Buffer): string {
   const [version, iv, tag, data] = sealed.split(".");
   if (version !== VERSION || !iv || !tag || data === undefined) {
-    throw new Error("Token do Mercado Pago em formato desconhecido.");
+    throw new Error("Token cifrado em formato desconhecido.");
   }
   const decipher = createDecipheriv(
     "aes-256-gcm",
