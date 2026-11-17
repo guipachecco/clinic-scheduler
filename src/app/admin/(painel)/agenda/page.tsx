@@ -77,9 +77,9 @@ export default async function AgendaPage() {
     ),
     listActiveProfessionals(clinicId),
   ]);
-  const asaasError = asaasEnabled()
-    ? ((await getAccountView(clinicId))?.lastError ?? null)
-    : null;
+  const asaasView = asaasEnabled() ? await getAccountView(clinicId) : null;
+  const asaasDisconnected = asaasView?.status === "disconnected";
+  const asaasError = asaasView?.lastError ?? null;
   const hasServices = services.length > 0;
 
   const servicesNotice = hasServices ? null : (
@@ -95,7 +95,21 @@ export default async function AgendaPage() {
   );
 
   // Stays until Asaas accepts a charge again (lastError back to null).
-  const asaasNotice = asaasError ? (
+  const asaasNotice = asaasDisconnected ? (
+    <p
+      role="status"
+      className="rounded-lg border border-destructive/40 bg-card p-4 text-sm text-destructive"
+    >
+      Sua conta do Asaas desconectou. O sinal foi desligado e as marcações
+      seguem sem sinal. Gere uma chave nova no Asaas e cole aqui.{" "}
+      <Link
+        href="/admin/financeiro/sinal-pix"
+        className="font-semibold text-primary underline underline-offset-4"
+      >
+        Ver recebimentos
+      </Link>
+    </p>
+  ) : asaasError ? (
     <p
       role="status"
       className="rounded-lg border border-destructive/40 bg-card p-4 text-sm text-destructive"

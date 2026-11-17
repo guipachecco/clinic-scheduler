@@ -12,8 +12,9 @@ import { connectAction, type SinalActionResult } from "./actions";
 
 const ERROR = "Não foi possível enviar. Tente novamente.";
 
-// Placeholder until the connection screen (Task 5): posts the pasted key.
-export function ActivationForm() {
+// The owner pastes the API key of her own Asaas account. The key is never
+// shown back: the field is cleared as soon as the server answers.
+export function ConnectForm({ onConnected }: { onConnected?: () => void }) {
   const router = useRouter();
   const [apiKey, setApiKey] = useState("");
   const [error, setError] = useState<string | undefined>();
@@ -35,6 +36,7 @@ export function ActivationForm() {
       setFormError(null);
       setApiKey("");
       router.refresh();
+      onConnected?.();
       return;
     }
     setError(result.fieldErrors?.apiKey);
@@ -49,6 +51,8 @@ export function ActivationForm() {
           id="sinal-apiKey"
           type="password"
           autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
           value={apiKey}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? "sinal-apiKey-erro" : undefined}

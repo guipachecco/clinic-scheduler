@@ -11,8 +11,9 @@ import { requireModule } from "@/modules/auth/session";
 
 import { FinanceTabs, PageTitle } from "../ui";
 
-import { ActivationForm } from "./activation-form";
+import { ConnectForm } from "./connect-form";
 import { DepositToggle } from "./deposit-toggle";
+import { ReplaceKey } from "./replace-key";
 
 export const metadata: Metadata = { title: "Sinal por Pix" };
 
@@ -37,21 +38,39 @@ export default async function SinalPixPage() {
       {!view ? (
         <section className={BOX}>
           <p>
-            Ative os recebimentos para pedir um sinal de {DEPOSIT_PERCENT}% por
-            Pix a quem marca horário online. O dinheiro cai direto na sua conta
-            do Asaas, sem taxa da Zemana. Preencha seus dados uma vez: a Zemana
-            cria a conta para você.
+            Receba um sinal de {DEPOSIT_PERCENT}% por Pix de quem marca horário
+            online. O dinheiro cai direto na sua conta do Asaas, sem taxa da
+            Zemana.
           </p>
-          <ActivationForm />
+          <ol className="grid list-decimal gap-1 pl-5 text-sm">
+            <li>
+              Crie sua conta no{" "}
+              <a
+                href="https://www.asaas.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-primary underline underline-offset-4"
+              >
+                Asaas
+              </a>
+              .
+            </li>
+            <li>Envie seus documentos e espere a aprovação.</li>
+            <li>
+              No Asaas, abra Integrações, depois Chaves de API, e clique em
+              Gerar chave.
+            </li>
+            <li>Cole a chave aqui embaixo.</li>
+          </ol>
+          <ConnectForm />
         </section>
-      ) : view.status === "pending" ? (
+      ) : view.status === "disconnected" ? (
         <section className={BOX}>
-          <p className="font-medium">Sua conta está em análise.</p>
-          <p>
-            Confira o e-mail do Asaas para enviar seus documentos. Quando a
-            conta for aprovada, o sinal liga sozinho: abra esta tela de novo
-            para ver como está.
+          <p role="alert" className="font-medium text-destructive">
+            Sua conta do Asaas desconectou. O sinal foi desligado e as marcações
+            seguem sem sinal. Gere uma chave nova no Asaas e cole aqui.
           </p>
+          <ConnectForm />
         </section>
       ) : view.status === "rejected" ? (
         <section className={BOX}>
@@ -65,25 +84,36 @@ export default async function SinalPixPage() {
         </section>
       ) : (
         <section className={BOX}>
-          {view.pixKeyReady && view.depositEnabled ? (
-            <p className="font-medium">
-              Sinal de {DEPOSIT_PERCENT}% ativo nos agendamentos online.
-            </p>
-          ) : view.pixKeyReady ? (
-            <p className="font-medium">
-              O sinal está desligado. Os agendamentos online seguem sem sinal.
-            </p>
+          {view.status === "approved" && view.pixKeyReady ? (
+            <>
+              {view.depositEnabled ? (
+                <p className="font-medium">
+                  Sinal de {DEPOSIT_PERCENT}% ativo nos agendamentos online.
+                </p>
+              ) : (
+                <p className="font-medium">
+                  O sinal está desligado. Os agendamentos online seguem sem
+                  sinal.
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">
+                Conta Asaas: {view.accountName}
+              </p>
+              <div>
+                <DepositToggle enabled={view.depositEnabled} />
+              </div>
+            </>
           ) : (
-            <p className="font-medium">
-              Conta aprovada. Falta criar a chave Pix: abra esta tela de novo em
-              instantes.
-            </p>
+            <>
+              <p className="font-medium">Conta conectada: {view.accountName}</p>
+              <p>
+                {view.status === "pending"
+                  ? "Confira o e-mail do Asaas para enviar seus documentos."
+                  : "Falta a chave Pix ficar ativa no Asaas. Abra esta tela de novo em instantes."}
+              </p>
+            </>
           )}
-          {view.pixKeyReady ? (
-            <div>
-              <DepositToggle enabled={view.depositEnabled} />
-            </div>
-          ) : null}
+          <ReplaceKey />
         </section>
       )}
 
