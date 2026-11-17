@@ -44,11 +44,13 @@ O spec pede que o sinal só conte como devolvido quando o Asaas confirmar. O flu
 ### Task 1: Chamadas novas do Asaas e regra de ambiente
 
 **Files:**
+
 - Modify: `src/modules/asaas/api.ts` (remover `createSubaccount` e `SubaccountInput`; acrescentar as funções abaixo)
 - Modify: `src/modules/asaas/rules.ts`
 - Test: `src/modules/asaas/api.test.ts`, `src/modules/asaas/rules.test.ts`
 
 **Interfaces:**
+
 - Produces:
   - `getCommercialInfo(apiKey: string, fetchImpl?: Fetch): Promise<{ name: string; email: string }>`: `GET /myAccount/commercialInfo` (sem corpo).
   - `getWalletId(apiKey: string, fetchImpl?: Fetch): Promise<string>`: `GET /wallets`, devolve `data[0].id`; lança `AsaasError` (status 0, código `no_wallet`) se vier vazio.
@@ -61,7 +63,7 @@ O spec pede que o sinal só conte como devolvido quando o Asaas confirmar. O flu
   - `saveWebhook` sem `id` faz `POST .../webhooks` e com `id: "wh-1"` faz `PUT .../webhooks/wh-1`; nos dois o corpo tem `name: "Zemana"`, `enabled: true`, `interrupted: false`, `apiVersion: 3`, `sendType: "SEQUENTIALLY"`, `authToken` e `events` iguais a `WEBHOOK_EVENTS`.
   - `getCommercialInfo` devolve `{ name, email }`.
   - Remover o teste de `createSubaccount`.
-  Em `rules.test.ts`: `keyEnvironment("$aact_prod_x") === "production"`, `keyEnvironment("$aact_hmlg_x") === "sandbox"`, `keyEnvironment("abc") === "unknown"`; `baseUrlEnvironment("https://api-sandbox.asaas.com/v3") === "sandbox"`, `baseUrlEnvironment("https://api.asaas.com/v3") === "production"`.
+    Em `rules.test.ts`: `keyEnvironment("$aact_prod_x") === "production"`, `keyEnvironment("$aact_hmlg_x") === "sandbox"`, `keyEnvironment("abc") === "unknown"`; `baseUrlEnvironment("https://api-sandbox.asaas.com/v3") === "sandbox"`, `baseUrlEnvironment("https://api.asaas.com/v3") === "production"`.
 - [ ] **Step 2:** `corepack pnpm vitest run src/modules/asaas` → falha (funções não existem).
 - [ ] **Step 3:** Implementar. Antes, conferir na documentação v3 do Asaas o método de atualizar webhook (esperado `PUT /v3/webhooks/{id}`); se for outro, ajustar e anotar no relatório.
 - [ ] **Step 4:** `corepack pnpm vitest run src/modules/asaas` → passa. `corepack pnpm typecheck` vai acusar `accounts.ts` ainda usando `createSubaccount`: esperado, resolvido na Task 3. Se o typecheck for gate do commit, deixe `accounts.ts` compilando com um `throw new Error("substituído na Task 3")` temporário em `activateAccount`.
@@ -70,11 +72,13 @@ O spec pede que o sinal só conte como devolvido quando o Asaas confirmar. O flu
 ### Task 2: Banco: conta desconectada, nome da conta, uma conta por clínica
 
 **Files:**
+
 - Modify: `src/db/schema/asaas.ts`
 - Create: `drizzle/0039_asaas_own_account.sql` (via `corepack pnpm db:generate`, depois revisar à mão) e o snapshot/journal gerados
 - Test: `tests/integration/asaas-db.test.ts`
 
 **Interfaces:**
+
 - Produces: `asaasAccountStatus` com o valor novo `"disconnected"`; `asaasAccounts.accountId` opcional (nullable); `asaasAccounts.accountName: text | null`; `unique("asaas_accounts_wallet_unique").on(walletId)`.
 
 - [ ] **Step 1: Teste que falha** em `asaas-db.test.ts`: `"a wallet connects to one clinic only"`: inserir `asaas_accounts` com `walletId: "wal-x"` na clínica de teste e tentar a mesma `walletId` em uma segunda clínica (o helper de clínicas desse arquivo); a segunda inserção rejeita com código Postgres `23505`. E `"accepts the disconnected status and no account id"`: inserir com `accountId: null` e atualizar `status` para `"disconnected"` sem erro.
@@ -86,10 +90,12 @@ O spec pede que o sinal só conte como devolvido quando o Asaas confirmar. O flu
 ### Task 3: Conectar, trocar chave e atualizar a conta
 
 **Files:**
+
 - Modify: `src/modules/asaas/accounts.ts`, `src/modules/asaas/fields.ts`, `src/lib/env.ts`, `vitest.config.ts`
 - Test: `tests/integration/asaas-accounts.test.ts` (reescrever o fake para os endpoints novos)
 
 **Interfaces:**
+
 - Consumes: Task 1 (`getCommercialInfo`, `getWalletId`, `listWebhooks`, `saveWebhook`, `keyEnvironment`, `baseUrlEnvironment`), Task 2 (colunas e status).
 - Produces:
   - `connectSchema` em `fields.ts`: `{ apiKey: string }`, com trim, mínimo 1 ("Cole a chave de API do Asaas."), máximo 500. Tipos `ConnectInput`/`ConnectValues`. `activationSchema`, `COMPANY_TYPES` e `ActivationValues` saem.
@@ -100,6 +106,7 @@ O spec pede que o sinal só conte como devolvido quando o Asaas confirmar. O flu
   - `activateAccount` e `activationDefaults` saem.
 
 O que `connectAccount` faz, em ordem (cada passo para no primeiro erro, com os textos das Global Constraints):
+
 1. Ambiente: `keyEnvironment(key)` diferente de `"unknown"` e de `baseUrlEnvironment(env.ASAAS_BASE_URL)` → texto de ambiente errado, sem chamar o Asaas.
 2. `getWalletId` e `getCommercialInfo` com a chave. `AsaasError` 401 → "chave recusada"; outro erro → "O Asaas não respondeu. Tente de novo em instantes."
 3. Troca de chave: se a linha existe e `walletId` difere → texto de "outra conta".
@@ -130,14 +137,17 @@ O que `connectAccount` faz, em ordem (cada passo para no primeiro erro, com os t
 ### Task 4: Chave revogada e reembolso pendente nos fluxos do sinal
 
 **Files:**
+
 - Modify: `src/modules/asaas/deposits.ts`, `src/modules/appointments/appointments.ts` (tipo `AppointmentResult`), `src/app/admin/(painel)/agenda/[id]/status-actions.tsx`
 - Test: `tests/integration/asaas-booking.test.ts`, `tests/integration/asaas-cancel.test.ts`
 
 **Interfaces:**
+
 - Consumes: `markDisconnected` (Task 3).
 - Produces: `AppointmentResult` com `refundPending?: boolean`; `refundCharge` devolve o status final do pagamento (`string`).
 
 Comportamento:
+
 - Em `startDeposit`, um `AsaasError` 401 ao criar cliente, cobrança ou QR chama `markDisconnected(clinicId)` antes de seguir o caminho atual de falha permanente (a marcação segue sem sinal, como já faz para `permanent`).
 - No cancelamento com reembolso, 401 também chama `markDisconnected` (o texto de falha de reembolso atual continua).
 - No cancelamento, se o status devolvido por `refundCharge` não for `"REFUNDED"`, o resultado traz `refundPending: true`; `status-actions.tsx` mostra o texto de reembolso pendente das Global Constraints.
@@ -154,21 +164,24 @@ Comportamento:
 ### Task 5: Tela "Sinal por Pix", agenda e documentação
 
 **Files:**
+
 - Create: `src/app/admin/(painel)/financeiro/sinal-pix/connect-form.tsx`
 - Delete: `src/app/admin/(painel)/financeiro/sinal-pix/activation-form.tsx`
 - Modify: `src/app/admin/(painel)/financeiro/sinal-pix/page.tsx`, `.../sinal-pix/actions.ts` (`activateAction` vira `connectAction(input: ConnectInput)`), `src/app/admin/(painel)/agenda/page.tsx`, `docs/asaas.md`, `.env.example`
 - Test: unit do formulário se o projeto tiver padrão para isso; senão, verificação no navegador (Step 4)
 
 **Interfaces:**
+
 - Consumes: `connectSchema`, `connectAccount`, `AccountView` (Task 3).
 
 Estados da página (seguir o esboço aprovado no spec):
+
 1. Sem linha: texto do sinal ("O dinheiro cai direto na sua conta do Asaas, sem taxa da Zemana."), passo a passo numerado (criar conta no Asaas com link para `https://www.asaas.com`, enviar documentos e esperar aprovação, Integrações → Chaves de API → Gerar chave, colar aqui), campo `type="password"` "Chave de API do Asaas", botão "Conectar conta". Conferir os nomes de menu no painel do Asaas.
 2. `pending` ou aprovada sem chave Pix: "Conta conectada: {accountName}" e o que falta (análise no Asaas: "Confira o e-mail do Asaas para enviar seus documentos."; chave Pix: "Falta a chave Pix ficar ativa no Asaas. Abra esta tela de novo em instantes."). Botão "Trocar chave".
 3. Aprovada com chave Pix: textos atuais do toggle, "Conta Asaas: {accountName}", `DepositToggle` e "Trocar chave".
 4. `rejected`: texto atual.
 5. `disconnected`: aviso vermelho das Global Constraints e o formulário de chave aberto.
-"Trocar chave" abre o mesmo `ConnectForm` (estado local do cliente), que chama `connectAction`.
+   "Trocar chave" abre o mesmo `ConnectForm` (estado local do cliente), que chama `connectAction`.
 
 Agenda: quando `getAccountView(...).status === "disconnected"`, o aviso que já existe mostra o texto de desconexão com link para `/admin/financeiro/sinal-pix`.
 
