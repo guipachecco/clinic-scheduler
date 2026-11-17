@@ -15,6 +15,8 @@ import {
 
 import { changeStatusAction } from "../actions";
 
+const REFUND_PENDING =
+  "O reembolso foi pedido e está aguardando sua aprovação no app do Asaas.";
 const STATUS_ERROR = "Não foi possível mudar o status. Tente novamente.";
 
 const ACTION_LABELS: Record<Exclude<Status, "requested">, string> = {
@@ -29,19 +31,40 @@ const REASONS = Object.entries(CANCELLATION_REASON_LABELS) as [
   string,
 ][];
 
+type CancelledBy = "patient" | "clinic";
+
+const CANCELLED_BY: [CancelledBy, string][] = [
+  ["patient", "A cliente"],
+  ["clinic", "A clínica"],
+];
+
+const BY_ERROR = "Escolha quem desmarcou.";
+
 // Stays mounted across refreshes, so its status message survives the
 // transition that removes every button (a cancellation).
 export function StatusActions({
   id,
   allowedTransitions,
+  depositPending = false,
+  depositCancel,
 }: {
   id: string;
   allowedTransitions: Status[];
+  // Held for a Pix deposit: confirming by hand cancels the charge.
+  depositPending?: boolean;
+  // A paid Pix deposit: cancelling asks who called it off. `patientRefunds`
+  // is whether the patient's cancellation still gets the deposit back (more
+  // than 24h before); the clinic's always does.
+  depositCancel?: { amount: string; patientRefunds: boolean };
 }) {
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
   const [reason, setReason] = useState<CancellationReason | "">("");
   const [reasonError, setReasonError] = useState<string | null>(null);
+  const [by, setBy] = useState<CancelledBy | "">("");
+  const [byError, setByError] = useState<string | null>(null);
+  // Asaas refused the refund: she may cancel and give it back herself.
+  const [refundFailed, setRefundFailed] = useState(false);
   const [pending, setPending] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -59,20 +82,34 @@ export function StatusActions({
     if (cancelling) document.getElementById("cancellation-reason")?.focus();
   }, [cancelling]);
 
-  async function change(to: Status) {
+  async function change(to: Status, skipRefund = false) {
     if (to === "cancelled" && !reason) {
       setReasonError("Escolha o motivo do cancelamento.");
       document.getElementById("cancellation-reason")?.focus();
       return;
     }
+    if (to === "cancelled" && depositCancel && !by) {
+      setByError(BY_ERROR);
+      document.getElementById("cancelled-by-patient")?.focus();
+      return;
+    }
     setPending(true);
     setFormError(null);
     setReasonError(null);
+    setByError(null);
     setMessage("");
     let result;
     try {
       result = await changeStatusAction(
-        to === "cancelled" ? { id, to, reason } : { id, to },
+        to === "cancelled"
+          ? {
+              id,
+              to,
+              reason,
+              ...(by ? { by } : {}),
+              ...(skipRefund ? { skipRefund } : {}),
+            }
+          : { id, to },
       );
     } catch {
       setFormError(STATUS_ERROR);
@@ -82,15 +119,27 @@ export function StatusActions({
     }
     if (!result.ok) {
       const fieldError = result.fieldErrors?.reason;
+      const byFieldError = result.fieldErrors?.by;
       if (fieldError) setReasonError(fieldError);
-      else setFormError(result.formError ?? STATUS_ERROR);
+      // Without the fieldset on the page, its error shows as the form's.
+      else if (byFieldError && depositCancel) setByError(byFieldError);
+      else setFormError(result.formError ?? byFieldError ?? STATUS_ERROR);
+      setRefundFailed(Boolean(result.refundFailed));
+      // Paid meanwhile: the refreshed page asks who called it off.
+      if (result.stale) router.refresh();
       return;
     }
     focusMessage.current = true;
     setCancelling(false);
     setReason("");
+    setBy("");
+    setRefundFailed(false);
     setMessage(
-      to === "cancelled" ? "Agendamento cancelado." : "Status atualizado.",
+      to === "cancelled"
+        ? result.refundPending
+          ? `Agendamento cancelado. ${REFUND_PENDING}`
+          : "Agendamento cancelado."
+        : "Status atualizado.",
     );
     router.refresh();
   }
@@ -101,6 +150,12 @@ export function StatusActions({
 
   return (
     <div className="grid gap-4">
+      {depositPending && buttons.includes("confirmed") ? (
+        <p className="text-sm text-muted-foreground">
+          Ao confirmar, a cobrança do sinal por Pix é cancelada no Asaas e
+          nenhuma venda é criada.
+        </p>
+      ) : null}
       {buttons.length > 0 ? (
         <div className="flex flex-wrap gap-3">
           {buttons.map((to) => (
@@ -150,6 +205,50 @@ export function StatusActions({
               message={reasonError ?? undefined}
             />
           </div>
+          {depositCancel ? (
+            <fieldset
+              className="grid gap-2"
+              aria-describedby={byError ? "cancelled-by-error" : undefined}
+            >
+              <legend className="mb-1 text-sm font-medium">
+                Quem desmarcou?
+              </legend>
+              <div className="flex flex-wrap gap-4">
+                {CANCELLED_BY.map(([value, label]) => (
+                  <label
+                    key={value}
+                    className="flex h-11 items-center gap-2 text-sm"
+                  >
+                    <input
+                      id={`cancelled-by-${value}`}
+                      type="radio"
+                      name="cancelled-by"
+                      value={value}
+                      checked={by === value}
+                      onChange={() => {
+                        setBy(value);
+                        setByError(null);
+                        setRefundFailed(false);
+                      }}
+                      className="size-5 accent-primary"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <FieldError
+                id="cancelled-by-error"
+                message={byError ?? undefined}
+              />
+              {by ? (
+                <p className="text-sm text-muted-foreground">
+                  {by === "clinic" || depositCancel.patientRefunds
+                    ? `O sinal de ${depositCancel.amount} volta para a cliente por Pix.`
+                    : `O sinal de ${depositCancel.amount} fica com você.`}
+                </p>
+              ) : null}
+            </fieldset>
+          ) : null}
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button
               type="button"
@@ -166,11 +265,31 @@ export function StatusActions({
               onClick={() => {
                 setCancelling(false);
                 setReasonError(null);
+                setByError(null);
+                setRefundFailed(false);
               }}
             >
               Voltar
             </Button>
           </div>
+          {refundFailed && depositCancel ? (
+            <div className="grid gap-2">
+              <p className="text-sm text-muted-foreground">
+                Se você já devolveu o sinal de {depositCancel.amount} por outro
+                meio, pode cancelar sem a devolução pelo Asaas.
+              </p>
+              <div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => void change("cancelled", true)}
+                >
+                  Cancelar sem devolver pelo Asaas
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

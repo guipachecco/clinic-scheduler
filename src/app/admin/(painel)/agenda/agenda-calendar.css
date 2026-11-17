@@ -252,6 +252,15 @@
   outline-offset: -2px;
 }
 
+/* Requested and held for a Pix deposit: solid warning tone, apart from a
+   request waiting for the owner. */
+.agenda-calendar .fc-deposit-pending {
+  --fc-event-bg-color: var(--highlight);
+  --fc-event-border-color: var(--highlight);
+  --fc-event-text-color: var(--highlight-foreground);
+  --agenda-event-name-color: var(--highlight-foreground);
+}
+
 .agenda-calendar .fc-status-confirmed {
   --fc-event-bg-color: var(--status-confirmed);
   --fc-event-border-color: var(--status-confirmed);

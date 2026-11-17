@@ -7,6 +7,7 @@ import type {
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 
 import { RequestedList, type RequestedListItem } from "./requested-list";
+import { depositHoldLabel } from "./status-badge";
 
 // The summary beside the calendar: requests waiting for confirmation and
 // today's active appointments. Rendered from the page's server data.
@@ -118,7 +119,13 @@ export function AgendaSidePanel({
                       }
                     >
                       {event.serviceLabel} ·{" "}
-                      {pending ? "aguardando" : `${minutesOf(event)} min`}
+                      {event.depositMinutesLeft !== undefined
+                        ? depositHoldLabel(
+                            event.depositMinutesLeft,
+                          ).toLowerCase()
+                        : pending
+                          ? "aguardando"
+                          : `${minutesOf(event)} min`}
                       {event.online ? " · Online" : ""}
                     </span>
                   </span>

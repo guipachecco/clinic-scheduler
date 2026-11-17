@@ -8,6 +8,7 @@ import {
   ACTIVE_APPOINTMENT_STATUSES,
   appointments,
   appointmentServices,
+  asaasDeposits,
   auditLogs,
   patients,
   professionals,
@@ -15,6 +16,14 @@ import {
   serviceCategories,
   services,
 } from "@/db/schema";
+import { asaasEnabled } from "@/modules/asaas/accounts";
+import type { Fetch } from "@/modules/asaas/api";
+import {
+  cancelChargeQuietly,
+  closePendingDeposit,
+  syncDepositSale,
+} from "@/modules/asaas/deposit-sale";
+import { depositMinutesLeft, type DepositStatus } from "@/modules/asaas/rules";
 import { syncSessionInstallment } from "@/modules/finance/session-links";
 import { ANONYMIZED_NAME } from "@/modules/patients/patients";
 import { findBlocksAndHours } from "@/modules/schedule/schedule";
@@ -42,12 +51,23 @@ import { checkWarnings, type Warning } from "./rules";
 // messages; audit `changes` hold ids, ISO instants, durations and codes only.
 
 export type AppointmentResult =
-  | { ok: true; id: string }
+  | {
+      ok: true;
+      id: string;
+      // Asaas accepted the deposit refund, but it waits for the owner's
+      // approval in the Asaas app.
+      refundPending?: boolean;
+    }
   | {
       ok: false;
       fieldErrors?: Record<string, string>;
       formError?: string;
       warnings?: Warning[];
+      // Asaas refused to refund the deposit: the owner may cancel without it.
+      refundFailed?: boolean;
+      // The page is out of date (a Pix deposit got paid meanwhile): the
+      // client refreshes it.
+      stale?: boolean;
     };
 
 export type AppointmentRecord = {
@@ -82,6 +102,15 @@ export type AppointmentRecord = {
   }[];
   // A session of a package (a sale_sessions row points to it).
   inPackage: boolean;
+  // The Pix deposit of an online booking. Absent when it has none (and
+  // always while Asaas is off).
+  deposit?: AppointmentDeposit;
+};
+
+export type AppointmentDeposit = {
+  status: DepositStatus;
+  amountCents: number;
+  expiresAt: Date;
 };
 
 export type CalendarEvent = {
@@ -99,6 +128,9 @@ export type CalendarEvent = {
   online: boolean;
   professionalId: string;
   professionalName: string;
+  // Requested and holding the slot until its Pix deposit is paid: the
+  // minutes left ("Aguardando sinal · N min"). Absent otherwise.
+  depositMinutesLeft?: number;
 };
 
 export type PatientAppointmentItem = {
@@ -179,6 +211,32 @@ export async function lockAgenda(tx: Tx, clinicId: string) {
   await tx.execute(
     sql`select pg_advisory_xact_lock(${AGENDA_LOCK}, hashtext(${clinicId}))`,
   );
+}
+
+// The deposit sale follows the appointment, like the package installment.
+// Nothing to do (and no query) while Asaas is off.
+async function syncDeposit(
+  tx: Tx,
+  clinicId: string,
+  id: string,
+  now: Date,
+): Promise<void> {
+  if (asaasEnabled()) await syncDepositSale(tx, clinicId, id, now);
+}
+
+// Explicit names: Drizzle writes columns unqualified inside sql``.
+const pendingDepositOf = sql`select 1 from asaas_deposits d
+  where d.clinic_id = "appointments"."clinic_id"
+    and d.appointment_id = "appointments"."id"
+    and d.status = 'pending'`;
+
+// When the pending deposit of the appointment expires; null without one.
+function pendingDepositExpiry() {
+  if (!asaasEnabled()) return sql<Date | null>`null`;
+  return sql<Date | null>`(select d.expires_at from asaas_deposits d
+    where d.clinic_id = "appointments"."clinic_id"
+      and d.appointment_id = "appointments"."id"
+      and d.status = 'pending')`.mapWith(asaasDeposits.expiresAt);
 }
 
 async function lockPatient(
@@ -956,7 +1014,10 @@ export async function updateAppointment(
             }
           : { ...serviceChanges, ...otherChanges },
       });
-      if (timeChanged) await syncSessionInstallment(tx, clinicId, id);
+      if (timeChanged) {
+        await syncSessionInstallment(tx, clinicId, id);
+        await syncDeposit(tx, clinicId, id, now);
+      }
       return { ok: true, id };
     });
   } catch (error) {
@@ -1044,6 +1105,7 @@ export async function rescheduleAppointment(
         },
       });
       await syncSessionInstallment(tx, clinicId, id);
+      await syncDeposit(tx, clinicId, id, now);
       return { ok: true, id };
     });
   } catch (error) {
@@ -1054,12 +1116,26 @@ export async function rescheduleAppointment(
 const isReason = (value: unknown): value is CancellationReason =>
   typeof value === "string" && Object.hasOwn(CANCELLATION_REASON_LABELS, value);
 
+// Runs inside the status change's transaction, after the appointment row is
+// locked and the transition checked, before the row is written (the deposit
+// side of a cancellation, see cancelWithDeposit).
+export type StatusChangeHook = (tx: Tx) => Promise<void>;
+
+// `fetchImpl` reaches Asaas only after the transaction commits: confirming
+// by hand a booking still waiting for its Pix deposit, or cancelling it,
+// cancels that charge. `cancelledBy` defaults to the clinic.
 export async function changeAppointmentStatus(
   clinicId: string,
   id: string,
-  input: { to: Status; reason?: CancellationReason },
+  input: {
+    to: Status;
+    reason?: CancellationReason;
+    cancelledBy?: "clinic" | "patient";
+  },
   actorUserId: string,
   now: Date = new Date(),
+  fetchImpl: Fetch = fetch,
+  inTx?: StatusChangeHook,
 ): Promise<AppointmentResult> {
   if (!UUID_PATTERN.test(id)) return formFail(NOT_FOUND);
   if (!APPOINTMENT_STATUSES.includes(input.to)) {
@@ -1068,59 +1144,88 @@ export async function changeAppointmentStatus(
   if (input.to === "cancelled" && !isReason(input.reason)) {
     return fieldFail("reason", REASON_REQUIRED);
   }
+  // Set inside the transaction; the cast keeps TS from narrowing it to null.
+  let chargeToCancel = null as string | null;
+  let result: AppointmentResult;
   try {
-    return await inClinic(clinicId, async (tx): Promise<AppointmentResult> => {
-      await lockAgenda(tx, clinicId);
-      const locked = await lockAppointment(tx, clinicId, id, {
-        allowAnonymized: true,
-      });
-      if (locked.fail) return locked.fail;
-      const { current } = locked;
+    result = await inClinic(
+      clinicId,
+      async (tx): Promise<AppointmentResult> => {
+        await lockAgenda(tx, clinicId);
+        const locked = await lockAppointment(tx, clinicId, id, {
+          allowAnonymized: true,
+        });
+        if (locked.fail) return locked.fail;
+        const { current } = locked;
 
-      const allowed = canTransition(
-        current.status,
-        input.to,
-        current.startsAt,
-        now,
-      );
-      if (!allowed.ok) return formFail(allowed.message);
-
-      const reason = input.to === "cancelled" ? input.reason! : undefined;
-      await tx
-        .update(appointments)
-        .set({
-          status: input.to,
-          ...(input.to === "confirmed" ? { confirmedAt: now } : {}),
-          ...(reason
-            ? {
-                cancelledAt: now,
-                cancelledBy: "clinic" as const,
-                cancellationReason: reason,
-              }
-            : {}),
-        })
-        .where(
-          and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)),
+        const allowed = canTransition(
+          current.status,
+          input.to,
+          current.startsAt,
+          now,
         );
-      await tx.insert(auditLogs).values({
-        clinicId,
-        actorType: "admin",
-        actorUserId,
-        action: "appointment.status_changed",
-        entityType: "appointment",
-        entityId: id,
-        changes: {
-          from: current.status,
-          to: input.to,
-          ...(reason ? { reason } : {}),
-        },
-      });
-      await syncSessionInstallment(tx, clinicId, id);
-      return { ok: true, id };
-    });
+        if (!allowed.ok) return formFail(allowed.message);
+
+        // Confirmed by hand (paid some other way): the deposit closes and no
+        // sale is made for it. Cancelled while it waits for the Pix: the
+        // deposit closes too. The charge goes once this commits.
+        if (
+          asaasEnabled() &&
+          current.status === "requested" &&
+          (input.to === "confirmed" || input.to === "cancelled")
+        ) {
+          chargeToCancel = await closePendingDeposit(
+            tx,
+            clinicId,
+            id,
+            input.to === "confirmed" ? "manual_confirm" : "clinic_cancelled",
+            now,
+          );
+        }
+        if (inTx) await inTx(tx);
+
+        const reason = input.to === "cancelled" ? input.reason! : undefined;
+        await tx
+          .update(appointments)
+          .set({
+            status: input.to,
+            ...(input.to === "confirmed" ? { confirmedAt: now } : {}),
+            ...(reason
+              ? {
+                  cancelledAt: now,
+                  cancelledBy: input.cancelledBy ?? "clinic",
+                  cancellationReason: reason,
+                }
+              : {}),
+          })
+          .where(
+            and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)),
+          );
+        await tx.insert(auditLogs).values({
+          clinicId,
+          actorType: "admin",
+          actorUserId,
+          action: "appointment.status_changed",
+          entityType: "appointment",
+          entityId: id,
+          changes: {
+            from: current.status,
+            to: input.to,
+            ...(reason ? { reason } : {}),
+          },
+        });
+        await syncSessionInstallment(tx, clinicId, id);
+        await syncDeposit(tx, clinicId, id, now);
+        return { ok: true, id };
+      },
+    );
   } catch (error) {
     return backstop(error);
   }
+  if (result.ok && chargeToCancel) {
+    await cancelChargeQuietly(clinicId, chargeToCancel, fetchImpl);
+  }
+  return result;
 }
 
 // The nickname, else the first word of the name. Anonymized patients only
@@ -1212,10 +1317,25 @@ export async function getAppointment(
         ),
       )
       .limit(1);
-    return { row: main, extras, inPackage: Boolean(session) };
+    const [deposit] = asaasEnabled()
+      ? await tx
+          .select({
+            status: asaasDeposits.status,
+            amountCents: asaasDeposits.amountCents,
+            expiresAt: asaasDeposits.expiresAt,
+          })
+          .from(asaasDeposits)
+          .where(
+            and(
+              eq(asaasDeposits.appointmentId, id),
+              eq(asaasDeposits.clinicId, clinicId),
+            ),
+          )
+      : [];
+    return { row: main, extras, inPackage: Boolean(session), deposit };
   });
   if (!found) return null;
-  const { row, extras, inPackage } = found;
+  const { row, extras, inPackage, deposit } = found;
   // Anonymized patients cannot be (re)scheduled, but their appointments
   // still take status corrections.
   const writable = !row.anonymizedAt;
@@ -1245,6 +1365,7 @@ export async function getAppointment(
     ),
     extras,
     inPackage,
+    ...(deposit ? { deposit } : {}),
   };
 }
 
@@ -1300,7 +1421,8 @@ function toCalendarEvent(row: {
   };
 }
 
-// Appointments that intersect [from, to), ordered by start.
+// Appointments that intersect [from, to), ordered by start. A requested one
+// holding its slot for a Pix deposit carries the minutes left on the hold.
 export async function listAppointmentsInRange(
   clinicId: string,
   input: {
@@ -1308,10 +1430,11 @@ export async function listAppointmentsInRange(
     to: Date;
     includeCancelled: boolean;
   },
+  now: Date = new Date(),
 ): Promise<CalendarEvent[]> {
   const rows = await inClinic(clinicId, (tx) =>
     tx
-      .select(calendarColumns)
+      .select({ ...calendarColumns, depositExpiresAt: pendingDepositExpiry() })
       .from(appointments)
       .innerJoin(patients, eq(appointments.patientId, patients.id))
       .innerJoin(professionals, professionalJoin)
@@ -1327,16 +1450,27 @@ export async function listAppointmentsInRange(
       )
       .orderBy(asc(appointments.startsAt), asc(appointments.id)),
   );
-  return rows.map(toCalendarEvent);
+  return rows.map(({ depositExpiresAt, ...row }) => {
+    const event = toCalendarEvent(row);
+    return depositExpiresAt && row.status === "requested"
+      ? {
+          ...event,
+          depositMinutesLeft: depositMinutesLeft(depositExpiresAt, now),
+        }
+      : event;
+  });
 }
 
 export type RequestedItem = CalendarEvent & { requiresApproval: boolean };
 
+// A booking holding its slot for a Pix deposit resolves itself (paid or
+// expired): it is not waiting for the admin.
 const pendingFrom = (clinicId: string, now: Date) =>
   and(
     eq(appointments.clinicId, clinicId),
     eq(appointments.status, "requested"),
     gte(appointments.startsAt, now),
+    asaasEnabled() ? sql`not exists (${pendingDepositOf})` : undefined,
   );
 
 // Requested appointments that start at or after `now`, ordered by start:

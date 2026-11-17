@@ -9,6 +9,11 @@ import {
   CANCELLATION_REASON_LABELS,
   serviceLabel,
 } from "@/modules/appointments/fields";
+import {
+  previewCancellation,
+  sweepBeforePanel,
+} from "@/modules/asaas/deposits";
+import { depositMinutesLeft, type DepositStatus } from "@/modules/asaas/rules";
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import {
   getAppointmentBilling,
@@ -50,6 +55,17 @@ export const metadata: Metadata = { title: "Atendimento" };
 
 const SOURCE_LABELS = { admin: "Painel", online: "Online" } as const;
 
+// The Pix deposit of an online booking, in the header. An expired or closed
+// one took no money: nothing to say.
+const DEPOSIT_TEXTS: Partial<
+  Record<DepositStatus, (amount: string) => string>
+> = {
+  pending: (amount) => `Sinal de ${amount} aguardando o Pix da cliente.`,
+  paid: (amount) => `Sinal pago ${amount}.`,
+  kept: (amount) => `Sinal de ${amount} ficou com a clínica.`,
+  refunded: (amount) => `Sinal de ${amount} devolvido à cliente.`,
+};
+
 export default async function AppointmentPage({
   params,
 }: {
@@ -58,8 +74,17 @@ export default async function AppointmentPage({
   const session = await requireAdmin();
   const { clinicId } = session;
   const { id } = await params;
-  const appointment = await getAppointment(clinicId, id);
+  // An expired Pix hold is cancelled before the page shows it.
+  await sweepBeforePanel(clinicId);
+  const now = new Date();
+  const appointment = await getAppointment(clinicId, id, now);
   if (!appointment) notFound();
+  const { deposit } = appointment;
+  // Held for a Pix deposit: "Aguardando sinal · N min" instead of "Solicitado".
+  const holdMinutes =
+    appointment.status === "requested" && deposit?.status === "pending"
+      ? depositMinutesLeft(deposit.expiresAt, now)
+      : undefined;
   // A package session paid per session: its open installment, to receive now.
   // Otherwise a single appointment is received on the spot ("Receber").
   // With the finance module off there is no payment block at all.
@@ -111,11 +136,37 @@ export default async function AppointmentPage({
         </Link>
       </p>
     ) : null;
+  // An online booking with a deposit sale is paid through that sale, never
+  // with a separate receipt.
+  const hasDepositSale =
+    deposit?.status === "paid" || deposit?.status === "kept";
   const receivable =
     !sessionInstallment &&
+    !hasDepositSale &&
     billing !== null &&
     !billing.inPackage &&
     (RECEIVABLE_STATUSES as readonly string[]).includes(appointment.status);
+  // A paid deposit with the rest still open shows in "Pagamento da sessão",
+  // right above "Receber agora"; otherwise in the header.
+  const depositWithRest = deposit?.status === "paid" && sessionInstallment;
+  const depositText =
+    deposit && !depositWithRest
+      ? (DEPOSIT_TEXTS[deposit.status]?.(money(deposit.amountCents)) ?? null)
+      : null;
+  // A paid deposit: cancelling asks who called it off and says what happens
+  // to the deposit (the clinic always refunds; the patient only more than
+  // 24h before).
+  const cancelPreview =
+    deposit?.status === "paid" &&
+    appointment.allowedTransitions.includes("cancelled")
+      ? await previewCancellation(clinicId, appointment.id, "patient", now)
+      : null;
+  const depositCancel = cancelPreview?.hasPaidDeposit
+    ? {
+        amount: money(cancelPreview.amountCents),
+        patientRefunds: cancelPreview.outcome === "refund",
+      }
+    : undefined;
 
   const extraNames = appointment.extras.map((extra) => extra.name);
   const serviceText = serviceLabel(
@@ -185,7 +236,10 @@ export default async function AppointmentPage({
           <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
             Atendimento
           </h1>
-          <StatusBadge status={appointment.status} />
+          <StatusBadge
+            status={appointment.status}
+            depositMinutesLeft={holdMinutes}
+          />
         </div>
         <div className="grid gap-1">
           <p className="text-lg font-medium">
@@ -228,6 +282,7 @@ export default async function AppointmentPage({
             </Link>
           </p>
           <p>Origem: {SOURCE_LABELS[appointment.source]}</p>
+          {depositText ? <p>{depositText}</p> : null}
           {appointment.status === "cancelled" &&
           appointment.cancellationReason ? (
             <p>
@@ -247,7 +302,9 @@ export default async function AppointmentPage({
             Pagamento da sessão
           </h2>
           <p>
-            Falta receber {money(sessionInstallment.outstandingCents)}.{" "}
+            {depositWithRest
+              ? `Sinal pago ${money(deposit.amountCents)} · Falta ${money(sessionInstallment.outstandingCents)}.`
+              : `Falta receber ${money(sessionInstallment.outstandingCents)}.`}{" "}
             <Link
               href={
                 `/admin/financeiro/vendas/${sessionInstallment.saleId}` as Route
@@ -377,6 +434,8 @@ export default async function AppointmentPage({
         <StatusActions
           id={appointment.id}
           allowedTransitions={appointment.allowedTransitions}
+          depositPending={holdMinutes !== undefined}
+          depositCancel={depositCancel}
         />
       </section>
 

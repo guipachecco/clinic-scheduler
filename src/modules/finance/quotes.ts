@@ -70,7 +70,7 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Arbitrary constant: quote numbers of a clinic are handed out one at a time.
-const QUOTE_NUMBER_LOCK = 7_204_514;
+export const QUOTE_NUMBER_LOCK = 7_204_514;
 
 const NOT_FOUND = "Orçamento não encontrado.";
 const PATIENT_MISSING = "Escolha um paciente cadastrado.";

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Icon, type IconName } from "@/components/icon";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
+import { asaasEnabled } from "@/modules/asaas/accounts";
 import { MERCADO_PAGO_VISIBLE } from "@/modules/mercado-pago/visible";
 import { formatCents } from "@/modules/services/fields";
 
@@ -30,6 +31,7 @@ const TABS = [
   { href: "/admin/financeiro/caixa", label: "Caixa" },
   { href: "/admin/financeiro/despesas", label: "Despesas" },
   { href: "/admin/financeiro/mercado-pago", label: "Mercado Pago" },
+  { href: "/admin/financeiro/sinal-pix", label: "Sinal por Pix" },
 ] as const;
 
 export function FinanceTabs({
@@ -42,8 +44,9 @@ export function FinanceTabs({
       <ul className="flex gap-1 p-1">
         {TABS.filter(
           (tab) =>
-            MERCADO_PAGO_VISIBLE ||
-            tab.href !== "/admin/financeiro/mercado-pago",
+            (MERCADO_PAGO_VISIBLE ||
+              tab.href !== "/admin/financeiro/mercado-pago") &&
+            (asaasEnabled() || tab.href !== "/admin/financeiro/sinal-pix"),
         ).map((tab) => (
           <li key={tab.href} className="shrink-0">
             <Link

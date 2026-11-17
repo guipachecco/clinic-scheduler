@@ -58,6 +58,6 @@ A documentação pública não mostrava tudo. Estes pontos seguem o que é mais 
 ## O que ainda não existe
 
 - Comissão da Zemana por venda (`marketplace_fee`).
-- Link para entradas avulsas (receitas fora de uma venda) e sinal no agendamento online.
+- Link para entradas avulsas (receitas fora de uma venda). O sinal no agendamento online não usa o Mercado Pago: é um Pix pelo Asaas (veja [asaas.md](asaas.md)).
 - Devolução parcial.
 - Lançar a taxa do Mercado Pago como despesa.

@@ -7,6 +7,8 @@ import { findPgError } from "@/db/errors";
 import {
   anamneses,
   appointments,
+  asaasCustomers,
+  asaasDeposits,
   auditLogs,
   loyaltyRedemptions,
   patients,
@@ -15,6 +17,7 @@ import {
   services,
   users,
 } from "@/db/schema";
+import { findPendingHold, getDepositView } from "@/modules/asaas/deposits";
 import { listMyAppointments } from "@/modules/booking/booking";
 import {
   getClientContext,
@@ -138,6 +141,8 @@ async function patientRow(id: string) {
 async function clearClinic(id: string) {
   await db.delete(anamneses).where(eq(anamneses.clinicId, id));
   await db.delete(auditLogs).where(eq(auditLogs.clinicId, id));
+  await db.delete(asaasDeposits).where(eq(asaasDeposits.clinicId, id));
+  await db.delete(asaasCustomers).where(eq(asaasCustomers.clinicId, id));
   await db.delete(reviews).where(eq(reviews.clinicId, id));
   await db
     .delete(loyaltyRedemptions)
@@ -345,6 +350,87 @@ describe("pending links", () => {
       .from(anamneses)
       .where(eq(anamneses.id, row!.id));
     expect(moved?.patientId).toBe(s.existingId);
+  });
+
+  it("confirm moves her Pix deposit and her Asaas customer", async () => {
+    const s = await scenario();
+    const [held] = await db
+      .select({ startsAt: appointments.startsAt })
+      .from(appointments)
+      .where(eq(appointments.id, s.onlineAppointment));
+    await db
+      .update(appointments)
+      .set({ status: "requested", confirmedAt: null })
+      .where(eq(appointments.id, s.onlineAppointment));
+    const expiresAt = new Date(Date.now() + 30 * 60_000);
+    await db.insert(asaasDeposits).values({
+      clinicId,
+      appointmentId: s.onlineAppointment,
+      patientId: s.provisionalId,
+      amountCents: 1_200,
+      chargeId: "pay-fichas-1",
+      status: "pending",
+      expiresAt,
+    });
+    const [customer] = await db
+      .insert(asaasCustomers)
+      .values({
+        clinicId,
+        patientId: s.provisionalId,
+        customerId: "cus-fichas-1",
+        cpfCnpjLast4: "1234",
+      })
+      .returning({ id: asaasCustomers.id });
+
+    expect(await confirmLink(clinicId, s.provisionalId, ownerId)).toEqual({
+      ok: true,
+    });
+
+    expect(await patientRow(s.provisionalId)).toBeNull();
+    expect(
+      await getDepositView(clinicId, s.onlineAppointment, s.existingId),
+    ).toMatchObject({ status: "pending", amountCents: 1_200 });
+    expect(
+      await findPendingHold(clinicId, s.existingId, serviceId, held!.startsAt),
+    ).toBe(s.onlineAppointment);
+    const [moved] = await db
+      .select({ patientId: asaasCustomers.patientId })
+      .from(asaasCustomers)
+      .where(eq(asaasCustomers.id, customer!.id));
+    expect(moved).toEqual({ patientId: s.existingId });
+  });
+
+  it("confirm keeps the Asaas customer the existing record already has", async () => {
+    const s = await scenario();
+    await db.insert(asaasCustomers).values([
+      {
+        clinicId,
+        patientId: s.existingId,
+        customerId: "cus-fichas-antiga",
+        cpfCnpjLast4: "1111",
+      },
+      {
+        clinicId,
+        patientId: s.provisionalId,
+        customerId: "cus-fichas-online",
+        cpfCnpjLast4: "2222",
+      },
+    ]);
+
+    expect(await confirmLink(clinicId, s.provisionalId, ownerId)).toEqual({
+      ok: true,
+    });
+
+    const rows = await db
+      .select({
+        patientId: asaasCustomers.patientId,
+        customerId: asaasCustomers.customerId,
+      })
+      .from(asaasCustomers)
+      .where(eq(asaasCustomers.clinicId, clinicId));
+    expect(rows).toEqual([
+      { patientId: s.existingId, customerId: "cus-fichas-antiga" },
+    ]);
   });
 
   it("confirm moves her reviews and loyalty rewards", async () => {

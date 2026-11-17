@@ -5,6 +5,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { Status } from "@/modules/appointments/fields";
 import {
+  type DepositView,
+  failedDepositAppointments,
+  getDepositView,
+  sweepExpiredDeposits,
+} from "@/modules/asaas/deposits";
+import {
   listMyAppointments,
   type MyAppointment,
 } from "@/modules/booking/booking";
@@ -12,9 +18,15 @@ import { requireClient } from "@/modules/clients/session";
 import { hasModule } from "@/modules/clinics/modules";
 
 import { Icon } from "../icons";
+import { PixCode } from "../marcar/pix-step";
 import { clinicName, PageTitle, whatsappUrl } from "../ui";
 
 export const metadata: Metadata = { title: "Meus horários" };
+
+const money = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
 
 // What she sees of each status. The owner's cancellations read "Desmarcado".
 const STATUS_TEXT: Record<Status, string> = {
@@ -32,14 +44,31 @@ export default async function MyAppointmentsPage({
 }: PageProps<"/[slug]/meus-horarios">) {
   const { slug } = await params;
   const { ctx, clinic } = await requireClient(slug, `/${slug}/meus-horarios`);
-  const { upcoming: upcomingAll, past: pastAll } =
-    await listMyAppointments(ctx);
+  // Holds whose Pix ran out are let go first (nothing runs without Asaas).
+  await sweepExpiredDeposits(ctx.clinicId);
+  const [{ upcoming: upcomingAll, past: pastAll }, failed] = await Promise.all([
+    listMyAppointments(ctx),
+    failedDepositAppointments(ctx.clinicId, ctx.patientId),
+  ]);
   // Cancelled ones (upcoming or past) leave the lists and get their own.
   const upcoming = upcomingAll.filter((item) => item.status !== "cancelled");
   const past = pastAll.filter((item) => item.status !== "cancelled");
+  // Attempts undone because the Pix could not be created never were hers.
   const cancelled = [...upcomingAll, ...pastAll]
-    .filter((item) => item.status === "cancelled")
+    .filter((item) => item.status === "cancelled" && !failed.has(item.id))
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  // The Pix of the holds still waiting for their deposit, with the QR.
+  const deposits = new Map<string, DepositView>();
+  for (const item of upcoming) {
+    if (item.status !== "requested") continue;
+    const view = await getDepositView(
+      ctx.clinicId,
+      item.id,
+      ctx.patientId,
+      true,
+    );
+    if (view?.status === "pending") deposits.set(item.id, view);
+  }
   const name = clinicName(clinic);
   // The reviews module off hides the "Avaliar" link.
   const reviewsOn = hasModule(clinic, "reviews");
@@ -59,6 +88,7 @@ export default async function MyAppointmentsPage({
             timezone={clinic.timezone}
             slug={clinic.slug}
             reviewsOn={reviewsOn}
+            deposits={deposits}
           />
         )}
         <Button asChild size="lg" variant="outline">
@@ -116,11 +146,13 @@ function AppointmentList({
   timezone,
   slug,
   reviewsOn,
+  deposits,
 }: {
   items: MyAppointment[];
   timezone: string;
   slug: string;
   reviewsOn: boolean;
+  deposits?: Map<string, DepositView>;
 }) {
   return (
     <ul className="grid gap-2">
@@ -128,6 +160,7 @@ function AppointmentList({
         const start = DateTime.fromJSDate(item.startsAt, {
           zone: timezone,
         }).setLocale("pt-BR");
+        const deposit = deposits?.get(item.id);
         return (
           <li
             key={item.id}
@@ -155,8 +188,30 @@ function AppointmentList({
                   : "text-sm text-muted-foreground"
               }
             >
-              {STATUS_TEXT[item.status]}
+              {deposit
+                ? "Aguardando pagamento do sinal"
+                : STATUS_TEXT[item.status]}
             </span>
+            {deposit?.pixPayload ? (
+              <div className="mt-2 grid gap-2">
+                <p className="text-sm">
+                  Pague o sinal de {money.format(deposit.amountCents / 100)} até{" "}
+                  {DateTime.fromJSDate(deposit.expiresAt, {
+                    zone: timezone,
+                  }).toFormat("HH:mm")}{" "}
+                  para garantir o horário.
+                </p>
+                <PixCode
+                  payload={deposit.pixPayload}
+                  qrImageBase64={deposit.qrImageBase64}
+                />
+              </div>
+            ) : deposit ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                O código do Pix não carregou agora. Recarregue a página em
+                instantes; se continuar, fale com a clínica.
+              </p>
+            ) : null}
             {reviewsOn && item.status === "completed" ? (
               <Button
                 asChild

@@ -7,6 +7,7 @@ import { findPgError } from "@/db/errors";
 import {
   anamneses,
   appointments,
+  asaasAccounts,
   auditLogs,
   clinics,
   patients,
@@ -416,6 +417,95 @@ describe("client access", () => {
         ),
       );
       expect(code).toBe("42501");
+    }
+  });
+
+  it("client inserts 'requested' only while the clinic charges a deposit", async () => {
+    const requested = (start: string) =>
+      asClient(ctx("ana", patientAna), (tx) =>
+        tx
+          .insert(appointments)
+          .values(
+            appointmentValues(patientAna, start, {
+              status: "requested",
+              confirmedAt: null,
+            }),
+          )
+          .returning({ id: appointments.id }),
+      );
+    const setAccount = (values: Partial<typeof asaasAccounts.$inferInsert>) =>
+      db
+        .update(asaasAccounts)
+        .set(values)
+        .where(eq(asaasAccounts.clinicId, CLINIC));
+
+    const grants = await db.execute<Record<string, boolean>>(sql`
+      select p.prosecdef as secdef,
+             has_function_privilege('app_client', p.oid, 'EXECUTE') as client,
+             has_function_privilege('app_panel', p.oid, 'EXECUTE') as panel,
+             has_function_privilege('app_platform', p.oid, 'EXECUTE') as platform,
+             has_function_privilege('app_auth', p.oid, 'EXECUTE') as auth
+      from pg_proc p where p.proname = 'asaas_deposit_active'
+    `);
+    expect(grants.rows).toEqual([
+      { secdef: true, client: true, panel: true, platform: false, auth: false },
+    ]);
+
+    await db.delete(asaasAccounts).where(eq(asaasAccounts.clinicId, CLINIC));
+    try {
+      // No subaccount.
+      expect(await pgErrorCode(requested("2033-03-14T13:00:00Z"))).toBe(
+        "42501",
+      );
+      await db.insert(asaasAccounts).values({
+        clinicId: CLINIC,
+        accountId: "acc-acesso-cliente",
+        walletId: "wal-acesso-cliente",
+        apiKeyEnc: "cifrada-ficticia",
+        status: "pending",
+        pixKeyReady: true,
+        depositEnabled: true,
+      });
+      // Not approved yet, approved without Pix key, switched off.
+      expect(await pgErrorCode(requested("2033-03-14T13:00:00Z"))).toBe(
+        "42501",
+      );
+      await setAccount({ status: "approved", pixKeyReady: false });
+      expect(await pgErrorCode(requested("2033-03-14T13:00:00Z"))).toBe(
+        "42501",
+      );
+      await setAccount({ pixKeyReady: true, depositEnabled: false });
+      expect(await pgErrorCode(requested("2033-03-14T13:00:00Z"))).toBe(
+        "42501",
+      );
+
+      // Active deposit: held as requested, but never with confirmed_at.
+      await setAccount({ depositEnabled: true });
+      const withConfirmedAt = await pgErrorCode(
+        asClient(ctx("ana", patientAna), (tx) =>
+          tx.insert(appointments).values(
+            appointmentValues(patientAna, "2033-03-14T13:00:00Z", {
+              status: "requested",
+            }),
+          ),
+        ),
+      );
+      expect(withConfirmedAt).toBe("42501");
+      const [row] = await requested("2033-03-14T13:00:00Z");
+      expect(row!.id).toBeTruthy();
+      // Any other status is still refused.
+      const completed = await pgErrorCode(
+        asClient(ctx("ana", patientAna), (tx) =>
+          tx.insert(appointments).values(
+            appointmentValues(patientAna, "2033-03-15T13:00:00Z", {
+              status: "completed",
+            }),
+          ),
+        ),
+      );
+      expect(completed).toBe("42501");
+    } finally {
+      await db.delete(asaasAccounts).where(eq(asaasAccounts.clinicId, CLINIC));
     }
   });
 

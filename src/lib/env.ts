@@ -63,6 +63,12 @@ export const serverEnvSchema = z
     // Signs the notifications (Webhooks > Configurar notificações, in the
     // application). Without it, every notification is refused.
     MP_WEBHOOK_SECRET: optionalText(),
+    // Asaas (Pix deposit on online bookings). Without ASAAS_WEBHOOK_TOKEN the
+    // feature stays hidden. Each clinic owner pastes her own Asaas API key.
+    // Defaults to the sandbox outside production (see the transform below).
+    ASAAS_BASE_URL: optionalText(),
+    // Sent back by Asaas in the asaas-access-token header of every webhook.
+    ASAAS_WEBHOOK_TOKEN: optionalText(),
   })
   .refine(
     (env) =>
@@ -98,7 +104,32 @@ export const serverEnvSchema = z
       error: "obrigatória quando MAILERSEND_API_KEY está definida",
       path: ["EMAIL_FROM"],
     },
-  );
+  )
+  // The token signs every webhook: a short one is easy to guess.
+  .refine(
+    (env) =>
+      env.ASAAS_WEBHOOK_TOKEN === undefined ||
+      env.ASAAS_WEBHOOK_TOKEN.length >= 32,
+    {
+      error: "deve ter ao menos 32 caracteres",
+      path: ["ASAAS_WEBHOOK_TOKEN"],
+    },
+  )
+  // No silent sandbox in production once the feature is on.
+  .refine(
+    (env) =>
+      env.NODE_ENV !== "production" ||
+      env.ASAAS_WEBHOOK_TOKEN === undefined ||
+      env.ASAAS_BASE_URL !== undefined,
+    {
+      error: "obrigatória em produção quando ASAAS_WEBHOOK_TOKEN está definida",
+      path: ["ASAAS_BASE_URL"],
+    },
+  )
+  .transform((env) => ({
+    ...env,
+    ASAAS_BASE_URL: env.ASAAS_BASE_URL ?? "https://api-sandbox.asaas.com/v3",
+  }));
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 

@@ -6,6 +6,12 @@ import {
   listAppointmentsInRange,
   listRequestedFrom,
 } from "@/modules/appointments/appointments";
+import {
+  asaasEnabled,
+  getAccountView,
+  REFUND_PENDING_APPROVAL,
+} from "@/modules/asaas/accounts";
+import { sweepBeforePanel } from "@/modules/asaas/deposits";
 import { requireAdmin } from "@/modules/auth/session";
 import { listActiveProfessionals } from "@/modules/professionals/professionals";
 import {
@@ -54,6 +60,8 @@ export default async function AgendaPage() {
   const now = new Date();
   const today = todayLocal();
   const { startsAt, endsAt } = localDayRange(today, today);
+  // Expired Pix holds free their slots before the agenda is read.
+  await sweepBeforePanel(clinicId);
   const [
     days,
     slotStepMinutes,
@@ -66,13 +74,16 @@ export default async function AgendaPage() {
     getSlotStepMinutes(clinicId),
     listActiveServices(clinicId),
     listRequestedFrom(clinicId, now),
-    listAppointmentsInRange(clinicId, {
-      from: startsAt,
-      to: endsAt,
-      includeCancelled: false,
-    }),
+    listAppointmentsInRange(
+      clinicId,
+      { from: startsAt, to: endsAt, includeCancelled: false },
+      now,
+    ),
     listActiveProfessionals(clinicId),
   ]);
+  const asaasView = asaasEnabled() ? await getAccountView(clinicId) : null;
+  const asaasDisconnected = asaasView?.status === "disconnected";
+  const asaasError = asaasView?.lastError ?? null;
   const hasServices = services.length > 0;
 
   const servicesNotice = hasServices ? null : (
@@ -87,6 +98,51 @@ export default async function AgendaPage() {
     </p>
   );
 
+  // Stays until Asaas accepts a charge again (lastError back to null).
+  const asaasNotice = asaasDisconnected ? (
+    <p
+      role="status"
+      className="rounded-lg border border-destructive/40 bg-card p-4 text-sm text-destructive"
+    >
+      Sua conta do Asaas desconectou. O sinal foi desligado e as marcações
+      seguem sem sinal. Gere uma chave nova no Asaas e cole aqui.{" "}
+      <Link
+        href="/admin/financeiro/sinal-pix"
+        className="font-semibold text-primary underline underline-offset-4"
+      >
+        Conectar conta
+      </Link>
+    </p>
+  ) : asaasError === REFUND_PENDING_APPROVAL ? (
+    <p
+      role="status"
+      className="rounded-lg border border-destructive/40 bg-card p-4 text-sm text-destructive"
+    >
+      Um reembolso automático de sinal está aguardando sua aprovação no app do
+      Asaas.{" "}
+      <Link
+        href="/admin/financeiro/sinal-pix"
+        className="font-semibold text-primary underline underline-offset-4"
+      >
+        Ver recebimentos
+      </Link>
+    </p>
+  ) : asaasError ? (
+    <p
+      role="status"
+      className="rounded-lg border border-destructive/40 bg-card p-4 text-sm text-destructive"
+    >
+      O Asaas recusou o sinal: {asaasError}. Os agendamentos online estão
+      entrando sem sinal.{" "}
+      <Link
+        href="/admin/financeiro/sinal-pix"
+        className="font-semibold text-primary underline underline-offset-4"
+      >
+        Ver recebimentos
+      </Link>
+    </p>
+  ) : null;
+
   return (
     // data-layout="wide" lets the panel layout drop its narrow max width.
     // Computers open on the week, phones on the day's time grid.
@@ -97,7 +153,14 @@ export default async function AgendaPage() {
         businessHours={toBusinessHours(days)}
         canCreate={hasServices}
         showProfessional={professionals.length > 1}
-        notice={servicesNotice}
+        notice={
+          asaasNotice || servicesNotice ? (
+            <div className="grid gap-3">
+              {asaasNotice}
+              {servicesNotice}
+            </div>
+          ) : null
+        }
         aside={
           <AgendaSidePanel
             now={now}

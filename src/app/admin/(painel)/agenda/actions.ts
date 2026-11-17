@@ -21,6 +21,11 @@ import {
   type RescheduleFormInput,
   type StatusChangeInput,
 } from "@/modules/appointments/fields";
+import {
+  cancelWithDeposit,
+  paidMeanwhile,
+  previewCancellation,
+} from "@/modules/asaas/deposits";
 import { moduleActive, requireAdmin } from "@/modules/auth/session";
 import { MODULE_OFF_ERROR } from "@/modules/clinics/modules";
 import { TIME_BLOCK_TYPES } from "@/modules/schedule/fields";
@@ -194,6 +199,32 @@ export async function changeStatusAction(
   if (!parsed.success) return fieldErrorsOf(parsed.error.issues);
   const { id, ...change } = parsed.data;
   try {
+    // Every cancellation goes through the deposit rules: with a paid Pix
+    // deposit the owner must say who called it off (refund or keep).
+    if (change.to === "cancelled") {
+      let by = "by" in change ? change.by : undefined;
+      if (!by) {
+        const preview = await previewCancellation(
+          session.clinicId,
+          id,
+          "clinic",
+        );
+        // The client sends `by` whenever the page shows a paid deposit, so
+        // a missing one means the Pix was paid after the page rendered.
+        if (preview?.hasPaidDeposit) return paidMeanwhile();
+        by = "clinic";
+      }
+      return await cancelWithDeposit(
+        session.clinicId,
+        id,
+        {
+          by,
+          reason: change.reason,
+          skipRefund: "skipRefund" in change ? change.skipRefund : undefined,
+        },
+        session.user.id,
+      );
+    }
     return await changeAppointmentStatus(
       session.clinicId,
       id,

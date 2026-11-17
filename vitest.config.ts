@@ -48,6 +48,8 @@ export default defineConfig({
       MP_CLIENT_ID: "1234567890",
       MP_CLIENT_SECRET: "segredo-ficticio-do-cliente",
       MP_WEBHOOK_SECRET: "segredo-ficticio-do-webhook",
+      // Fictitious Asaas webhook token. The tests pass a fake fetch, never the network.
+      ASAAS_WEBHOOK_TOKEN: "token-ficticio-do-webhook-asaas-0123456789",
     },
     projects: [
       {

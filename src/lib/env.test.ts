@@ -20,6 +20,7 @@ describe("parseServerEnv", () => {
       ...valid,
       LOG_LEVEL: "info",
       EMAIL_OUTBOX_DIR: ".emails",
+      ASAAS_BASE_URL: "https://api-sandbox.asaas.com/v3",
     });
   });
 
@@ -87,5 +88,38 @@ describe("parseServerEnv", () => {
       DATABASE_URL: "postgres://owner:segredo@db.example.com:5432/app",
     });
     expect(parsed).not.toHaveProperty("DATABASE_URL");
+  });
+});
+
+const TOKEN = "token-ficticio-do-webhook-asaas-0123456789";
+
+describe("parseServerEnv Asaas", () => {
+  it("keeps the webhook token and no longer knows a root API key", () => {
+    const parsed = parseServerEnv({
+      ...valid,
+      ASAAS_WEBHOOK_TOKEN: TOKEN,
+      ASAAS_BASE_URL: "https://api.asaas.com/v3",
+    });
+    expect(parsed.ASAAS_WEBHOOK_TOKEN).toBe(TOKEN);
+    expect(parsed).not.toHaveProperty("ASAAS_API_KEY");
+  });
+
+  it("refuses a webhook token shorter than 32 characters", () => {
+    expect(() =>
+      parseServerEnv({ ...valid, ASAAS_WEBHOOK_TOKEN: "t" }),
+    ).toThrowError(/ASAAS_WEBHOOK_TOKEN: deve ter ao menos 32/);
+  });
+
+  it("requires ASAAS_BASE_URL in production when the token is set", () => {
+    expect(() =>
+      parseServerEnv({ ...valid, ASAAS_WEBHOOK_TOKEN: TOKEN }),
+    ).toThrowError(/ASAAS_BASE_URL/);
+    expect(
+      parseServerEnv({
+        ...valid,
+        NODE_ENV: "development",
+        ASAAS_WEBHOOK_TOKEN: TOKEN,
+      }).ASAAS_BASE_URL,
+    ).toBe("https://api-sandbox.asaas.com/v3");
   });
 });

@@ -689,95 +689,106 @@ export async function cancelSale(
 ): Promise<SaleResult> {
   if (!UUID_PATTERN.test(saleId)) return fail(SALE_NOT_FOUND);
   try {
-    return await inClinic(clinicId, async (tx): Promise<SaleResult> => {
-      if (input.cancelFutureSessions) await lockAgenda(tx, clinicId);
-      const sale = await lockSale(tx, clinicId, saleId);
-      if (!sale) return fail(SALE_NOT_FOUND);
-      if (sale.cancelledAt) return fail(SALE_CANCELLED);
-      const before = await snapshot(tx, saleId);
-
-      await tx
-        .update(sales)
-        .set({ cancelledAt: now, cancellationReason: input.reason })
-        .where(eq(sales.id, saleId));
-      await tx
-        .update(installments)
-        .set({ cancelledAt: now })
-        .where(
-          and(
-            eq(installments.saleId, saleId),
-            isNull(installments.cancelledAt),
-            sql`${paidOf()} = 0`,
-          ),
-        );
-
-      let cancelledSessions = 0;
-      if (input.cancelFutureSessions) {
-        const future = await tx
-          .select({ id: appointments.id })
-          .from(saleSessions)
-          .innerJoin(saleItems, eq(saleSessions.saleItemId, saleItems.id))
-          .innerJoin(
-            appointments,
-            eq(saleSessions.appointmentId, appointments.id),
-          )
-          .where(
-            and(
-              eq(saleItems.saleId, saleId),
-              inArray(appointments.status, ["requested", "confirmed"]),
-              gt(appointments.startsAt, now),
-            ),
-          );
-        for (const { id } of future) {
-          await tx
-            .update(appointments)
-            .set({
-              status: "cancelled",
-              cancelledAt: now,
-              cancelledBy: "clinic",
-              cancellationReason: "other",
-            })
-            .where(eq(appointments.id, id));
-          await tx.insert(auditLogs).values({
-            clinicId,
-            actorType: "admin",
-            actorUserId,
-            action: "appointment.status_changed",
-            entityType: "appointment",
-            entityId: id,
-            changes: {
-              to: "cancelled",
-              reason: "other",
-              saleCancelled: saleId,
-            },
-          });
-          await syncSessionInstallment(tx, clinicId, id);
-        }
-        cancelledSessions = future.length;
-      }
-
-      await tx.insert(saleRevisions).values({
-        clinicId,
-        saleId,
-        actorUserId,
-        reason: `Venda cancelada: ${input.reason}`,
-        before,
-        after: await snapshot(tx, saleId),
-      });
-      await tx.insert(auditLogs).values({
-        clinicId,
-        actorType: "admin",
-        actorUserId,
-        action: "sale.cancelled",
-        entityType: "sale",
-        entityId: saleId,
-        changes: { cancelledSessions },
-      });
-      return { ok: true, id: saleId };
-    });
+    return await inClinic(clinicId, (tx) =>
+      cancelSaleInTx(tx, clinicId, saleId, input, actorUserId, now),
+    );
   } catch (error) {
     throw unexpected(error);
   }
+}
+
+// cancelSale inside a transaction the caller already holds. A null actor is
+// the system (the Asaas webhook, when a deposit is refunded at Asaas).
+export async function cancelSaleInTx(
+  tx: Tx,
+  clinicId: string,
+  saleId: string,
+  input: { reason: string; cancelFutureSessions: boolean },
+  actorUserId: string | null,
+  now: Date = new Date(),
+): Promise<SaleResult> {
+  const actor = actorUserId
+    ? { actorType: "admin" as const, actorUserId }
+    : { actorType: "system" as const };
+  if (input.cancelFutureSessions) await lockAgenda(tx, clinicId);
+  const sale = await lockSale(tx, clinicId, saleId);
+  if (!sale) return fail(SALE_NOT_FOUND);
+  if (sale.cancelledAt) return fail(SALE_CANCELLED);
+  const before = await snapshot(tx, saleId);
+
+  await tx
+    .update(sales)
+    .set({ cancelledAt: now, cancellationReason: input.reason })
+    .where(eq(sales.id, saleId));
+  await tx
+    .update(installments)
+    .set({ cancelledAt: now })
+    .where(
+      and(
+        eq(installments.saleId, saleId),
+        isNull(installments.cancelledAt),
+        sql`${paidOf()} = 0`,
+      ),
+    );
+
+  let cancelledSessions = 0;
+  if (input.cancelFutureSessions) {
+    const future = await tx
+      .select({ id: appointments.id })
+      .from(saleSessions)
+      .innerJoin(saleItems, eq(saleSessions.saleItemId, saleItems.id))
+      .innerJoin(appointments, eq(saleSessions.appointmentId, appointments.id))
+      .where(
+        and(
+          eq(saleItems.saleId, saleId),
+          inArray(appointments.status, ["requested", "confirmed"]),
+          gt(appointments.startsAt, now),
+        ),
+      );
+    for (const { id } of future) {
+      await tx
+        .update(appointments)
+        .set({
+          status: "cancelled",
+          cancelledAt: now,
+          cancelledBy: "clinic",
+          cancellationReason: "other",
+        })
+        .where(eq(appointments.id, id));
+      await tx.insert(auditLogs).values({
+        clinicId,
+        ...actor,
+        action: "appointment.status_changed",
+        entityType: "appointment",
+        entityId: id,
+        changes: {
+          to: "cancelled",
+          reason: "other",
+          saleCancelled: saleId,
+        },
+      });
+      await syncSessionInstallment(tx, clinicId, id);
+    }
+    cancelledSessions = future.length;
+  }
+
+  await tx.insert(saleRevisions).values({
+    clinicId,
+    saleId,
+    actorUserId,
+    reason: `Venda cancelada: ${input.reason}`,
+    before,
+    after: await snapshot(tx, saleId),
+  });
+  await tx.insert(auditLogs).values({
+    clinicId,
+    ...actor,
+    action: "sale.cancelled",
+    entityType: "sale",
+    entityId: saleId,
+    changes: { cancelledSessions },
+  });
+  return { ok: true, id: saleId };
 }
 
 // ------------------------------------------------------- package sessions

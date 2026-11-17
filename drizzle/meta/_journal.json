@@ -253,6 +253,34 @@
       "when": 1794845183308,
       "tag": "0035_appointment_services",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1794877742369,
+      "tag": "0036_asaas",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1794878450010,
+      "tag": "0037_asaas_client_hold",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1794879050010,
+      "tag": "0038_asaas_link_fixes",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1794917526584,
+      "tag": "0039_asaas_own_account",
+      "breakpoints": true
     }
   ]
 }

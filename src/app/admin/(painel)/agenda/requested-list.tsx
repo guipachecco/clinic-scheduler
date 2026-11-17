@@ -49,6 +49,11 @@ export function RequestedList({ items }: { items: RequestedListItem[] }) {
           Object.values(result.fieldErrors ?? {})[0] ??
           STATUS_ERROR,
       );
+      // A Pix deposit got paid meanwhile: show the request as it is now.
+      if (result.stale) {
+        refreshCalendar();
+        router.refresh();
+      }
       return;
     }
     setRefusing(null);

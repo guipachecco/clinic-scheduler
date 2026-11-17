@@ -12,9 +12,23 @@ import {
   patients,
   services,
 } from "@/db/schema";
+import { logger } from "@/lib/logger";
 import { lockAgenda } from "@/modules/appointments/appointments";
 import { extraNamesSql } from "@/modules/appointments/extras";
 import { serviceLabel, type Status } from "@/modules/appointments/fields";
+import { markAccountError } from "@/modules/asaas/accounts";
+import type { Fetch } from "@/modules/asaas/api";
+import {
+  confirmWithoutDeposit,
+  depositQuote,
+  type DepositView,
+  findPendingHold,
+  getDepositView,
+  startDeposit,
+  sweepExpiredDeposits,
+  undoHold,
+  validCpf,
+} from "@/modules/asaas/deposits";
 import type { DayHours } from "@/modules/schedule/schedule";
 
 import { type BusyInterval, freeSlots, parseLocalDate } from "./slots";
@@ -50,9 +64,16 @@ export type BookableService = {
   preparationInstructions: string | null;
 };
 
+// deposit is the Pix deposit to pay when the booking is held for one, null
+// when it was booked confirmed. cpf_required / cpf_invalid: the deposit needs
+// a valid CPF and nothing was booked.
 export type BookingResult =
-  | { ok: true; appointmentId: string }
-  | { ok: false; reason: "taken" | "unavailable" | "unverified" };
+  | { ok: true; appointmentId: string; deposit: DepositView | null }
+  | {
+      ok: false;
+      reason:
+        "taken" | "unavailable" | "unverified" | "cpf_required" | "cpf_invalid";
+    };
 
 export type MyAppointment = {
   id: string;
@@ -94,9 +115,11 @@ const validContext = (ctx: BookingContext) =>
   UUID_PATTERN.test(ctx.patientId) &&
   UUID_PATTERN.test(ctx.userId);
 
+class BookingFailed extends Error {}
+
 // Never lets driver details (which can echo values) out of this module.
 function unexpected(error: unknown): Error {
-  return new Error("Não foi possível concluir o agendamento.", {
+  return new BookingFailed("Não foi possível concluir o agendamento.", {
     cause: error,
   });
 }
@@ -169,6 +192,22 @@ async function isOwnRow(tx: Tx, ctx: BookingContext): Promise<boolean> {
       ),
     );
   return Boolean(row);
+}
+
+// Her name, when her row is hers (as isOwnRow); null otherwise.
+async function ownName(tx: Tx, ctx: BookingContext): Promise<string | null> {
+  const [row] = await tx
+    .select({ name: patients.name })
+    .from(patients)
+    .where(
+      and(
+        eq(patients.id, ctx.patientId),
+        eq(patients.clinicId, ctx.clinicId),
+        eq(patients.userId, ctx.userId),
+        isNull(patients.anonymizedAt),
+      ),
+    );
+  return row?.name ?? null;
 }
 
 // Rolls the booking transaction back when her row changed under it.
@@ -323,8 +362,11 @@ export async function listFreeSlots(
   ctx: BookingContext,
   serviceId: string,
   date: string,
+  fetchImpl: Fetch = fetch,
 ): Promise<string[]> {
   if (!validContext(ctx)) return [];
+  // Holds whose Pix was not paid in time free their slots first.
+  await sweepExpiredDeposits(ctx.clinicId, new Date(), fetchImpl);
   const now = new Date();
   return asClient(scope(ctx), async (tx) => {
     const clinic = await readClinic(tx, ctx.clinicId);
@@ -356,8 +398,10 @@ export async function listDaysWithSlots(
   ctx: BookingContext,
   serviceId: string,
   month: string,
+  fetchImpl: Fetch = fetch,
 ): Promise<string[]> {
   if (!validContext(ctx) || !MONTH_PATTERN.test(month)) return [];
+  await sweepExpiredDeposits(ctx.clinicId, new Date(), fetchImpl);
   const now = new Date();
   return asClient(scope(ctx), async (tx) => {
     const clinic = await readClinic(tx, ctx.clinicId);
@@ -403,28 +447,158 @@ export async function listDaysWithSlots(
 // and that the start is still a free slot: hours,
 // blocks, other appointments with buffers, step, minimum and maximum
 // advance. appointments_no_overlap backs this up: its violation is "taken".
+//
+// When the clinic charges a Pix deposit (src/modules/asaas/deposits.ts) the
+// appointment is held as 'requested' instead, a pending deposit opens for 30
+// minutes and the Pix charge is made at Asaas. Holds that ran out are swept
+// first, as app_panel under their own agenda lock (app_client cannot change
+// other patients' rows). Without ASAAS_WEBHOOK_TOKEN nothing of that runs.
 export async function bookOnline(
   ctx: BookingContext,
-  input: { serviceId: string; startsAt: string | Date },
+  input: { serviceId: string; startsAt: string | Date; cpf?: string },
+  fetchImpl: Fetch = fetch,
 ): Promise<BookingResult> {
   if (!ctx.emailVerified) return { ok: false, reason: "unverified" };
   if (!validContext(ctx)) return { ok: false, reason: "unavailable" };
+  try {
+    return await book(ctx, input, fetchImpl);
+  } catch (error) {
+    if (error instanceof BookingFailed) throw error;
+    throw unexpected(error);
+  }
+}
+
+async function book(
+  ctx: BookingContext,
+  input: { serviceId: string; startsAt: string | Date; cpf?: string },
+  fetchImpl: Fetch,
+): Promise<BookingResult> {
   const startsAt = new Date(input.startsAt);
   const now = new Date();
+
+  await sweepExpiredDeposits(ctx.clinicId, now, fetchImpl);
+  const quote = await depositQuote(
+    ctx.clinicId,
+    input.serviceId,
+    ctx.patientId,
+  );
+  const cpf = input.cpf?.trim() || undefined;
+  if (quote?.needsCpf) {
+    if (!cpf) return { ok: false, reason: "cpf_required" };
+    if (!validCpf(cpf)) return { ok: false, reason: "cpf_invalid" };
+  }
+
+  const inserted = await insertOnline(ctx, input.serviceId, startsAt, {
+    held: quote !== null,
+    now,
+  });
+  if (!inserted.ok) {
+    if (inserted.reason === "taken" && quote && !Number.isNaN(+startsAt)) {
+      // Her own second click on the slot she is paying for.
+      const held = await findPendingHold(
+        ctx.clinicId,
+        ctx.patientId,
+        input.serviceId,
+        startsAt,
+        now,
+      );
+      const deposit = held
+        ? await getDepositView(
+            ctx.clinicId,
+            held,
+            ctx.patientId,
+            true,
+            fetchImpl,
+          )
+        : null;
+      if (held && deposit) return { ok: true, appointmentId: held, deposit };
+    }
+    return inserted;
+  }
+  if (!quote) {
+    return { ok: true, appointmentId: inserted.appointmentId, deposit: null };
+  }
+
+  // The hold is saved: from here on any failure lets it go, so no slot is
+  // left blocked by a 'requested' appointment without a pending deposit.
   try {
-    return await asClient(scope(ctx), async (tx): Promise<BookingResult> => {
+    const started = await startDeposit(
+      ctx.clinicId,
+      {
+        appointmentId: inserted.appointmentId,
+        patientId: ctx.patientId,
+        patientName: inserted.patientName,
+        serviceName: inserted.serviceName,
+        amountCents: quote.amountCents,
+        cpf,
+      },
+      now,
+      fetchImpl,
+    );
+    if (started.ok) {
+      return {
+        ok: true,
+        appointmentId: inserted.appointmentId,
+        deposit: started.deposit,
+      };
+    }
+    if (started.reason === "permanent") {
+      await markAccountError(ctx.clinicId, started.code);
+      await confirmWithoutDeposit(ctx.clinicId, inserted.appointmentId, now);
+      return { ok: true, appointmentId: inserted.appointmentId, deposit: null };
+    }
+    await undoHold(ctx.clinicId, inserted.appointmentId, now);
+    return { ok: false, reason: "unavailable" };
+  } catch (error) {
+    logger.error("online booking: deposit failed after the hold", {
+      clinicId: ctx.clinicId,
+      appointmentId: inserted.appointmentId,
+      error,
+    });
+    try {
+      await undoHold(ctx.clinicId, inserted.appointmentId, now);
+    } catch {
+      logger.error("online booking: hold not undone", {
+        clinicId: ctx.clinicId,
+        appointmentId: inserted.appointmentId,
+      });
+    }
+    return { ok: false, reason: "unavailable" };
+  }
+}
+
+type Inserted =
+  | {
+      ok: true;
+      appointmentId: string;
+      serviceName: string;
+      patientName: string;
+    }
+  | { ok: false; reason: "taken" | "unavailable" };
+
+// The booking transaction of bookOnline, as app_client: 'confirmed', or
+// 'requested' when held for a deposit (the insert policy of 0037 allows that
+// only while the clinic's deposit is active).
+async function insertOnline(
+  ctx: BookingContext,
+  serviceId: string,
+  startsAt: Date,
+  { held, now }: { held: boolean; now: Date },
+): Promise<Inserted> {
+  const status = held ? "requested" : "confirmed";
+  try {
+    return await asClient(scope(ctx), async (tx): Promise<Inserted> => {
       await lockAgenda(tx, ctx.clinicId);
 
       const clinic = await readClinic(tx, ctx.clinicId);
       if (!clinic) return { ok: false, reason: "unavailable" };
-      const service = await readService(tx, ctx.clinicId, input.serviceId);
+      const service = await readService(tx, ctx.clinicId, serviceId);
       if (!service) return { ok: false, reason: "unavailable" };
       const professionalId = await readProfessional(tx, ctx.clinicId);
       if (!professionalId) return { ok: false, reason: "unavailable" };
 
-      if (!(await isOwnRow(tx, ctx))) {
-        return { ok: false, reason: "unavailable" };
-      }
+      const patientName = await ownName(tx, ctx);
+      if (patientName === null) return { ok: false, reason: "unavailable" };
 
       if (Number.isNaN(startsAt.getTime())) {
         return { ok: false, reason: "taken" };
@@ -473,9 +647,9 @@ export async function bookOnline(
             occupiedUntil: new Date(
               endsAt.getTime() + service.bufferAfterMinutes * MINUTE,
             ),
-            status: "confirmed",
+            status,
             source: "online",
-            confirmedAt: now,
+            confirmedAt: held ? null : now,
           })
           .returning({ id: appointments.id }),
       );
@@ -494,7 +668,7 @@ export async function bookOnline(
           startsAt: startsAt.toISOString(),
           endsAt: endsAt.toISOString(),
           durationMinutes: service.durationMinutes,
-          status: "confirmed",
+          status,
           source: "online",
         },
       });
@@ -502,7 +676,12 @@ export async function bookOnline(
       // foreign key check waits for an anonymization in progress. Reading
       // the row again afterwards sees it, and the booking is undone.
       if (!(await isOwnRow(tx, ctx))) throw new RowNoLongerHers();
-      return { ok: true, appointmentId: row!.id };
+      return {
+        ok: true,
+        appointmentId: row!.id,
+        serviceName: service.name,
+        patientName,
+      };
     });
   } catch (error) {
     if (error instanceof RowNoLongerHers || error instanceof InsertRefused) {
