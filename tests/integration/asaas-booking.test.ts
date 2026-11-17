@@ -26,6 +26,7 @@ import {
 import { env } from "@/lib/env";
 import {
   depositQuote,
+  failedDepositAppointments,
   getDepositView,
   sweepExpiredDeposits,
 } from "@/modules/asaas/deposits";
@@ -561,6 +562,35 @@ describe("online booking with a Pix deposit", () => {
     // Nobody can pay a charge whose code she never saw.
     expect(asaas.count("DELETE", /\/payments\/pay-1$/)).toBe(1);
     expect(await listFreeSlots(ctx("bia"), serviceId, MONDAY)).toContain(SLOT);
+    // She never really booked it: Meus horários leaves it out, for her only.
+    const anaFailed = await failedDepositAppointments(
+      clinicId,
+      ctx("ana").patientId,
+    );
+    expect([...anaFailed]).toEqual([row!.id]);
+    expect(
+      (await failedDepositAppointments(clinicId, ctx("bia").patientId)).size,
+    ).toBe(0);
+  });
+
+  it("an unpaid hold that timed out is not hidden as a failed attempt", async () => {
+    const asaas = fakeAsaas();
+    const booked = await bookOnline(
+      ctx("ana"),
+      { serviceId, startsAt: SLOT, cpf: CPF },
+      asaas.fetchImpl,
+    );
+    expect(booked.ok).toBe(true);
+    expect(
+      await sweepExpiredDeposits(
+        clinicId,
+        new Date(NOW.getTime() + 31 * MINUTE),
+        asaas.fetchImpl,
+      ),
+    ).toBe(1);
+    expect(
+      (await failedDepositAppointments(clinicId, ctx("ana").patientId)).size,
+    ).toBe(0);
   });
 
   it("an unexpected error after the hold lets the slot go", async () => {

@@ -596,6 +596,36 @@ export async function getDepositView(
   return view(row, qr, now);
 }
 
+// Her bookings undone because the Pix could not be created (charge or QR
+// failed): she never really booked them, so Meus horários leaves them out.
+// Holds she simply did not pay ("timeout") stay visible as cancelled.
+export async function failedDepositAppointments(
+  clinicId: string,
+  patientId: string,
+): Promise<Set<string>> {
+  if (
+    !asaasEnabled() ||
+    !UUID_PATTERN.test(clinicId) ||
+    !UUID_PATTERN.test(patientId)
+  ) {
+    return new Set();
+  }
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ appointmentId: asaasDeposits.appointmentId })
+      .from(asaasDeposits)
+      .where(
+        and(
+          eq(asaasDeposits.clinicId, clinicId),
+          eq(asaasDeposits.patientId, patientId),
+          eq(asaasDeposits.status, "closed"),
+          eq(asaasDeposits.closeReason, "charge_failed"),
+        ),
+      ),
+  );
+  return new Set(rows.map((row) => row.appointmentId));
+}
+
 // Her held appointment for this service and start, with a deposit still
 // pending: a second click on the same slot gets it back instead of "taken".
 export async function findPendingHold(

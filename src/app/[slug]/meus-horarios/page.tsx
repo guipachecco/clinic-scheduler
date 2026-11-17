@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { Status } from "@/modules/appointments/fields";
 import {
   type DepositView,
+  failedDepositAppointments,
   getDepositView,
   sweepExpiredDeposits,
 } from "@/modules/asaas/deposits";
@@ -45,13 +46,16 @@ export default async function MyAppointmentsPage({
   const { ctx, clinic } = await requireClient(slug, `/${slug}/meus-horarios`);
   // Holds whose Pix ran out are let go first (nothing runs without Asaas).
   await sweepExpiredDeposits(ctx.clinicId);
-  const { upcoming: upcomingAll, past: pastAll } =
-    await listMyAppointments(ctx);
+  const [{ upcoming: upcomingAll, past: pastAll }, failed] = await Promise.all([
+    listMyAppointments(ctx),
+    failedDepositAppointments(ctx.clinicId, ctx.patientId),
+  ]);
   // Cancelled ones (upcoming or past) leave the lists and get their own.
   const upcoming = upcomingAll.filter((item) => item.status !== "cancelled");
   const past = pastAll.filter((item) => item.status !== "cancelled");
+  // Attempts undone because the Pix could not be created never were hers.
   const cancelled = [...upcomingAll, ...pastAll]
-    .filter((item) => item.status === "cancelled")
+    .filter((item) => item.status === "cancelled" && !failed.has(item.id))
     .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
   // The Pix of the holds still waiting for their deposit, with the QR.
   const deposits = new Map<string, DepositView>();
