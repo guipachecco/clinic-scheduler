@@ -284,6 +284,19 @@ export async function depositApiKey(clinicId: string): Promise<string | null> {
   return decryptToken(row.apiKeyEnc, key());
 }
 
+// The subaccount key whatever its state, to read or cancel charges already
+// made (a QR still showing, a hold that expired after the deposit was turned
+// off). Never for new charges: those use depositApiKey.
+export async function accountApiKey(clinicId: string): Promise<string | null> {
+  const [row] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ apiKeyEnc: asaasAccounts.apiKeyEnc })
+      .from(asaasAccounts)
+      .where(eq(asaasAccounts.clinicId, clinicId)),
+  );
+  return row ? decryptToken(row.apiKeyEnc, key()) : null;
+}
+
 // A short Asaas code of the last failure; null clears it.
 export async function markAccountError(
   clinicId: string,

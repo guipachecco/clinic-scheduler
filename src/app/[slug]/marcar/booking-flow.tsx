@@ -2,18 +2,27 @@
 
 import { DateTime } from "luxon";
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { FormError } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 
-import { book, type Confirmation, loadDays, loadSlots } from "./actions";
+import {
+  book,
+  type Confirmation,
+  type DepositOffer,
+  type DepositPayload,
+  loadDays,
+  loadDepositOffer,
+  loadSlots,
+} from "./actions";
 import { ConfirmSheet } from "./confirm-sheet";
 import { DayStrip, dayLabel, STRIP_SPAN, stripDays } from "./day-strip";
+import { PixStep } from "./pix-step";
 import { SlotGroups } from "./slot-groups";
 
 // Service → day strip → times by period → confirm sheet, then the
-// confirmation. Dates are local to the clinic (yyyy-mm-dd); slots are ISO
+// confirmation (through the Pix step when the clinic takes a deposit). Dates are local to the clinic (yyyy-mm-dd); slots are ISO
 // strings carrying the clinic's offset, so their HH:mm is already the
 // clinic's time.
 
@@ -25,7 +34,7 @@ export type ServiceOption = {
   price: string | null;
 };
 
-type Step = "service" | "day" | "done";
+type Step = "service" | "day" | "pix" | "done";
 
 const TAKEN = "Esse horário acabou de ser preenchido";
 const FAILURES = {
@@ -33,7 +42,10 @@ const FAILURES = {
   unavailable:
     "Não foi possível marcar esse horário. Escolha outro ou tente mais tarde.",
   unverified: "Confirme seu e-mail para marcar horários.",
+  cpf_required: "Informe o CPF de quem vai pagar o sinal.",
+  cpf_invalid: "Confira o CPF: ele não parece válido.",
 } as const;
+const PIX_FAILED = "Não conseguimos gerar o Pix agora, tente de novo.";
 const GENERIC_ERROR = "Não foi possível carregar. Tente novamente.";
 
 const monthOf = (date: string) => date.slice(0, 7);
@@ -62,8 +74,12 @@ export function BookingFlow({
   const [slot, setSlot] = useState<string | null>(null);
   const [trigger, setTrigger] = useState<HTMLElement | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [offer, setOffer] = useState<DepositOffer | null>(null);
+  const [cpf, setCpf] = useState("");
+  const [deposit, setDeposit] = useState<DepositPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const markPaid = useCallback(() => setStep("done"), []);
 
   function run(task: () => Promise<void>) {
     setError(null);
@@ -96,13 +112,23 @@ export function BookingFlow({
     setStart(from);
   }
 
+  // Its first week and the deposit it takes, if any.
+  async function openService(target: ServiceOption) {
+    const [quote] = await Promise.all([
+      loadDepositOffer(slug, target.id),
+      loadWeek(target, today, {}),
+    ]);
+    setOffer(quote);
+  }
+
   function chooseService(target: ServiceOption) {
     run(async () => {
       setService(target);
       setDay(null);
       setSlot(null);
       setSlots([]);
-      await loadWeek(target, today, {});
+      setOffer(null);
+      await openService(target);
       setStep("day");
     });
   }
@@ -111,7 +137,7 @@ export function BookingFlow({
   useEffect(() => {
     // Fetch-on-mount: the state is set after the request, not in the effect body.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (initial) run(() => loadWeek(initial, today, {}));
+    if (initial) run(() => openService(initial));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -145,16 +171,34 @@ export function BookingFlow({
     setError(null);
   }
 
+  function restart() {
+    setDeposit(null);
+    setConfirmation(null);
+    setSlot(null);
+    setStep("day");
+    if (day) chooseDay(day);
+  }
+
   function confirm() {
     if (!service || !slot || !day) return;
     run(async () => {
       const result = await book(slug, {
         serviceId: service.id,
         startsAt: slot,
+        ...(offer?.needsCpf ? { cpf } : {}),
       });
       if (result.ok) {
         setConfirmation(result.confirmation);
-        setStep("done");
+        setDeposit(result.deposit);
+        setCpf("");
+        setStep(result.deposit?.status === "pending" ? "pix" : "done");
+        return;
+      }
+      if (result.reason === "cpf_required") {
+        setOffer(await loadDepositOffer(slug, service.id));
+      }
+      if (result.reason === "unavailable" && offer) {
+        setError(PIX_FAILED);
         return;
       }
       if (result.reason === "taken") {
@@ -169,12 +213,24 @@ export function BookingFlow({
     });
   }
 
+  if (step === "pix" && deposit && confirmation && service) {
+    return (
+      <PixStep
+        slug={slug}
+        deposit={deposit}
+        onPaid={markPaid}
+        onRestart={restart}
+      />
+    );
+  }
+
   if (step === "done" && confirmation && service) {
     return (
       <Done
         slug={slug}
         confirmation={confirmation}
         serviceName={confirmation.serviceName || service.name}
+        title={deposit ? "Horário confirmado" : "Horário marcado"}
       />
     );
   }
@@ -267,6 +323,9 @@ export function BookingFlow({
               slot={slot}
               minutes={service.durationMinutes}
               price={service.price}
+              deposit={offer}
+              cpf={cpf}
+              onCpf={setCpf}
               error={error}
               pending={pending}
               onConfirm={confirm}
@@ -306,10 +365,12 @@ function Done({
   slug,
   confirmation,
   serviceName,
+  title,
 }: {
   slug: string;
   confirmation: Confirmation;
   serviceName: string;
+  title: string;
 }) {
   return (
     <section
@@ -317,7 +378,7 @@ function Done({
       className="grid gap-4 rounded-2xl border bg-card p-4"
     >
       <h2 id="horario-marcado" className="font-heading text-xl font-semibold">
-        Horário marcado
+        {title}
       </h2>
       <dl className="grid gap-1">
         <dt className="text-sm text-muted-foreground">Serviço</dt>
