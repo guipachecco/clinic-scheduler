@@ -296,6 +296,20 @@ export async function sweepExpiredDeposits(
   return charges.length;
 }
 
+// The same sweep when a panel page opens (agenda, appointment): a failure is
+// logged and the page still renders.
+export async function sweepBeforePanel(clinicId: string): Promise<void> {
+  if (!asaasEnabled()) return;
+  try {
+    await sweepExpiredDeposits(clinicId);
+  } catch (error) {
+    logger.warn("asaas: sinais vencidos não verificados", {
+      clinicId,
+      code: failureCode(error),
+    });
+  }
+}
+
 function view(
   row: { status: DepositStatus; amountCents: number; expiresAt: Date },
   qr: { payload: string; encodedImage: string } | null,

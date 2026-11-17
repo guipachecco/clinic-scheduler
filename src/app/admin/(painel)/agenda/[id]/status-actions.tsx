@@ -34,9 +34,12 @@ const REASONS = Object.entries(CANCELLATION_REASON_LABELS) as [
 export function StatusActions({
   id,
   allowedTransitions,
+  depositPending = false,
 }: {
   id: string;
   allowedTransitions: Status[];
+  // Held for a Pix deposit: confirming by hand cancels the charge.
+  depositPending?: boolean;
 }) {
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
@@ -101,6 +104,12 @@ export function StatusActions({
 
   return (
     <div className="grid gap-4">
+      {depositPending && buttons.includes("confirmed") ? (
+        <p className="text-sm text-muted-foreground">
+          Ao confirmar, a cobrança do sinal por Pix é cancelada no Asaas e
+          nenhuma venda é criada.
+        </p>
+      ) : null}
       {buttons.length > 0 ? (
         <div className="flex flex-wrap gap-3">
           {buttons.map((to) => (

@@ -41,6 +41,7 @@ import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 
 import { loadCalendarAction, rescheduleAction } from "./actions";
 import { AgendaRefreshContext } from "./agenda-refresh";
+import { depositHoldLabel } from "./status-badge";
 
 export type BusinessHoursInterval = {
   daysOfWeek: number[];
@@ -166,17 +167,30 @@ function renderEvent(arg: EventContentArg) {
       </span>
     );
   }
-  const { patientLabel, serviceLabel, status, online, professionalName } = arg
-    .event.extendedProps as {
+  const {
+    patientLabel,
+    serviceLabel,
+    status,
+    online,
+    professionalName,
+    depositMinutesLeft,
+  } = arg.event.extendedProps as {
     patientLabel?: string;
     serviceLabel?: string;
     status?: Status;
     online?: boolean;
     // Set only when the clinic has more than one active professional.
     professionalName?: string;
+    // Set only while the slot is held for a Pix deposit.
+    depositMinutesLeft?: number;
   };
   if (!patientLabel) return true;
-  const statusText = status ? ` · ${STATUS_LABELS[status].toLowerCase()}` : "";
+  const statusText =
+    depositMinutesLeft !== undefined
+      ? ` · ${depositHoldLabel(depositMinutesLeft).toLowerCase()}`
+      : status
+        ? ` · ${STATUS_LABELS[status].toLowerCase()}`
+        : "";
   return (
     <span className="agenda-event">
       {arg.timeText ? <span className="sr-only">{arg.timeText} </span> : null}
@@ -298,12 +312,16 @@ export function AgendaCalendar({
               title: event.title,
               start: event.start,
               end: event.end,
-              classNames: [`fc-status-${event.status}`],
+              classNames:
+                event.depositMinutesLeft === undefined
+                  ? [`fc-status-${event.status}`]
+                  : ["fc-deposit-pending"],
               extendedProps: {
                 patientLabel: event.patientLabel,
                 serviceLabel: event.serviceLabel,
                 status: event.status,
                 online: event.online,
+                depositMinutesLeft: event.depositMinutesLeft,
                 ...(showProfessional
                   ? { professionalName: event.professionalName }
                   : {}),

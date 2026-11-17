@@ -43,6 +43,13 @@ export function cancellationOutcome(input: {
     : "keep";
 }
 
+// Whole minutes left on a held slot ("Aguardando sinal · N min"), rounded up
+// and never below zero.
+export function depositMinutesLeft(expiresAt: Date, now: Date): number {
+  const ms = expiresAt.getTime() - now.getTime();
+  return ms > 0 ? Math.ceil(ms / 60_000) : 0;
+}
+
 export type DepositStatus =
   "pending" | "paid" | "expired" | "refunded" | "kept" | "closed";
 

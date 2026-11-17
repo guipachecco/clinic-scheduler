@@ -4,6 +4,7 @@ import {
   accountReady,
   cancellationOutcome,
   depositFor,
+  depositMinutesLeft,
   isValidCpfCnpj,
   lateArrival,
 } from "./rules";
@@ -187,5 +188,21 @@ describe("accountReady", () => {
     expect(accountReady({ general: "APPROVED" })).toBe(true);
     expect(accountReady({ general: "PENDING" })).toBe(false);
     expect(accountReady({ general: "REJECTED" })).toBe(false);
+  });
+});
+
+describe("depositMinutesLeft", () => {
+  const expiresAt = new Date("2033-03-01T12:30:00Z");
+  it("arredonda para cima e nunca fica negativo", () => {
+    expect(
+      depositMinutesLeft(expiresAt, new Date("2033-03-01T12:00:00Z")),
+    ).toBe(30);
+    expect(
+      depositMinutesLeft(expiresAt, new Date("2033-03-01T12:29:01Z")),
+    ).toBe(1);
+    expect(depositMinutesLeft(expiresAt, expiresAt)).toBe(0);
+    expect(
+      depositMinutesLeft(expiresAt, new Date("2033-03-01T13:00:00Z")),
+    ).toBe(0);
   });
 });

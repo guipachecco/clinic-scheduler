@@ -1,10 +1,12 @@
 import "server-only";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { DateTime } from "luxon";
 
 import type { Tx } from "@/db/client";
 import {
+  appointments,
+  asaasDeposits,
   installments,
   payments,
   quoteItems,
@@ -12,10 +14,13 @@ import {
   saleItems,
   sales,
 } from "@/db/schema";
+import { logger } from "@/lib/logger";
 import { QUOTE_NUMBER_LOCK } from "@/modules/finance/quotes";
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 
-import { ensurePixOnlineMethod } from "./accounts";
+import { accountApiKey, ensurePixOnlineMethod } from "./accounts";
+import { AsaasError, deletePayment, type Fetch } from "./api";
+import type { CloseReason } from "./rules";
 
 // The sale an online booking gets when its Pix deposit is paid: an approved
 // quote (the sales screens join quotes), one item, and two installments, the
@@ -136,4 +141,142 @@ export async function createDepositSale(
     })
     .returning({ id: payments.id });
   return { saleId: sale!.id, paymentId: payment!.id };
+}
+
+// Unpaid (reversals aside), like cancelSaleInTx leaves a cancelled sale.
+const unpaid = sql`coalesce((
+    select sum(p.amount_cents) from payments p
+    where p.installment_id = "installments"."id"
+      and p.reversed_at is null), 0) = 0`;
+
+// Keeps the deposit sale of an online booking in step with its appointment.
+// Called inside the agenda's transaction, right after syncSessionInstallment
+// (which handles package sales; this one only follows asaas_deposits.sale_id).
+// - Requested, confirmed or completed: the rest installment is due on the
+//   appointment's local day. Back from a no-show (a correction), the deposit
+//   is "paid" again and the rest is owed again.
+// - No-show: the clinic keeps the deposit (its payment stays) and the rest
+//   installment is cancelled; the sale stays.
+// - Cancelled: left to the cancellation flow.
+export async function syncDepositSale(
+  tx: Tx,
+  clinicId: string,
+  appointmentId: string,
+  now: Date = new Date(),
+): Promise<void> {
+  const [row] = await tx
+    .select({
+      id: asaasDeposits.id,
+      status: asaasDeposits.status,
+      saleId: asaasDeposits.saleId,
+      appointmentStatus: appointments.status,
+      startsAt: appointments.startsAt,
+      saleCancelledAt: sales.cancelledAt,
+    })
+    .from(asaasDeposits)
+    .innerJoin(
+      appointments,
+      and(
+        eq(appointments.clinicId, asaasDeposits.clinicId),
+        eq(appointments.id, asaasDeposits.appointmentId),
+      ),
+    )
+    .innerJoin(
+      sales,
+      and(
+        eq(sales.clinicId, asaasDeposits.clinicId),
+        eq(sales.id, asaasDeposits.saleId),
+      ),
+    )
+    .where(
+      and(
+        eq(asaasDeposits.clinicId, clinicId),
+        eq(asaasDeposits.appointmentId, appointmentId),
+        inArray(asaasDeposits.status, ["paid", "kept"]),
+        isNotNull(asaasDeposits.saleId),
+      ),
+    )
+    .for("update", { of: asaasDeposits });
+  if (!row || row.saleCancelledAt) return;
+  const rest = and(
+    eq(installments.clinicId, clinicId),
+    eq(installments.saleId, row.saleId!),
+    eq(installments.appointmentId, appointmentId),
+  );
+
+  if (row.appointmentStatus === "no_show") {
+    if (row.status === "paid") {
+      await tx
+        .update(asaasDeposits)
+        .set({ status: "kept", updatedAt: now })
+        .where(eq(asaasDeposits.id, row.id));
+    }
+    await tx
+      .update(installments)
+      .set({ cancelledAt: now })
+      .where(and(rest, isNull(installments.cancelledAt), unpaid));
+    return;
+  }
+  if (row.appointmentStatus === "cancelled") return;
+
+  if (row.status === "kept") {
+    await tx
+      .update(asaasDeposits)
+      .set({ status: "paid", updatedAt: now })
+      .where(eq(asaasDeposits.id, row.id));
+    await tx
+      .update(installments)
+      .set({ cancelledAt: null })
+      .where(and(rest, isNotNull(installments.cancelledAt)));
+  }
+  await tx
+    .update(installments)
+    .set({ dueDate: localDate(row.startsAt) })
+    .where(rest);
+}
+
+// Closes the deposit still pending for an appointment the owner decided on
+// (confirmed by hand, or cancelled). Returns the Asaas charge to cancel once
+// the transaction commits, or null when there is none.
+export async function closePendingDeposit(
+  tx: Tx,
+  clinicId: string,
+  appointmentId: string,
+  closeReason: Extract<CloseReason, "manual_confirm" | "clinic_cancelled">,
+  now: Date = new Date(),
+): Promise<string | null> {
+  const [closed] = await tx
+    .update(asaasDeposits)
+    .set({ status: "closed", closeReason, updatedAt: now })
+    .where(
+      and(
+        eq(asaasDeposits.clinicId, clinicId),
+        eq(asaasDeposits.appointmentId, appointmentId),
+        eq(asaasDeposits.status, "pending"),
+      ),
+    )
+    .returning({ chargeId: asaasDeposits.chargeId });
+  return closed?.chargeId ?? null;
+}
+
+// Cancels a charge at Asaas after the local change committed. Best effort:
+// a failure is logged (ids and codes only) and a late payment is refunded by
+// the webhook, since the deposit is already closed.
+export async function cancelChargeQuietly(
+  clinicId: string,
+  chargeId: string,
+  fetchImpl: Fetch = fetch,
+): Promise<void> {
+  try {
+    const apiKey = await accountApiKey(clinicId);
+    if (!apiKey) return;
+    await deletePayment(apiKey, chargeId, fetchImpl);
+  } catch (error) {
+    logger.warn("asaas: cobrança não cancelada", {
+      clinicId,
+      chargeId,
+      status: error instanceof AsaasError ? error.status : undefined,
+      codes: error instanceof AsaasError ? error.codes : undefined,
+    });
+  }
 }
