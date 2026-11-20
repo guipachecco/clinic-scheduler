@@ -218,6 +218,8 @@ describe("the panel's checkbox", () => {
       startTime: "14:30",
       durationMinutes: "60",
       idempotencyKey: crypto.randomUUID(),
+      // The test clinic has no working hours: every time is "outside hours".
+      acknowledgeWarnings: true,
       ...overrides,
     });
   }

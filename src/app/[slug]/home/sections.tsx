@@ -19,7 +19,7 @@ import {
 
 import { bookingButtonClass } from "./booking-button";
 import { CopyPhone } from "./copy-phone";
-import { openStatus, WEEKDAY_NAMES } from "./open-status";
+import { WEEKDAY_NAMES } from "./open-status";
 import { PhotoGallery } from "./photo-gallery";
 import { durationLabel, groupByCategory } from "./service-groups";
 
@@ -499,14 +499,13 @@ export function BookingBar({ page }: { page: ClinicPage }) {
 
 // The same action on a computer: a card in the right column that follows the
 // scroll, with the open/closed status and the way to the clinic.
-export function BookingCard({ page, now }: { page: ClinicPage; now: Date }) {
-  const status = openStatus(page.hours, page.timezone, now);
+export function BookingCard({ page }: { page: ClinicPage }) {
   const button = cn(bookingButtonClass(page.theme), "shadow-none");
   const services = page.services.length;
   return (
     <aside
       aria-label="Agendamento"
-      className="hidden lg:sticky lg:top-8 lg:grid lg:gap-5 lg:rounded-3xl lg:border lg:bg-card lg:p-6 lg:shadow-sm"
+      className="hidden lg:sticky lg:top-8 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:grid lg:gap-5 lg:self-start lg:rounded-3xl lg:border lg:bg-card lg:p-6 lg:shadow-sm"
     >
       <div className="grid gap-1">
         <p className="text-xs font-bold tracking-widest text-primary-text uppercase">
@@ -518,33 +517,15 @@ export function BookingCard({ page, now }: { page: ClinicPage; now: Date }) {
             : "Combine seu horário"}
         </h2>
       </div>
-      <ul className="grid gap-2 text-sm">
-        <li className="flex items-center gap-2">
-          <Icon name="clock" className="size-4 shrink-0 text-primary-text" />
-          <span className={status.open ? "font-semibold" : ""}>
-            {status.label}
-          </span>
-        </li>
-        {page.onlineBookingEnabled && services > 0 ? (
-          <li className="flex items-center gap-2">
-            <Icon
-              name="calendar"
-              className="size-4 shrink-0 text-primary-text"
-            />
-            {services === 1 ? "1 serviço" : `${services} serviços`} para
-            escolher, confirmação na hora
-          </li>
-        ) : null}
-        {page.address ? (
-          <li className="flex items-start gap-2">
-            <Icon
-              name="map"
-              className="mt-0.5 size-4 shrink-0 text-primary-text"
-            />
-            <span className="text-muted-foreground">{page.address}</span>
-          </li>
-        ) : null}
-      </ul>
+      {/* The open/closed status and the address stay in the hero and in
+          Location: repeating them here would show the same text twice. */}
+      <p className="text-sm text-muted-foreground">
+        {page.onlineBookingEnabled
+          ? services > 1
+            ? `Escolha entre ${services} serviços, o dia e o horário. A confirmação sai na hora.`
+            : "Escolha o dia e o horário. A confirmação sai na hora."
+          : "Chame a clínica para combinar o melhor dia e horário."}
+      </p>
       {page.onlineBookingEnabled ? (
         <Link href={`/${page.slug}/marcar` as Route} className={button}>
           <Icon name="calendar" className="size-5" />

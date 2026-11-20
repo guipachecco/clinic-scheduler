@@ -209,8 +209,8 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
   }
 
   // Phones: one column (the wrappers are `contents`, so every section stays a
-  // direct item of the layout's column). From lg: the cover across, the
-  // sections on the left and a sticky booking card on the right in place of
+  // direct item of the layout's column). From lg: cover and sections on the
+  // left, a sticky booking card on the right from the top, in place of
   // the fixed bar at the bottom.
   return (
     <div
@@ -218,7 +218,7 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
       className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-x-12 lg:gap-y-8 xl:grid-cols-[minmax(0,1fr)_22rem]"
     >
       <Hero page={page} now={now} />
-      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-8">
+      <div className="contents lg:col-start-1 lg:flex lg:min-w-0 lg:flex-col lg:gap-8">
         <Tabs tabs={tabs} />
         <Amenities amenities={page.amenities} />
         <Reviews page={page} canReview={mayReview} />
@@ -227,7 +227,7 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
         <PaymentMethods methods={page.paymentMethods} />
         <Contacts page={page} />
       </div>
-      <BookingCard page={page} now={now} />
+      <BookingCard page={page} />
       <div className="contents lg:col-span-2 lg:block">
         <ClinicFooter
           page={page}

@@ -49,7 +49,7 @@ export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
   const { average, total } = page.reviewSummary;
 
   return (
-    <header className="grid lg:col-span-2">
+    <header className="grid lg:col-start-1">
       {/* -mx-4 -mt-6 undo the page padding (layout.tsx) so the photo runs
           edge to edge on a phone; from lg it is a rounded banner in the
           wide page.

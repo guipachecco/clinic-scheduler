@@ -1012,6 +1012,8 @@ describe("getAppointment", () => {
       source: "admin",
       cancellationReason: null,
       confirmedAt: NOW,
+      whatsappReminder: false,
+      reminderSent: false,
       editable: true,
       allowedTransitions: ["cancelled"],
       extras: [],
