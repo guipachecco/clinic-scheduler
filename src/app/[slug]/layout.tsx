@@ -45,11 +45,17 @@ export default async function ClientLayout({
   children,
   params,
 }: LayoutProps<"/[slug]">) {
-  const clinic = await requireClinic((await params).slug);
-  const theme = await getTheme();
-  const user = await getClientUser();
-  // Only the look and the logo: the full page is read by the home page alone.
-  const look = (await getClinicLook(clinic.slug)) ?? {
+  const { slug } = await params;
+  // Independent reads, side by side (each is a round trip to the database or
+  // the session store). Only the look and the logo: the full page is read by
+  // the home page alone.
+  const [clinic, theme, user, clinicLook] = await Promise.all([
+    requireClinic(slug),
+    getTheme(),
+    getClientUser(),
+    getClinicLook(slug),
+  ]);
+  const look = clinicLook ?? {
     theme: {},
     hasLogo: false,
     logoVersion: null,
@@ -89,8 +95,10 @@ export default async function ClientLayout({
         </div>
       </header>
       {/* Bottom padding keeps the content clear of the fixed navigation
-          (less from lg, where the navigation is in the header). */}
-      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pt-6 pb-28 lg:pb-12">
+          (less from lg, where the navigation is in the header). A page that
+          marks itself `data-wide` (home, booking) gets the header's width
+          from lg; the other screens stay a single phone-sized column. */}
+      <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pt-6 pb-28 lg:pb-12 lg:has-[[data-wide]]:max-w-5xl lg:has-[[data-wide]]:px-8 lg:has-[[data-wide]]:pt-8">
         {children}
       </main>
       <BottomNav slug={clinic.slug} signedIn={user !== null} />

@@ -49,10 +49,12 @@ export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
   const { average, total } = page.reviewSummary;
 
   return (
-    <header className="grid">
+    <header className="grid lg:col-span-2">
       {/* -mx-4 -mt-6 undo the page padding (layout.tsx) so the photo runs
-          edge to edge in the column. */}
-      <div className="-mx-4 -mt-6">
+          edge to edge on a phone; from lg it is a rounded banner in the
+          wide page.
+          */}
+      <div className="-mx-4 -mt-6 lg:mx-0 lg:mt-0 lg:overflow-hidden lg:rounded-3xl">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element -- served by the /capa and /fotos route handlers
           <img
@@ -61,11 +63,11 @@ export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
             width={cover.width}
             height={cover.height}
             fetchPriority="high"
-            className="h-56 w-full bg-muted object-cover"
+            className="h-56 w-full bg-muted object-cover lg:h-96"
           />
         ) : (
           <div
-            className="flex h-40 flex-col items-center justify-center gap-1 bg-muted text-muted-foreground"
+            className="flex h-40 flex-col items-center justify-center gap-1 bg-muted text-muted-foreground lg:h-64"
             style={{
               backgroundImage:
                 "repeating-linear-gradient(45deg, transparent 0 10px, color-mix(in srgb, currentColor 6%, transparent) 10px 20px)",
@@ -82,23 +84,23 @@ export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
         <img
           src={`/${page.slug}/foto`}
           alt=""
-          className="relative -mt-10 size-20 rounded-full border-4 border-background bg-card object-cover"
+          className="relative -mt-10 size-20 rounded-full border-4 border-background bg-card object-cover lg:-mt-16 lg:ml-8 lg:size-32 lg:border-[6px]"
         />
       ) : (
         <div
           aria-hidden="true"
-          className="relative -mt-10 flex size-20 items-center justify-center rounded-full border-4 border-background bg-primary font-heading text-2xl font-semibold text-primary-foreground"
+          className="relative -mt-10 flex size-20 items-center justify-center rounded-full border-4 border-background bg-primary font-heading text-2xl font-semibold text-primary-foreground lg:-mt-16 lg:ml-8 lg:size-32 lg:border-[6px] lg:text-4xl"
         >
           {initials(name)}
         </div>
       )}
 
-      <h1 className="mt-3 font-heading text-[2rem] leading-none font-extrabold tracking-tight">
+      <h1 className="mt-3 font-heading text-[2rem] leading-none font-extrabold tracking-tight lg:mt-4 lg:px-8 lg:text-5xl">
         {name}
       </h1>
 
       {page.areaLabel ? (
-        <p className="mt-3">
+        <p className="mt-3 lg:px-8">
           {/* The one Zemana touch: brand colours in both themes. */}
           <span className="inline-block -rotate-3 rounded-full border-2 border-[#2a0081] bg-[#ffd3f0] px-3 py-0.5 font-heading text-xs font-extrabold tracking-wide text-[#2a0081] uppercase">
             {page.areaLabel}
@@ -106,7 +108,7 @@ export function Hero({ page, now }: { page: ClinicPage; now: Date }) {
         </p>
       ) : null}
 
-      <p className="mt-3 text-sm text-muted-foreground">
+      <p className="mt-3 text-sm text-muted-foreground lg:px-8 lg:text-base">
         <span className={status.open ? "font-semibold text-primary-text" : ""}>
           {status.label}
         </span>

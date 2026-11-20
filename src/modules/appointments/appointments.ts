@@ -90,6 +90,10 @@ export type AppointmentRecord = {
   source: "online" | "admin";
   cancellationReason: CancellationReason | null;
   confirmedAt: Date | null;
+  // The WhatsApp reminder the day before: asked for, and whether it already
+  // went out for the current start.
+  whatsappReminder: boolean;
+  reminderSent: boolean;
   editable: boolean;
   allowedTransitions: Status[];
   // The other procedures of the block, in order; `active` is whether the
@@ -636,6 +640,7 @@ export async function createAppointment(
           source: "admin",
           confirmedAt: now,
           idempotencyKey: values.idempotencyKey,
+          whatsappReminder: values.whatsappReminder === true,
         })
         .returning({ id: appointments.id });
       if (extras.length > 0) {
@@ -661,6 +666,7 @@ export async function createAppointment(
           ...period(values.startsAt, values.endsAt),
           status: "confirmed",
           ...(warned.codes.length > 0 ? { warnings: warned.codes } : {}),
+          ...(values.whatsappReminder ? { whatsappReminder: true } : {}),
         },
       });
       return { ok: true, id: row!.id };
@@ -884,6 +890,10 @@ export async function updateAppointment(
       const serviceChanged = service.id !== current.serviceId;
       const professionalChanged = professional.id !== current.professionalId;
       const labelChanged = values.customLabel !== current.customLabel;
+      // Undefined when the form had no checkbox: keep what was saved.
+      const reminderChanged =
+        values.whatsappReminder !== undefined &&
+        values.whatsappReminder !== current.whatsappReminder;
       const timeChanged =
         values.startsAt.getTime() !== current.startsAt.getTime() ||
         values.endsAt.getTime() !== current.endsAt.getTime();
@@ -896,6 +906,7 @@ export async function updateAppointment(
         !serviceChanged &&
         !professionalChanged &&
         !labelChanged &&
+        !reminderChanged &&
         !timeChanged &&
         !extrasChanged
       ) {
@@ -954,6 +965,9 @@ export async function updateAppointment(
           startsAt: values.startsAt,
           endsAt: values.endsAt,
           ...occupied,
+          ...(reminderChanged
+            ? { whatsappReminder: values.whatsappReminder }
+            : {}),
         })
         .where(
           and(eq(appointments.id, id), eq(appointments.clinicId, clinicId)),
@@ -983,6 +997,9 @@ export async function updateAppointment(
           }
         : {};
       const otherChanges = {
+        ...(reminderChanged
+          ? { whatsappReminder: values.whatsappReminder }
+          : {}),
         ...(labelChanged ? { labelChanged: true } : {}),
         ...(extrasChanged
           ? {
@@ -1273,6 +1290,8 @@ export async function getAppointment(
         source: appointments.source,
         cancellationReason: appointments.cancellationReason,
         confirmedAt: appointments.confirmedAt,
+        whatsappReminder: appointments.whatsappReminder,
+        reminderSentFor: appointments.reminderSentFor,
       })
       .from(appointments)
       .innerJoin(patients, eq(appointments.patientId, patients.id))
@@ -1359,6 +1378,10 @@ export async function getAppointment(
       ? row.cancellationReason
       : null,
     confirmedAt: row.confirmedAt,
+    whatsappReminder: row.whatsappReminder,
+    reminderSent:
+      row.reminderSentFor !== null &&
+      row.reminderSentFor.getTime() === row.startsAt.getTime(),
     editable: writable && isEditableStatus(row.status),
     allowedTransitions: APPOINTMENT_STATUSES.filter(
       (to) => canTransition(row.status, to, row.startsAt, now).ok,

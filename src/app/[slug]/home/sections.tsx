@@ -2,6 +2,7 @@ import type { Route } from "next";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { AMENITY_LABELS } from "@/modules/clinic-page/fields";
 import type { ClinicPage } from "@/modules/clinic-page/public";
 import { hasModule } from "@/modules/clinics/modules";
@@ -18,7 +19,7 @@ import {
 
 import { bookingButtonClass } from "./booking-button";
 import { CopyPhone } from "./copy-phone";
-import { WEEKDAY_NAMES } from "./open-status";
+import { openStatus, WEEKDAY_NAMES } from "./open-status";
 import { PhotoGallery } from "./photo-gallery";
 import { durationLabel, groupByCategory } from "./service-groups";
 
@@ -486,16 +487,86 @@ export function BookingBar({ page }: { page: ClinicPage }) {
   if (!action) return null;
   return (
     <>
-      {/* Keeps the last section clear of the fixed bar. */}
-      <div aria-hidden="true" className="h-16" />
-      {/* From lg the navigation is in the header: the bar sits at the
-          bottom of the screen. */}
-      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 lg:bottom-0">
-        <div className="mx-auto w-full max-w-md px-4 pb-3 lg:pb-6">
-          {action}
-        </div>
+      {/* Keeps the last section clear of the fixed bar. From lg the page is
+          wide and BookingCard takes its place. */}
+      <div aria-hidden="true" className="h-16 lg:hidden" />
+      <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-10 lg:hidden">
+        <div className="mx-auto w-full max-w-md px-4 pb-3">{action}</div>
       </div>
     </>
+  );
+}
+
+// The same action on a computer: a card in the right column that follows the
+// scroll, with the open/closed status and the way to the clinic.
+export function BookingCard({ page, now }: { page: ClinicPage; now: Date }) {
+  const status = openStatus(page.hours, page.timezone, now);
+  const button = cn(bookingButtonClass(page.theme), "shadow-none");
+  const services = page.services.length;
+  return (
+    <aside
+      aria-label="Agendamento"
+      className="hidden lg:sticky lg:top-8 lg:grid lg:gap-5 lg:rounded-3xl lg:border lg:bg-card lg:p-6 lg:shadow-sm"
+    >
+      <div className="grid gap-1">
+        <p className="text-xs font-bold tracking-widest text-primary-text uppercase">
+          {page.onlineBookingEnabled ? "Agende online" : "Fale com a clínica"}
+        </p>
+        <h2 className="font-heading text-2xl leading-tight font-extrabold tracking-tight">
+          {page.onlineBookingEnabled
+            ? "Marque seu horário"
+            : "Combine seu horário"}
+        </h2>
+      </div>
+      <ul className="grid gap-2 text-sm">
+        <li className="flex items-center gap-2">
+          <Icon name="clock" className="size-4 shrink-0 text-primary-text" />
+          <span className={status.open ? "font-semibold" : ""}>
+            {status.label}
+          </span>
+        </li>
+        {page.onlineBookingEnabled && services > 0 ? (
+          <li className="flex items-center gap-2">
+            <Icon
+              name="calendar"
+              className="size-4 shrink-0 text-primary-text"
+            />
+            {services === 1 ? "1 serviço" : `${services} serviços`} para
+            escolher, confirmação na hora
+          </li>
+        ) : null}
+        {page.address ? (
+          <li className="flex items-start gap-2">
+            <Icon
+              name="map"
+              className="mt-0.5 size-4 shrink-0 text-primary-text"
+            />
+            <span className="text-muted-foreground">{page.address}</span>
+          </li>
+        ) : null}
+      </ul>
+      {page.onlineBookingEnabled ? (
+        <Link href={`/${page.slug}/marcar` as Route} className={button}>
+          <Icon name="calendar" className="size-5" />
+          Marcar horário
+        </Link>
+      ) : null}
+      {page.whatsappPhone ? (
+        <a
+          href={whatsappUrl(page.whatsappPhone)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={
+            page.onlineBookingEnabled
+              ? "flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-button)] border text-sm font-semibold outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              : button
+          }
+        >
+          <Icon name="whatsapp" className="size-5" />
+          Chamar no WhatsApp
+        </a>
+      ) : null}
+    </aside>
   );
 }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { DateTime } from "luxon";
-import Link from "next/link";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
 import { FormError } from "@/components/form-message";
@@ -16,6 +15,9 @@ import {
   loadDepositOffer,
   loadSlots,
 } from "./actions";
+import { Icon } from "../icons";
+
+import { BookingDone } from "./booking-done";
 import { ConfirmSheet } from "./confirm-sheet";
 import { DayStrip, dayLabel, STRIP_SPAN, stripDays } from "./day-strip";
 import { PixStep } from "./pix-step";
@@ -44,6 +46,8 @@ const FAILURES = {
   unverified: "Confirme seu e-mail para marcar horários.",
   cpf_required: "Informe o CPF de quem vai pagar o sinal.",
   cpf_invalid: "Confira o CPF: ele não parece válido.",
+  rate_limited:
+    "Muitas tentativas seguidas. Espere alguns minutos e tente de novo.",
 } as const;
 const PIX_FAILED = "Não conseguimos gerar o Pix agora, tente de novo.";
 const GENERIC_ERROR = "Não foi possível carregar. Tente novamente.";
@@ -56,12 +60,15 @@ export function BookingFlow({
   today,
   lastDay,
   initialServiceId,
+  reminderAvailable,
 }: {
   slug: string;
   services: ServiceOption[];
   today: string;
   lastDay: string;
   initialServiceId?: string;
+  // The "me avise 1 dia antes" checkbox (WhatsApp set up on the site).
+  reminderAvailable: boolean;
 }) {
   const initial = services.find((item) => item.id === initialServiceId) ?? null;
   const [step, setStep] = useState<Step>(initial ? "day" : "service");
@@ -76,6 +83,8 @@ export function BookingFlow({
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [offer, setOffer] = useState<DepositOffer | null>(null);
   const [cpf, setCpf] = useState("");
+  // Opt-in: unticked until she ticks it.
+  const [remind, setRemind] = useState(false);
   const [deposit, setDeposit] = useState<DepositPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -186,6 +195,7 @@ export function BookingFlow({
         serviceId: service.id,
         startsAt: slot,
         ...(offer?.needsCpf ? { cpf } : {}),
+        ...(reminderAvailable && remind ? { whatsappReminder: true } : {}),
       });
       if (result.ok) {
         setConfirmation(result.confirmation);
@@ -226,11 +236,11 @@ export function BookingFlow({
 
   if (step === "done" && confirmation && service) {
     return (
-      <Done
+      <BookingDone
         slug={slug}
         confirmation={confirmation}
         serviceName={confirmation.serviceName || service.name}
-        title={deposit ? "Horário confirmado" : "Horário marcado"}
+        paid={deposit !== null}
       />
     );
   }
@@ -244,14 +254,14 @@ export function BookingFlow({
           <h2 id="passo-servico" className="font-heading text-lg font-semibold">
             Escolha o serviço
           </h2>
-          <ul className="grid gap-3">
+          <ul className="grid gap-3 lg:grid-cols-2">
             {services.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} className="grid">
                 <button
                   type="button"
                   disabled={pending}
                   onClick={() => chooseService(item)}
-                  className="grid w-full gap-1 rounded-2xl border bg-card p-4 text-left outline-none hover:border-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60"
+                  className="grid w-full content-start gap-1 rounded-2xl border bg-card p-4 text-left outline-none hover:border-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60 lg:p-5 lg:transition-colors lg:hover:bg-accent/40"
                 >
                   <span className="font-semibold">{item.name}</span>
                   <span className="text-sm text-muted-foreground">
@@ -268,34 +278,41 @@ export function BookingFlow({
           <FormError message={error} />
         </section>
       ) : (
-        <>
-          <Summary label="Serviço" onChange={() => setStep("service")}>
-            {service.name}
-          </Summary>
-          <section aria-labelledby="passo-dia" className="grid gap-3">
-            <h2 id="passo-dia" className="font-heading text-lg font-semibold">
-              Escolha o dia
-            </h2>
-            <DayStrip
-              start={start}
-              today={today}
-              lastDay={lastDay}
-              open={open}
-              selected={day}
-              disabled={pending}
-              onShift={shift}
-              onDay={chooseDay}
-            />
-            {day || slot ? null : <FormError message={error} />}
-            {Object.keys(available).length > 0 &&
-            !stripDays(start).some((date) => open.has(date)) ? (
-              <p className="text-sm text-muted-foreground">
-                Nenhum dia livre nesta semana. Veja os próximos dias.
-              </p>
-            ) : null}
-          </section>
+        // From lg: service and day on the left (following the scroll), the
+        // times on the right.
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:items-start lg:gap-10">
+          <div className="grid gap-6 lg:sticky lg:top-8 lg:rounded-3xl lg:border lg:bg-card lg:p-5">
+            <Summary label="Serviço" onChange={() => setStep("service")}>
+              {service.name}
+            </Summary>
+            <section aria-labelledby="passo-dia" className="grid gap-3">
+              <h2 id="passo-dia" className="font-heading text-lg font-semibold">
+                Escolha o dia
+              </h2>
+              <DayStrip
+                start={start}
+                today={today}
+                lastDay={lastDay}
+                open={open}
+                selected={day}
+                disabled={pending}
+                onShift={shift}
+                onDay={chooseDay}
+              />
+              {day || slot ? null : <FormError message={error} />}
+              {Object.keys(available).length > 0 &&
+              !stripDays(start).some((date) => open.has(date)) ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum dia livre nesta semana. Veja os próximos dias.
+                </p>
+              ) : null}
+            </section>
+          </div>
           {day ? (
-            <section aria-labelledby="passo-horario" className="grid gap-3">
+            <section
+              aria-labelledby="passo-horario"
+              className="grid gap-3 lg:rounded-3xl lg:border lg:bg-card lg:p-6"
+            >
               <h2
                 id="passo-horario"
                 className="font-heading text-lg font-semibold"
@@ -315,7 +332,13 @@ export function BookingFlow({
                 />
               )}
             </section>
-          ) : null}
+          ) : (
+            // Only on a computer, where the right column would be empty.
+            <div className="hidden min-h-64 flex-col items-center justify-center gap-3 rounded-3xl border border-dashed p-10 text-center text-muted-foreground lg:flex">
+              <Icon name="calendar" className="size-8 text-primary-text" />
+              <p>Escolha um dia ao lado para ver os horários livres.</p>
+            </div>
+          )}
           {slot && day ? (
             <ConfirmSheet
               serviceName={service.name}
@@ -326,6 +349,11 @@ export function BookingFlow({
               deposit={offer}
               cpf={cpf}
               onCpf={setCpf}
+              reminder={
+                reminderAvailable
+                  ? { checked: remind, onChange: setRemind }
+                  : null
+              }
               error={error}
               pending={pending}
               onConfirm={confirm}
@@ -333,7 +361,7 @@ export function BookingFlow({
               returnFocus={trigger}
             />
           ) : null}
-        </>
+        </div>
       )}
     </div>
   );
@@ -358,68 +386,5 @@ function Summary({
         Trocar
       </Button>
     </div>
-  );
-}
-
-function Done({
-  slug,
-  confirmation,
-  serviceName,
-  title,
-}: {
-  slug: string;
-  confirmation: Confirmation;
-  serviceName: string;
-  title: string;
-}) {
-  return (
-    <section
-      aria-labelledby="horario-marcado"
-      className="grid gap-4 rounded-2xl border bg-card p-4"
-    >
-      <h2 id="horario-marcado" className="font-heading text-xl font-semibold">
-        {title}
-      </h2>
-      <dl className="grid gap-1">
-        <dt className="text-sm text-muted-foreground">Serviço</dt>
-        <dd className="font-semibold">{serviceName}</dd>
-        <dt className="text-sm text-muted-foreground">Dia</dt>
-        <dd className="font-semibold">{confirmation.dateLabel}</dd>
-        <dt className="text-sm text-muted-foreground">Horário</dt>
-        <dd className="font-semibold">{confirmation.timeLabel}</dd>
-        {confirmation.address ? (
-          <>
-            <dt className="text-sm text-muted-foreground">Endereço</dt>
-            <dd>
-              {confirmation.address}
-              {confirmation.mapsUrl ? (
-                <>
-                  {" "}
-                  <a
-                    href={confirmation.mapsUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-primary-text underline underline-offset-4"
-                  >
-                    Ver no mapa
-                  </a>
-                </>
-              ) : null}
-            </dd>
-          </>
-        ) : null}
-      </dl>
-      {confirmation.preparationInstructions ? (
-        <div className="grid gap-1 rounded-xl bg-muted p-3">
-          <p className="text-sm font-semibold">Como se preparar</p>
-          <p className="text-sm whitespace-pre-line">
-            {confirmation.preparationInstructions}
-          </p>
-        </div>
-      ) : null}
-      <Button asChild size="lg">
-        <Link href={`/${slug}/meus-horarios`}>Ver meus horários</Link>
-      </Button>
-    </section>
   );
 }

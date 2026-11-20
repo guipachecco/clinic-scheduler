@@ -50,3 +50,4 @@ next-env.d.ts
 
 # E-mails written locally when MAILERSEND_API_KEY is not set
 /.emails/
+/.whatsapp/

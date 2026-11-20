@@ -1,16 +1,17 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import * as z from "zod";
 
 import { platformDb } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { accounts, auditLogs, clinics, rateLimits, users } from "@/db/schema";
+import { accounts, auditLogs, clinics, users } from "@/db/schema";
 import {
   emailSchema,
   hashPassword,
   passwordSchema,
 } from "@/modules/auth/admin-accounts";
+import { consumeRateLimit } from "@/modules/platform/rate-limit";
 
 import { SIGNUP_LIMIT } from "./signup-limit";
 
@@ -41,25 +42,10 @@ const clientAccountSchema = z.object({
 });
 
 // Counts this attempt and says whether it is within the limit. The counter is
-// a rate_limits row keyed "signup:<ip>"; the window starts at the first
-// attempt (last_request) and a new one starts once it has passed.
+// a rate_limits row keyed "signup:<ip>" (src/modules/platform/rate-limit.ts).
 async function consumeSignupAttempt(ip: string | null): Promise<boolean> {
   const key = `signup:${(ip ?? "").trim().slice(0, 64) || "unknown"}`;
-  const now = Date.now();
-  const windowStart = now - SIGNUP_LIMIT.window * 1000;
-  const expired = sql`${rateLimits.lastRequest} <= ${windowStart}`;
-  const [row] = await platformDb
-    .insert(rateLimits)
-    .values({ key, count: 1, lastRequest: now })
-    .onConflictDoUpdate({
-      target: rateLimits.key,
-      set: {
-        count: sql`case when ${expired} then 1 else ${rateLimits.count} + 1 end`,
-        lastRequest: sql`case when ${expired} then ${now} else ${rateLimits.lastRequest} end`,
-      },
-    })
-    .returning({ count: rateLimits.count });
-  return (row?.count ?? Infinity) <= SIGNUP_LIMIT.max;
+  return consumeRateLimit(key, SIGNUP_LIMIT);
 }
 
 export async function createClientAccount(input: {
