@@ -64,6 +64,14 @@ export type BookableService = {
   preparationInstructions: string | null;
 };
 
+// whatsappReminder: she ticked "Me avise 1 dia antes pelo WhatsApp".
+export type BookInput = {
+  serviceId: string;
+  startsAt: string | Date;
+  cpf?: string;
+  whatsappReminder?: boolean;
+};
+
 // deposit is the Pix deposit to pay when the booking is held for one, null
 // when it was booked confirmed. cpf_required / cpf_invalid: the deposit needs
 // a valid CPF and nothing was booked.
@@ -455,7 +463,7 @@ export async function listDaysWithSlots(
 // other patients' rows). Without ASAAS_WEBHOOK_TOKEN nothing of that runs.
 export async function bookOnline(
   ctx: BookingContext,
-  input: { serviceId: string; startsAt: string | Date; cpf?: string },
+  input: BookInput,
   fetchImpl: Fetch = fetch,
 ): Promise<BookingResult> {
   if (!ctx.emailVerified) return { ok: false, reason: "unverified" };
@@ -470,7 +478,7 @@ export async function bookOnline(
 
 async function book(
   ctx: BookingContext,
-  input: { serviceId: string; startsAt: string | Date; cpf?: string },
+  input: BookInput,
   fetchImpl: Fetch,
 ): Promise<BookingResult> {
   const startsAt = new Date(input.startsAt);
@@ -491,6 +499,7 @@ async function book(
   const inserted = await insertOnline(ctx, input.serviceId, startsAt, {
     held: quote !== null,
     now,
+    whatsappReminder: input.whatsappReminder === true,
   });
   if (!inserted.ok) {
     if (inserted.reason === "taken" && quote && !Number.isNaN(+startsAt)) {
@@ -583,7 +592,11 @@ async function insertOnline(
   ctx: BookingContext,
   serviceId: string,
   startsAt: Date,
-  { held, now }: { held: boolean; now: Date },
+  {
+    held,
+    now,
+    whatsappReminder,
+  }: { held: boolean; now: Date; whatsappReminder: boolean },
 ): Promise<Inserted> {
   const status = held ? "requested" : "confirmed";
   try {
@@ -650,6 +663,7 @@ async function insertOnline(
             status,
             source: "online",
             confirmedAt: held ? null : now,
+            whatsappReminder,
           })
           .returning({ id: appointments.id }),
       );
@@ -670,6 +684,7 @@ async function insertOnline(
           durationMinutes: service.durationMinutes,
           status,
           source: "online",
+          ...(whatsappReminder ? { whatsappReminder: true } : {}),
         },
       });
       // app_client cannot lock her row (that needs UPDATE), but the insert's

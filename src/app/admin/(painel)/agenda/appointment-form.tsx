@@ -52,6 +52,8 @@ type Props = {
   services: ServiceOption[];
   professionals: ProfessionalChoice[];
   allowExtras: boolean;
+  // Shows "Avisar 1 dia antes pelo WhatsApp" (WhatsApp set up on the site).
+  reminderAvailable: boolean;
 } & (
   | {
       mode: "create";
@@ -278,6 +280,7 @@ export function AppointmentForm(props: Props) {
           extraServiceIds: [],
           idempotencyKey,
           acknowledgeWarnings: false,
+          ...(props.reminderAvailable ? { whatsappReminder: false } : {}),
         };
   const [patient, setPatient] = useState(initialPatient);
   const [warnings, setWarnings] = useState<Warning[] | null>(null);
@@ -652,6 +655,21 @@ export function AppointmentForm(props: Props) {
           />
         </div>
       </div>
+
+      {props.reminderAvailable ? (
+        <label
+          htmlFor="whatsappReminder"
+          className="flex min-h-11 items-center gap-3 text-sm font-semibold"
+        >
+          <input
+            id="whatsappReminder"
+            type="checkbox"
+            className="size-5 shrink-0 accent-primary"
+            {...register("whatsappReminder")}
+          />
+          Avisar a paciente 1 dia antes pelo WhatsApp
+        </label>
+      ) : null}
 
       {warnings ? (
         <div

@@ -72,7 +72,7 @@ export function PixStep({
     return (
       <section
         aria-labelledby="pix-expirado"
-        className="grid gap-4 rounded-2xl border bg-card p-4"
+        className="grid gap-4 rounded-2xl border bg-card p-4 lg:mx-auto lg:w-full lg:max-w-xl lg:rounded-3xl lg:p-8"
       >
         <h2 id="pix-expirado" className="font-heading text-xl font-semibold">
           O tempo para pagar acabou
@@ -90,7 +90,7 @@ export function PixStep({
   return (
     <section
       aria-labelledby="pix-sinal"
-      className="grid gap-4 rounded-2xl border bg-card p-4"
+      className="grid gap-4 rounded-2xl border bg-card p-4 lg:mx-auto lg:w-full lg:max-w-xl lg:rounded-3xl lg:p-8"
     >
       <h2 id="pix-sinal" className="font-heading text-xl font-semibold">
         Pague o sinal para garantir o horário

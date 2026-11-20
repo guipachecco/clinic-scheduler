@@ -6,6 +6,7 @@ import { requireAdmin } from "@/modules/auth/session";
 import { getPatient } from "@/modules/patients/patients";
 import { listActiveProfessionals } from "@/modules/professionals/professionals";
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
+import { whatsappRemindersAvailable } from "@/modules/reminders/whatsapp";
 import { listActiveServices } from "@/modules/services/services";
 
 import { AppointmentForm, type ServiceOption } from "../appointment-form";
@@ -106,6 +107,7 @@ export default async function NewAppointmentPage({
           services={services.map(toOption)}
           professionals={professionals}
           allowExtras
+          reminderAvailable={whatsappRemindersAvailable()}
           {...startDefaults(inicio)}
           initialPatient={patient}
         />

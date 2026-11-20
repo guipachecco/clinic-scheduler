@@ -31,6 +31,7 @@ import {
   formatLocal,
   todayLocal,
 } from "@/modules/schedule/time";
+import { whatsappRemindersAvailable } from "@/modules/reminders/whatsapp";
 import { listActiveServices } from "@/modules/services/services";
 import {
   listAppointmentUsage,
@@ -78,6 +79,7 @@ export default async function AppointmentPage({
   await sweepBeforePanel(clinicId);
   const now = new Date();
   const appointment = await getAppointment(clinicId, id, now);
+  const reminderAvailable = whatsappRemindersAvailable();
   if (!appointment) notFound();
   const { deposit } = appointment;
   // Held for a Pix deposit: "Aguardando sinal · N min" instead of "Solicitado".
@@ -282,6 +284,12 @@ export default async function AppointmentPage({
             </Link>
           </p>
           <p>Origem: {SOURCE_LABELS[appointment.source]}</p>
+          {appointment.whatsappReminder ? (
+            <p>
+              Lembrete por WhatsApp:{" "}
+              {appointment.reminderSent ? "enviado" : "1 dia antes"}
+            </p>
+          ) : null}
           {depositText ? <p>{depositText}</p> : null}
           {appointment.status === "cancelled" &&
           appointment.cancellationReason ? (
@@ -451,6 +459,7 @@ export default async function AppointmentPage({
             services={services}
             professionals={professionalChoices}
             allowExtras={!appointment.inPackage}
+            reminderAvailable={reminderAvailable}
             defaults={{
               patientId: appointment.patientId,
               serviceId: appointment.serviceId,
@@ -470,6 +479,9 @@ export default async function AppointmentPage({
               // Ignored on update; the schema only needs a UUID here.
               idempotencyKey: appointment.id,
               acknowledgeWarnings: false,
+              ...(reminderAvailable
+                ? { whatsappReminder: appointment.whatsappReminder }
+                : {}),
             }}
           />
         </section>

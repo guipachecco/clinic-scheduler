@@ -50,6 +50,11 @@ export default defineConfig({
       MP_WEBHOOK_SECRET: "segredo-ficticio-do-webhook",
       // Fictitious Asaas webhook token. The tests pass a fake fetch, never the network.
       ASAAS_WEBHOOK_TOKEN: "token-ficticio-do-webhook-asaas-0123456789",
+      // Without WHATSAPP_TOKEN the reminders the tests send are written here.
+      WHATSAPP_OUTBOX_DIR: path.join(
+        tmpdir(),
+        "clinic-scheduler-test-whatsapp",
+      ),
     },
     projects: [
       {

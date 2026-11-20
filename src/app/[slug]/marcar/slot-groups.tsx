@@ -75,7 +75,7 @@ export function SlotGroups({
                 {count(group.slots.length)}
               </span>
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 xl:grid-cols-5">
               {group.slots.map((value) => (
                 <button
                   key={value}

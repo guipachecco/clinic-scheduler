@@ -50,7 +50,7 @@ function Row({
   );
 }
 
-// A bottom sheet above the bottom navigation: traps focus, closes on Escape
+// A bottom sheet above the bottom navigation (a centered dialog from lg): traps focus, closes on Escape
 // and on the close icon, and gives focus back to the slot that opened it.
 export function ConfirmSheet({
   serviceName,
@@ -61,6 +61,7 @@ export function ConfirmSheet({
   deposit,
   cpf,
   onCpf,
+  reminder,
   error,
   pending,
   onConfirm,
@@ -76,6 +77,8 @@ export function ConfirmSheet({
   deposit: DepositOffer | null;
   cpf: string;
   onCpf: (value: string) => void;
+  // The WhatsApp reminder checkbox; null hides it.
+  reminder: { checked: boolean; onChange: (value: boolean) => void } | null;
   error: string | null;
   pending: boolean;
   onConfirm: () => void;
@@ -124,10 +127,10 @@ export function ConfirmSheet({
   }, [returnFocus]);
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center">
+    <div className="fixed inset-0 z-40 flex items-end justify-center lg:items-center lg:p-6">
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-black/50"
+        className="absolute inset-0 animate-[sheet-fade_150ms_ease-out] bg-black/50 motion-reduce:animate-none lg:backdrop-blur-sm"
         onClick={() => {
           if (!pending) onClose();
         }}
@@ -137,7 +140,7 @@ export function ConfirmSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="folha-titulo"
-        className="relative grid max-h-full w-full max-w-md gap-4 overflow-y-auto rounded-t-3xl border-t bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]"
+        className="relative grid max-h-full w-full max-w-md animate-[sheet-up_220ms_ease-out] gap-4 overflow-y-auto rounded-t-3xl border-t bg-card p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-2xl motion-reduce:animate-none lg:max-h-[calc(100dvh-3rem)] lg:max-w-lg lg:animate-[dialog-in_200ms_ease-out] lg:rounded-3xl lg:border lg:p-7"
       >
         <div className="flex items-center justify-between gap-3">
           <h2 id="folha-titulo" className="font-heading text-lg font-semibold">
@@ -203,6 +206,23 @@ export function ConfirmSheet({
               O Pix pede um CPF. Ele fica só com o Asaas, que gera a cobrança.
             </p>
           </div>
+        ) : null}
+        {reminder ? (
+          <label
+            htmlFor="lembrete-whatsapp"
+            className="flex min-h-11 items-center gap-3 text-sm font-semibold"
+          >
+            <input
+              id="lembrete-whatsapp"
+              name="lembrete"
+              type="checkbox"
+              className="size-5 shrink-0 accent-primary"
+              checked={reminder.checked}
+              disabled={pending}
+              onChange={(event) => reminder.onChange(event.target.checked)}
+            />
+            Me avise 1 dia antes pelo WhatsApp
+          </label>
         ) : null}
         <FormError message={error} />
         <Button

@@ -21,6 +21,10 @@ describe("parseServerEnv", () => {
       LOG_LEVEL: "info",
       EMAIL_OUTBOX_DIR: ".emails",
       ASAAS_BASE_URL: "https://api-sandbox.asaas.com/v3",
+      WHATSAPP_TEMPLATE: "lembrete_horario",
+      WHATSAPP_TEMPLATE_LANGUAGE: "pt_BR",
+      WHATSAPP_GRAPH_VERSION: "v23.0",
+      WHATSAPP_OUTBOX_DIR: ".whatsapp",
     });
   });
 

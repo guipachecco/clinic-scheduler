@@ -44,6 +44,7 @@ export default async function OpenGraphImage() {
           transform: "rotate(-6deg)",
         }}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element -- ImageResponse (Satori) renders plain <img>; next/image does not work here */}
         <img src={symbolSrc} width={200} height={200} alt="" />
       </div>
       <div

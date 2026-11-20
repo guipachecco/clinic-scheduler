@@ -69,7 +69,48 @@ export const serverEnvSchema = z
     ASAAS_BASE_URL: optionalText(),
     // Sent back by Asaas in the asaas-access-token header of every webhook.
     ASAAS_WEBHOOK_TOKEN: optionalText(),
+    // WhatsApp reminder the day before (docs/lembrete-whatsapp.md), through
+    // the WhatsApp Cloud API of Meta, from the Zemana's own number. With
+    // WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID the reminder goes out as the
+    // approved template WHATSAPP_TEMPLATE; without them the message is written
+    // as a JSON file to WHATSAPP_OUTBOX_DIR, and on the real site the "me avise"
+    // checkbox stays hidden.
+    WHATSAPP_TOKEN: optionalText(),
+    WHATSAPP_PHONE_NUMBER_ID: optionalText().refine(
+      (value) => value === undefined || /^\d{5,20}$/.test(value),
+      { error: "deve ser o número (só dígitos) do Phone Number ID da Meta" },
+    ),
+    WHATSAPP_TEMPLATE: optionalText().transform(
+      (value) => value ?? "lembrete_horario",
+    ),
+    WHATSAPP_TEMPLATE_LANGUAGE: optionalText().transform(
+      (value) => value ?? "pt_BR",
+    ),
+    WHATSAPP_GRAPH_VERSION: optionalText()
+      .refine((value) => value === undefined || /^v\d+\.\d+$/.test(value), {
+        error: 'deve ser uma versão da Graph API, como "v23.0"',
+      })
+      .transform((value) => value ?? "v23.0"),
+    WHATSAPP_OUTBOX_DIR: optionalText().transform(
+      (value) => value ?? ".whatsapp",
+    ),
+    // Sent by the Vercel cron as "Authorization: Bearer <CRON_SECRET>" to
+    // /api/cron/lembretes. Without it the route refuses every call.
+    CRON_SECRET: optionalText(),
   })
+  .refine(
+    (env) =>
+      (env.WHATSAPP_TOKEN === undefined) ===
+      (env.WHATSAPP_PHONE_NUMBER_ID === undefined),
+    {
+      error: "defina WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID juntas",
+      path: ["WHATSAPP_PHONE_NUMBER_ID"],
+    },
+  )
+  .refine(
+    (env) => env.CRON_SECRET === undefined || env.CRON_SECRET.length >= 32,
+    { error: "deve ter ao menos 32 caracteres", path: ["CRON_SECRET"] },
+  )
   .refine(
     (env) =>
       (env.MP_CLIENT_ID === undefined) === (env.MP_CLIENT_SECRET === undefined),
@@ -133,7 +174,7 @@ export const serverEnvSchema = z
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
-function isLocalhost(url: string) {
+export function isLocalhost(url: string) {
   const { hostname } = new URL(url);
   return hostname === "localhost" || hostname === "127.0.0.1";
 }

@@ -16,11 +16,13 @@ import {
   listFreeSlots,
 } from "@/modules/booking/booking";
 import { requireClient } from "@/modules/clients/session";
+import { BOOKING_LIMIT, consumeRateLimit } from "@/modules/platform/rate-limit";
+import { whatsappRemindersAvailable } from "@/modules/reminders/whatsapp";
 
 // The booking steps of /<slug>/marcar. Each action rebuilds who she is from
 // the server session (requireClient); nothing the browser sends but the
-// service, the month or day, the chosen start and the CPF for the deposit is
-// used. The CPF goes straight to bookOnline and is never logged.
+// service, the month or day, the chosen start, the CPF for the deposit and
+// whether she wants the WhatsApp reminder is used. The CPF goes straight to bookOnline and is never logged.
 
 export type Confirmation = {
   serviceName: string;
@@ -30,6 +32,8 @@ export type Confirmation = {
   address: string | null;
   mapsUrl: string | null;
   preparationInstructions: string | null;
+  // She asked for the WhatsApp reminder the day before.
+  whatsappReminder: boolean;
 };
 
 // The Pix deposit as the browser gets it. The QR image and the code only go
@@ -52,7 +56,12 @@ export type BookResult =
   | {
       ok: false;
       reason:
-        "taken" | "unavailable" | "unverified" | "cpf_required" | "cpf_invalid";
+        | "taken"
+        | "unavailable"
+        | "unverified"
+        | "cpf_required"
+        | "cpf_invalid"
+        | "rate_limited";
     };
 
 // What the confirm sheet shows before booking; null when no deposit.
@@ -71,6 +80,7 @@ const bookSchema = z.object({
   serviceId,
   startsAt: z.iso.datetime({ offset: true }),
   cpf: z.string().max(20).optional(),
+  whatsappReminder: z.boolean().optional(),
 });
 const appointmentId = z.uuid();
 
@@ -146,13 +156,22 @@ export async function pollDeposit(
 }
 
 export async function book(slug: string, input: unknown): Promise<BookResult> {
-  const { ctx, clinic } = await requireClient(slug, back(slug));
+  const { ctx, clinic, user } = await requireClient(slug, back(slug));
   const parsed = bookSchema.safeParse(input);
   if (!parsed.success) return { ok: false, reason: "unavailable" };
+  // Per account, across clinics: every try may hold a slot and open a Pix.
+  if (!(await consumeRateLimit(`book:${user.id}`, BOOKING_LIMIT))) {
+    logger.warn("online booking rate limited", { clinicId: ctx.clinicId });
+    return { ok: false, reason: "rate_limited" };
+  }
 
+  // Without WhatsApp on the site the checkbox is hidden; a ticked one sent
+  // anyway is dropped.
+  const whatsappReminder =
+    parsed.data.whatsappReminder === true && whatsappRemindersAvailable();
   let result;
   try {
-    result = await bookOnline(ctx, parsed.data);
+    result = await bookOnline(ctx, { ...parsed.data, whatsappReminder });
   } catch (error) {
     logger.error("online booking failed", { error });
     return { ok: false, reason: "unavailable" };
@@ -178,6 +197,7 @@ export async function book(slug: string, input: unknown): Promise<BookResult> {
       address: clinic.address,
       mapsUrl: clinic.mapsUrl,
       preparationInstructions: service?.preparationInstructions ?? null,
+      whatsappReminder,
     },
     deposit,
   };

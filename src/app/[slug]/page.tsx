@@ -18,6 +18,7 @@ import {
   AboutTab,
   Amenities,
   BookingBar,
+  BookingCard,
   ClinicFooter,
   Contacts,
   hasAbout,
@@ -148,8 +149,10 @@ async function clientExtras(
 // loyalty, products, about) and the sections below them.
 export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
   const { slug } = await params;
-  const clinic = await requireClinic(slug);
-  const page = await loadPage(slug);
+  const [clinic, page] = await Promise.all([
+    requireClinic(slug),
+    loadPage(slug),
+  ]);
   if (!page) notFound();
   const { mayReview, progress, needsRecord } = await clientExtras(
     slug,
@@ -205,22 +208,34 @@ export default async function ClinicHomePage({ params }: PageProps<"/[slug]">) {
     });
   }
 
+  // Phones: one column (the wrappers are `contents`, so every section stays a
+  // direct item of the layout's column). From lg: the cover across, the
+  // sections on the left and a sticky booking card on the right in place of
+  // the fixed bar at the bottom.
   return (
-    <>
+    <div
+      data-wide=""
+      className="contents lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-x-12 lg:gap-y-8 xl:grid-cols-[minmax(0,1fr)_22rem]"
+    >
       <Hero page={page} now={now} />
-      <Tabs tabs={tabs} />
-      <Amenities amenities={page.amenities} />
-      <Reviews page={page} canReview={mayReview} />
-      <Location page={page} />
-      <Hours page={page} today={today} />
-      <PaymentMethods methods={page.paymentMethods} />
-      <Contacts page={page} />
-      <ClinicFooter
-        page={page}
-        year={DateTime.fromJSDate(now, { zone: page.timezone }).year}
-      />
+      <div className="contents lg:flex lg:min-w-0 lg:flex-col lg:gap-8">
+        <Tabs tabs={tabs} />
+        <Amenities amenities={page.amenities} />
+        <Reviews page={page} canReview={mayReview} />
+        <Location page={page} />
+        <Hours page={page} today={today} />
+        <PaymentMethods methods={page.paymentMethods} />
+        <Contacts page={page} />
+      </div>
+      <BookingCard page={page} now={now} />
+      <div className="contents lg:col-span-2 lg:block">
+        <ClinicFooter
+          page={page}
+          year={DateTime.fromJSDate(now, { zone: page.timezone }).year}
+        />
+      </div>
       <BookingBar page={page} />
       <JsonLd data={clinicJsonLd(page)} />
-    </>
+    </div>
   );
 }

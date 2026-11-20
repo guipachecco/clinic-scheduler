@@ -161,6 +161,14 @@ export const appointmentFormSchema = z
       .transform((value) => value ?? []),
     idempotencyKey: z.uuid("Recarregue a página e tente de novo."),
     acknowledgeWarnings: checkbox,
+    // "Avisar 1 dia antes pelo WhatsApp". Absent when the form has no
+    // checkbox (WhatsApp off on the site): an edit then keeps what was saved.
+    whatsappReminder: z
+      .union([z.boolean(), z.literal("on")])
+      .optional()
+      .transform((value) =>
+        value === undefined ? undefined : value === true || value === "on",
+      ),
   })
   .superRefine((value, ctx) => {
     // Zod still runs this when a field failed; there is nothing to check then.
@@ -192,6 +200,7 @@ export const appointmentFormSchema = z
       durationMinutes: value.durationMinutes,
       idempotencyKey: value.idempotencyKey,
       acknowledgeWarnings: value.acknowledgeWarnings,
+      whatsappReminder: value.whatsappReminder,
     };
   });
 

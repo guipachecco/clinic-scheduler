@@ -799,6 +799,12 @@ export const appointments = pgTable(
     // SHA-256 of the patient's management link token; the token itself is never stored.
     manageTokenHash: text("manage_token_hash").unique(),
     idempotencyKey: uuid("idempotency_key").unique(),
+    // WhatsApp reminder the day before (migration 0041, src/modules/reminders):
+    // the patient asks for it when she books online, or the owner ticks it in
+    // the panel. reminder_sent_for is the starts_at the reminder went out for,
+    // so a rescheduled appointment gets a new one.
+    whatsappReminder: boolean("whatsapp_reminder").notNull().default(false),
+    reminderSentFor: timestamp("reminder_sent_for", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

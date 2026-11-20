@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { listBookableServices } from "@/modules/booking/booking";
 import { requireClient, requireClinic } from "@/modules/clients/session";
+import { whatsappRemindersAvailable } from "@/modules/reminders/whatsapp";
 
 import { ResendVerification } from "../resend-verification";
 import { ClinicContacts, PageTitle, priceLabel, Unavailable } from "../ui";
@@ -67,8 +68,9 @@ export default async function BookPage({
   }
 
   const today = DateTime.now().setZone(clinic.timezone).startOf("day");
+  // data-wide: the layout gives the flow the wide column from lg.
   return (
-    <>
+    <div data-wide="" className="grid gap-6 lg:gap-8">
       <PageTitle>Marcar horário</PageTitle>
       <BookingFlow
         slug={clinic.slug}
@@ -78,7 +80,8 @@ export default async function BookPage({
         lastDay={today
           .plus({ days: clinic.maxAdvanceDays })
           .toFormat("yyyy-MM-dd")}
+        reminderAvailable={whatsappRemindersAvailable()}
       />
-    </>
+    </div>
   );
 }
