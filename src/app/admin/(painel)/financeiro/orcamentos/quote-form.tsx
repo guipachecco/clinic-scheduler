@@ -270,7 +270,7 @@ export function QuoteForm({
           return (
             <div
               key={item.key}
-              className="grid gap-3 rounded-2xl border bg-card p-4 md:grid-cols-12"
+              className="grid gap-3 rounded-2xl border bg-card p-5 shadow-sm md:grid-cols-12 md:p-6"
             >
               {showKinds ? (
                 <div className="grid gap-2 md:col-span-2">

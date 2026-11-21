@@ -70,19 +70,19 @@ export default async function CashPage({
       </nav>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border bg-card p-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
           <p className="text-sm text-muted-foreground">Entradas</p>
           <p className="font-heading text-xl font-semibold tabular-nums">
             {money(incoming)}
           </p>
         </div>
-        <div className="rounded-2xl border bg-card p-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
           <p className="text-sm text-muted-foreground">Saídas</p>
           <p className="font-heading text-xl font-semibold tabular-nums">
             {money(outgoing)}
           </p>
         </div>
-        <div className="rounded-2xl border bg-card p-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
           <p className="text-sm text-muted-foreground">Saldo</p>
           <p className="font-heading text-xl font-semibold tabular-nums">
             {signedMoney(total)}

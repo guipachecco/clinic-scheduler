@@ -382,7 +382,7 @@ export function AnamnesisForm({
         void save();
       }}
     >
-      <div className="grid gap-4 rounded-2xl border bg-card p-4 md:p-5">
+      <div className="grid gap-4 rounded-2xl border bg-card p-5 shadow-sm md:p-5 md:p-6">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="grid gap-2">
             <Label htmlFor="takenOn">Data da anamnese</Label>
@@ -504,7 +504,7 @@ export function AnamnesisForm({
         })}
       </div>
 
-      <div className="grid gap-4 rounded-2xl border bg-card p-4 md:p-5">
+      <div className="grid gap-4 rounded-2xl border bg-card p-5 shadow-sm md:p-5 md:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="submit">Salvar</Button>
           <Button

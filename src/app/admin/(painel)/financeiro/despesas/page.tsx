@@ -40,7 +40,7 @@ export default async function ExpensesPage({
 
       <section
         aria-labelledby="nova-despesa"
-        className="grid gap-3 rounded-2xl border bg-card p-4"
+        className="grid gap-3 rounded-2xl border bg-card p-5 shadow-sm md:p-6"
       >
         <h2 id="nova-despesa" className="font-heading text-lg font-bold">
           Nova despesa

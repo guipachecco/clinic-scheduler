@@ -38,7 +38,7 @@ export default async function ReviewsPage() {
       </p>
 
       {reviews.length === 0 ? (
-        <p className="rounded-2xl border bg-card p-4 text-sm text-muted-foreground">
+        <p className="rounded-2xl border bg-card p-5 text-sm text-muted-foreground shadow-sm md:p-6">
           Nenhuma avaliação recebida ainda.
         </p>
       ) : (
@@ -46,7 +46,7 @@ export default async function ReviewsPage() {
           {reviews.map((review) => (
             <li
               key={review.id}
-              className="grid gap-2 rounded-2xl border bg-card p-4"
+              className="grid gap-2 rounded-2xl border bg-card p-5 shadow-sm md:p-6"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <Link

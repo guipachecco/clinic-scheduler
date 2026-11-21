@@ -50,6 +50,19 @@ const PATHS = {
       <path d="M4 10h16M9 3v4M15 3v4" />
     </>
   ),
+  box: (
+    <>
+      <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
+      <path d="m4 7.5 8 4.5 8-4.5M12 12v9" />
+    </>
+  ),
+  pulse: <path d="M3 12h4l2.5-6 5 12 2.5-6h4" />,
+  pencil: (
+    <>
+      <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z" />
+      <path d="m13.5 6.5 4 4" />
+    </>
+  ),
   globe: (
     <>
       <circle cx="12" cy="12" r="8" />

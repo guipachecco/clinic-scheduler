@@ -55,7 +55,7 @@ export default async function ProductsPage() {
       </PageHeader>
 
       {productCount === 0 ? (
-        <section className="grid gap-3 rounded-2xl border bg-card p-4">
+        <section className="grid gap-3 rounded-2xl border bg-card p-5 shadow-sm md:p-6">
           <p>Nenhum produto cadastrado ainda.</p>
           <ExampleProductsButton />
         </section>
@@ -91,7 +91,7 @@ export default async function ProductsPage() {
               Editar categoria
               <span className="sr-only">: {category.name}</span>
             </summary>
-            <div className="mt-2 rounded-2xl border bg-card p-4">
+            <div className="mt-2 rounded-2xl border bg-card p-5 shadow-sm md:p-6">
               <ProductCategoryForm
                 mode="edit"
                 id={category.id}

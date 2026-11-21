@@ -125,7 +125,7 @@ function Panel({
   return (
     <div
       className={cn(
-        "grid min-w-0 content-start gap-3 rounded-2xl border bg-card p-4 shadow-xs",
+        "grid min-w-0 content-start gap-3 rounded-2xl border bg-card p-5 shadow-sm shadow-xs md:p-6",
         className,
       )}
     >
@@ -364,7 +364,7 @@ export default async function MonitoringPage() {
           </Panel>
         </div>
         {errors.recent.length > 0 ? (
-          <details className="rounded-2xl border bg-card p-4 shadow-xs">
+          <details className="rounded-2xl border bg-card p-5 shadow-sm shadow-xs md:p-6">
             <summary className="cursor-pointer text-sm font-semibold">
               Últimos {errors.recent.length} erros, um a um
             </summary>

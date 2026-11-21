@@ -3,6 +3,8 @@ import type { Metadata, Route } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Icon } from "@/components/icon";
+import { SectionCard } from "@/components/section-card";
 import { Button } from "@/components/ui/button";
 import { getAppointment } from "@/modules/appointments/appointments";
 import {
@@ -232,83 +234,98 @@ export default async function AppointmentPage({
   }
 
   return (
-    <div className="grid max-w-3xl gap-8">
-      <header className="grid gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
-            Atendimento
-          </h1>
-          <StatusBadge
-            status={appointment.status}
-            depositMinutesLeft={holdMinutes}
-          />
-        </div>
-        <div className="grid gap-1">
-          <p className="text-lg font-medium">
-            {formatLocal(appointment.startsAt, "dd/MM/yyyy")},{" "}
-            <span>
+    <div className="grid max-w-3xl gap-6">
+      <header className="relative grid gap-6 overflow-hidden rounded-2xl border bg-card p-5 shadow-sm md:p-7">
+        {/* A soft glow of the identity colors in the corner. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-24 -right-24 size-64 rounded-full bg-highlight/10 blur-3xl"
+        />
+        <div className="relative grid gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-heading text-2xl font-bold tracking-tight md:text-3xl">
+              Atendimento
+            </h1>
+            <StatusBadge
+              status={appointment.status}
+              depositMinutesLeft={holdMinutes}
+            />
+          </div>
+          <p className="flex flex-wrap items-center gap-x-5 gap-y-2 text-lg font-semibold">
+            <span className="inline-flex items-center gap-2">
+              <Icon name="calendar" className="text-primary-text" />
+              {formatLocal(appointment.startsAt, "dd/MM/yyyy")},
+            </span>{" "}
+            <span className="inline-flex items-center gap-2">
+              <Icon name="clock" className="text-primary-text" />
               {formatLocal(appointment.startsAt, "HH:mm")}–
               {formatLocal(appointment.endsAt, "HH:mm")}
             </span>
           </p>
-          <p>Duração: {appointment.durationMinutes} min</p>
-          <p>Serviço: {serviceText}</p>
-          {appointment.extras.length > 0 ? (
-            <div>
-              <h2 id="procedimentos" className="font-medium">
-                Procedimentos
-              </h2>
-              <ul aria-labelledby="procedimentos" className="list-disc pl-5">
-                <li>
-                  {appointment.serviceName} ·{" "}
-                  {appointment.serviceDurationMinutes} min
-                </li>
-                {appointment.extras.map((extra) => (
-                  <li key={extra.serviceId}>
-                    {extra.name} · {extra.durationMinutes} min
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          {showProfessional ? (
-            <p>Profissional: {appointment.professionalName}</p>
-          ) : null}
-          <p>
-            Paciente:{" "}
+        </div>
+        <div className="relative grid gap-x-6 gap-y-4 border-t pt-5 sm:grid-cols-2 md:grid-cols-3">
+          <Fact label="Paciente">
             <Link
               href={`/admin/pacientes/${appointment.patientId}` as Route}
-              className="font-semibold text-primary underline underline-offset-4"
+              className="font-semibold text-primary-text underline decoration-primary/40 underline-offset-4 hover:decoration-primary"
             >
               {appointment.patientName}
             </Link>
-          </p>
-          <p>Origem: {SOURCE_LABELS[appointment.source]}</p>
-          {appointment.whatsappReminder ? (
-            <p>
-              Lembrete por WhatsApp:{" "}
-              {appointment.reminderSent ? "enviado" : "1 dia antes"}
-            </p>
+          </Fact>
+          <Fact label="Serviço">{serviceText}</Fact>
+          <Fact label="Duração">{appointment.durationMinutes} min</Fact>
+          {showProfessional ? (
+            <Fact label="Profissional">{appointment.professionalName}</Fact>
           ) : null}
-          {depositText ? <p>{depositText}</p> : null}
+          <Fact label="Origem">{SOURCE_LABELS[appointment.source]}</Fact>
+          {appointment.whatsappReminder ? (
+            <Fact label="Lembrete por WhatsApp">
+              {appointment.reminderSent ? "enviado" : "1 dia antes"}
+            </Fact>
+          ) : null}
           {appointment.status === "cancelled" &&
           appointment.cancellationReason ? (
-            <p>
-              Motivo:{" "}
+            <Fact label="Motivo">
               {CANCELLATION_REASON_LABELS[appointment.cancellationReason]}
-            </p>
+            </Fact>
           ) : null}
         </div>
+        {appointment.extras.length > 0 ? (
+          <div className="relative grid gap-2">
+            <h2
+              id="procedimentos"
+              className="text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+            >
+              Procedimentos
+            </h2>
+            <ul
+              aria-labelledby="procedimentos"
+              className="flex flex-wrap gap-2"
+            >
+              <li className="rounded-full bg-muted px-3 py-1 text-sm">
+                {appointment.serviceName} · {appointment.serviceDurationMinutes}{" "}
+                min
+              </li>
+              {appointment.extras.map((extra) => (
+                <li
+                  key={extra.serviceId}
+                  className="rounded-full bg-muted px-3 py-1 text-sm"
+                >
+                  {extra.name} · {extra.durationMinutes} min
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {depositText ? (
+          <p className="relative rounded-xl bg-muted px-4 py-3 text-sm font-medium">
+            {depositText}
+          </p>
+        ) : null}
       </header>
 
       {sessionInstallment ? (
-        <section
-          aria-labelledby="pagamento"
-          className="grid gap-3 rounded-2xl border bg-card p-4"
-        >
-          <h2 id="pagamento" className="font-heading text-lg font-bold">
-            Pagamento da sessão
-          </h2>
+        <SectionCard id="pagamento" title="Pagamento da sessão" icon="wallet">
           <p>
             {depositWithRest
               ? `Sinal pago ${money(deposit.amountCents)} · Falta ${money(sessionInstallment.outstandingCents)}.`
@@ -330,69 +347,52 @@ export default async function AppointmentPage({
             label="Receber agora"
           />
           {handOverLink}
-        </section>
+        </SectionCard>
       ) : handOverLink ? (
-        <section
-          aria-labelledby="sessao-paga"
-          className="grid gap-3 rounded-2xl border bg-card p-4"
-        >
-          <h2 id="sessao-paga" className="font-heading text-lg font-bold">
-            Pagamento da sessão
-          </h2>
+        <SectionCard id="sessao-paga" title="Pagamento da sessão" icon="wallet">
           <p>Sessão paga.</p>
           {handOverLink}
-        </section>
+        </SectionCard>
       ) : null}
 
       {billing?.receipt ? (
-        <section
-          aria-labelledby="pagamento"
-          className="grid gap-3 rounded-2xl border bg-card p-4"
-        >
-          <h2 id="pagamento" className="font-heading text-lg font-bold">
-            Pagamento
-          </h2>
+        <SectionCard id="pagamento" title="Pagamento" icon="wallet">
           <p>
             Recebido: {money(billing.receipt.amountCents)} no{" "}
             {billing.receipt.methodName} em{" "}
             {formatDay(billing.receipt.receivedOn)}.
           </p>
           <ReverseReceiptButton receiptId={billing.receipt.id} />
-        </section>
+        </SectionCard>
       ) : receivable ? (
-        <section
-          aria-labelledby="pagamento"
-          className="grid gap-3 rounded-2xl border bg-card p-4"
+        <SectionCard
+          id="pagamento"
+          title="Pagamento"
+          icon="wallet"
+          description="Ainda não recebido. Confira o valor e a forma de pagamento."
         >
-          <h2 id="pagamento" className="font-heading text-lg font-bold">
-            Pagamento
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Ainda não recebido. Confira o valor e a forma de pagamento.
-          </p>
           <ReceiptForm
             appointmentId={appointment.id}
             defaultAmountCents={billing?.servicePriceCents}
             methods={methods}
             today={todayLocal()}
           />
-        </section>
+        </SectionCard>
       ) : null}
 
       {usageOpen ? (
-        <section
-          aria-labelledby="produtos-usados"
-          className="grid gap-4 rounded-2xl border bg-card p-4"
+        <SectionCard
+          id="produtos-usados"
+          title="Produtos usados"
+          icon="box"
+          description="O que saiu do estoque neste atendimento."
         >
-          <h2 id="produtos-usados" className="font-heading text-lg font-bold">
-            Produtos usados
-          </h2>
           {usages.length > 0 ? (
             <ul className="grid gap-2">
               {usages.map((usage) => (
                 <li
                   key={usage.movementId}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-3 py-2"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/40 px-4 py-3"
                 >
                   <span
                     className={
@@ -432,26 +432,25 @@ export default async function AppointmentPage({
               }),
             )}
           />
-        </section>
+        </SectionCard>
       ) : null}
 
-      <section aria-labelledby="status" className="grid gap-4">
-        <h2 id="status" className="font-heading text-lg font-bold">
-          Status
-        </h2>
+      <SectionCard id="status" title="Status" icon="pulse">
         <StatusActions
           id={appointment.id}
           allowedTransitions={appointment.allowedTransitions}
           depositPending={holdMinutes !== undefined}
           depositCancel={depositCancel}
         />
-      </section>
+      </SectionCard>
 
       {appointment.editable ? (
-        <section aria-labelledby="alterar" className="grid gap-4">
-          <h2 id="alterar" className="font-heading text-lg font-bold">
-            Alterar agendamento
-          </h2>
+        <SectionCard
+          id="alterar"
+          title="Alterar agendamento"
+          icon="pencil"
+          description="Troque o serviço, a data ou o horário."
+        >
           <AppointmentForm
             mode="edit"
             id={appointment.id}
@@ -484,12 +483,32 @@ export default async function AppointmentPage({
                 : {}),
             }}
           />
-        </section>
+        </SectionCard>
       ) : (
         <Button asChild variant="outline" className="w-fit">
           <Link href={"/admin/agenda" as Route}>Voltar à agenda</Link>
         </Button>
       )}
     </div>
+  );
+}
+
+// One fact of the appointment: a small label over its value. The colon stays
+// in the text (screen readers and tests read "Serviço: X") but not on screen.
+function Fact({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <p className="grid min-w-0 content-start gap-1">
+      <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+        {label}
+        <span className="sr-only">:</span>
+      </span>{" "}
+      <span className="break-words">{children}</span>
+    </p>
   );
 }

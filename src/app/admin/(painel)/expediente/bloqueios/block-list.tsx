@@ -60,7 +60,7 @@ export function BlockList({ blocks }: { blocks: BlockRow[] }) {
           {blocks.map((block) => (
             <li
               key={block.id}
-              className="grid gap-2 rounded-2xl border bg-card p-4"
+              className="grid gap-2 rounded-2xl border bg-card p-5 shadow-sm md:p-6"
             >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">

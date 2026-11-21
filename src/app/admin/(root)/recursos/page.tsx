@@ -191,7 +191,7 @@ export default async function ResourcesPage() {
           return (
             <li
               key={clinic.id}
-              className="grid gap-3 rounded-2xl border bg-card p-4 shadow-xs"
+              className="grid gap-3 rounded-2xl border bg-card p-5 shadow-sm shadow-xs md:p-6"
             >
               <div className="min-w-0">
                 <Link

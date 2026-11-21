@@ -77,7 +77,7 @@ export function ReminderQueue({ items }: { items: QueueItem[] }) {
 
   return (
     <section aria-labelledby="fila-titulo" className="grid gap-4">
-      <div className="grid gap-3 rounded-2xl border bg-card p-4 md:p-5">
+      <div className="grid gap-3 rounded-2xl border bg-card p-5 shadow-sm md:p-5 md:p-6">
         <div className="flex items-baseline justify-between gap-3">
           <h2 id="fila-titulo" className="font-heading text-lg font-semibold">
             {pending.length === 0 ? "Todas avisadas" : "Avisar todas"}

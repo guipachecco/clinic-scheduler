@@ -131,7 +131,7 @@ export function Stat({
   iconTone?: keyof typeof ICON_TONES;
 }) {
   return (
-    <div className="grid content-start gap-1 rounded-2xl border bg-card p-4">
+    <div className="grid content-start gap-1 rounded-2xl border bg-card p-5 shadow-sm md:p-6">
       {icon ? (
         <span
           className={cn(

@@ -70,7 +70,7 @@ export default async function TeamPage() {
           <li
             key={professional.id}
             className={cn(
-              "grid gap-2 rounded-2xl border bg-card p-4",
+              "grid gap-2 rounded-2xl border bg-card p-5 shadow-sm md:p-6",
               professional.isActive ? null : "opacity-70",
             )}
           >

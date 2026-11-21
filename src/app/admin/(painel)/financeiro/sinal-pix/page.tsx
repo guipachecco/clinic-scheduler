@@ -18,7 +18,7 @@ import { ReplaceKey } from "./replace-key";
 
 export const metadata: Metadata = { title: "Sinal por Pix" };
 
-const BOX = "grid gap-3 rounded-2xl border bg-card p-4";
+const BOX = "grid gap-3 rounded-2xl border bg-card p-5 shadow-sm md:p-6";
 
 export default async function SinalPixPage() {
   const { clinicId } = await requireModule("finance");

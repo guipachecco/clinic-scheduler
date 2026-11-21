@@ -145,7 +145,7 @@ export default async function PatientPage({
 
       <section
         aria-labelledby="dados"
-        className="grid gap-4 rounded-2xl border bg-card p-4 md:p-6"
+        className="grid gap-4 rounded-2xl border bg-card p-5 shadow-sm md:p-6"
       >
         <h2 id="dados" className="font-heading text-lg font-bold">
           Dados do cadastro

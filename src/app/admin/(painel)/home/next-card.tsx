@@ -36,7 +36,7 @@ export function NextCard({
     return (
       <section
         aria-label="Próxima"
-        className="grid gap-1 rounded-2xl border bg-card p-4 shadow-sm"
+        className="grid gap-1 rounded-2xl border bg-card p-5 shadow-sm md:p-6"
       >
         <p className="font-semibold">Sem mais atendimentos hoje</p>
         {nextDayFirst ? (

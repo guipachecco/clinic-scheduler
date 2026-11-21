@@ -31,7 +31,7 @@ export default async function ClinicsPage() {
         {clinics.map((clinic) => (
           <li
             key={clinic.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-5 shadow-sm md:p-6"
           >
             <div className="min-w-0">
               <p className="font-semibold break-words">{clinic.name}</p>

@@ -120,19 +120,19 @@ export default async function SalePage({
           ) : null}
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-2xl border bg-card p-4">
+          <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
             <p className="text-sm text-muted-foreground">Total</p>
             <p className="font-heading text-xl font-semibold tabular-nums">
               {money(sale.totalCents)}
             </p>
           </div>
-          <div className="rounded-2xl border bg-card p-4">
+          <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
             <p className="text-sm text-muted-foreground">Pago</p>
             <p className="font-heading text-xl font-semibold tabular-nums">
               {money(sale.paidCents)}
             </p>
           </div>
-          <div className="rounded-2xl border bg-card p-4">
+          <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
             <p className="text-sm text-muted-foreground">Falta pagar</p>
             <p className="font-heading text-xl font-semibold tabular-nums">
               {money(sale.outstandingCents)}
@@ -149,7 +149,7 @@ export default async function SalePage({
           {sale.items.map((item) => (
             <li
               key={item.id}
-              className="grid gap-2 rounded-2xl border bg-card p-4"
+              className="grid gap-2 rounded-2xl border bg-card p-5 shadow-sm md:p-6"
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="font-medium">{item.serviceName}</p>
@@ -185,7 +185,7 @@ export default async function SalePage({
           ))}
         </ul>
         {active && serviceItems.length > 0 ? (
-          <details className="rounded-2xl border bg-card p-4">
+          <details className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
             <summary className="cursor-pointer font-medium">
               Agendar sessões
             </summary>
@@ -372,7 +372,7 @@ export default async function SalePage({
           <h2 id="alterar" className="font-heading text-lg font-bold">
             Alterar a venda
           </h2>
-          <div className="rounded-2xl border bg-card p-4">
+          <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
             <ReviseForm
               saleId={sale.id}
               perSession={sale.paymentPlan === "per_session"}
@@ -431,7 +431,7 @@ export default async function SalePage({
       ) : null}
 
       {active ? (
-        <details className="rounded-2xl border bg-card p-4">
+        <details className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
           <summary className="cursor-pointer font-medium">
             Cancelar a venda
           </summary>

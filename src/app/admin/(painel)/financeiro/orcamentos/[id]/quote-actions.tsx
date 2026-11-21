@@ -207,7 +207,7 @@ function ApproveForm({
       onSubmit={onSubmit}
       noValidate
       aria-labelledby="aprovar"
-      className="grid gap-4 rounded-2xl border bg-card p-4"
+      className="grid gap-4 rounded-2xl border bg-card p-5 shadow-sm md:p-6"
     >
       <h2 id="aprovar" className="font-heading text-lg font-bold">
         Cliente aprovou

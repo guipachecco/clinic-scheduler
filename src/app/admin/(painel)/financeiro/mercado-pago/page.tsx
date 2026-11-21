@@ -80,7 +80,7 @@ export default async function MercadoPagoPage({
         </p>
       ) : null}
 
-      <section className="grid gap-3 rounded-2xl border bg-card p-4">
+      <section className="grid gap-3 rounded-2xl border bg-card p-5 shadow-sm md:p-6">
         <p>
           Conecte a conta Mercado Pago da clínica para mandar links de pagamento
           às pacientes, por Pix ou cartão. O dinheiro cai direto na conta da
@@ -110,7 +110,7 @@ export default async function MercadoPagoPage({
       </section>
 
       {config && isRoot ? (
-        <section className="grid gap-2 rounded-2xl border bg-card p-4 text-sm">
+        <section className="grid gap-2 rounded-2xl border bg-card p-5 text-sm shadow-sm md:p-6">
           <h2 className="font-heading text-base font-semibold">
             Configuração da aplicação (só root vê)
           </h2>

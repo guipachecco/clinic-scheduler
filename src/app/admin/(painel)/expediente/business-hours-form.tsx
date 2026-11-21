@@ -50,7 +50,7 @@ function DayRow({
   const listError = dayErrors?.message ?? dayErrors?.root?.message;
 
   return (
-    <li className="grid gap-3 rounded-2xl border bg-card p-4 md:grid-cols-[9rem_minmax(0,1fr)] md:items-start">
+    <li className="grid gap-3 rounded-2xl border bg-card p-5 shadow-sm md:grid-cols-[9rem_minmax(0,1fr)] md:items-start md:p-6">
       <h2 className="flex h-11 items-center font-medium">{name}</h2>
       <div className="grid gap-3">
         {fields.length === 0 ? (

@@ -75,7 +75,7 @@ export default async function ProductPage({
             {stock.quantity}
           </p>
         </div>
-        <div className="rounded-2xl border bg-card p-4">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
           <h3 className="mb-3 font-medium">Lançar entrada</h3>
           <EntryForm productId={product.id} />
         </div>
