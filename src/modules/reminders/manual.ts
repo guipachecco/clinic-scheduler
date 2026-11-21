@@ -164,3 +164,45 @@ export async function markReminded(
     return true;
   });
 }
+
+// The same reminder for one appointment (the "WhatsApp" button of the panel
+// home's "Próxima" card). Null when the patient has no usable phone.
+export async function reminderLinkFor(
+  clinicId: string,
+  item: {
+    patientName: string;
+    patientPhone: string | null;
+    serviceName: string;
+    startsAt: Date;
+  },
+  now: Date = new Date(),
+): Promise<string | null> {
+  if (!item.patientPhone) return null;
+  const [clinic] = await inClinic(clinicId, (tx) =>
+    tx
+      .select({
+        name: clinics.name,
+        displayName: clinics.displayName,
+        timezone: clinics.timezone,
+        address: clinics.address,
+        mapsUrl: clinics.mapsUrl,
+      })
+      .from(clinics)
+      .where(eq(clinics.id, clinicId))
+      .limit(1),
+  );
+  if (!clinic) return null;
+  return whatsappLink(
+    item.patientPhone,
+    manualReminderText({
+      patientName: item.patientName,
+      clinicName: clinic.displayName?.trim() || clinic.name,
+      serviceName: item.serviceName,
+      startsAt: item.startsAt,
+      timezone: clinic.timezone,
+      address: clinic.address,
+      mapsUrl: clinic.mapsUrl,
+      now,
+    }),
+  );
+}

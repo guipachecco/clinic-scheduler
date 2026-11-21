@@ -5,6 +5,7 @@ import { requireAdmin } from "@/modules/auth/session";
 import { getClinicBranding } from "@/modules/branding/branding";
 import { greeting } from "@/modules/dashboard/day";
 import { getPanelHome } from "@/modules/dashboard/dashboard";
+import { reminderLinkFor } from "@/modules/reminders/manual";
 import { formatCents } from "@/modules/services/fields";
 
 import { PendingLinkNotice } from "./pacientes/pending-link-notice";
@@ -54,6 +55,10 @@ export default async function PanelHomePage() {
     birthdays,
     pendingLinks,
   } = home;
+  // The card's WhatsApp opens with the reminder already typed.
+  const reminderHref = next
+    ? await reminderLinkFor(session.clinicId, next, now)
+    : null;
 
   const firstName = session.user.name.trim().split(/\s+/)[0] ?? "";
   const dateLabel = new Intl.DateTimeFormat("pt-BR", {
@@ -109,6 +114,7 @@ export default async function PanelHomePage() {
         nextDayFirst={nextDayFirst}
         now={now}
         zone={today.zone}
+        reminderHref={reminderHref}
       />
 
       {birthdays > 0 ? (

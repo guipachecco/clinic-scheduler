@@ -174,9 +174,10 @@ test.describe("início do painel", () => {
       "href",
       `/admin/pacientes/${PATIENTS.next.id}`,
     );
+    // The conversation opens with the reminder already typed.
     await expect(next.getByRole("link", { name: "WhatsApp" })).toHaveAttribute(
       "href",
-      "https://wa.me/5511900000120",
+      /^https:\/\/api\.whatsapp\.com\/send\?phone=5511900000120&text=Ol%C3%A1/,
     );
 
     const list = page.getByRole("list", { name: "Atendimentos de hoje" });

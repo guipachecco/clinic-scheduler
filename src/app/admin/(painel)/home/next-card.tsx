@@ -3,6 +3,8 @@ import Link from "next/link";
 import { startsIn, type DayItem } from "@/modules/dashboard/day";
 import { CLINIC_TIME_ZONE } from "@/modules/schedule/time";
 
+import { ReminderButton } from "./reminder-button";
+
 const actionClass =
   "inline-flex min-h-11 items-center rounded-full bg-muted px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none";
 
@@ -13,11 +15,14 @@ export function NextCard({
   nextDayFirst,
   now,
   zone = CLINIC_TIME_ZONE,
+  reminderHref = null,
 }: {
   next: DayItem | null;
   nextDayFirst: DayItem | null;
   now: Date;
   zone?: string;
+  // The conversation with the reminder already typed (reminderLinkFor).
+  reminderHref?: string | null;
 }) {
   const time = new Intl.DateTimeFormat("pt-BR", {
     timeZone: zone,
@@ -71,15 +76,15 @@ export function NextCard({
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        {digits ? (
-          <a
-            href={`https://wa.me/${digits}`}
-            target="_blank"
-            rel="noopener noreferrer"
+        {reminderHref || digits ? (
+          <ReminderButton
+            href={
+              reminderHref ?? `https://api.whatsapp.com/send?phone=${digits}`
+            }
+            appointmentId={next.id}
+            mark={Boolean(reminderHref) && next.status === "confirmed"}
             className={actionClass}
-          >
-            WhatsApp
-          </a>
+          />
         ) : null}
         <Link
           href={`/admin/pacientes/${next.patientId}`}
