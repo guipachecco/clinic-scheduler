@@ -74,11 +74,30 @@ export function whatsappNumber(phone: string): string | null {
   return /^\+[1-9]\d{7,14}$/.test(phone) ? phone.slice(1) : null;
 }
 
+// The clinic's own map link, else a Google Maps search of its address (the
+// same rule as the clinic page). Null without either.
+export function clinicMapsLink(
+  address: string | null,
+  mapsUrl: string | null,
+): string | null {
+  if (mapsUrl?.trim()) return mapsUrl.trim();
+  if (address?.trim()) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.trim())}`;
+  }
+  return null;
+}
+
 // The reminder the clinic sends by hand from its own WhatsApp (the "Avisar
-// pelo WhatsApp" queue of the agenda): the same words as the template, with
-// "hoje", "amanhã" or the date, since the owner may pick any day.
+// pelo WhatsApp" queue of the agenda). Free text, unlike the template of the
+// automatic reminder: a warmer note with the address and the map link, and
+// "hoje", "amanhã" or the date, since the owner may pick any day. It goes
+// out from the clinic's number, so "avisar por aqui" reaches the clinic.
 export function manualReminderText(
-  input: ReminderInput & { now: Date },
+  input: ReminderInput & {
+    now: Date;
+    address?: string | null;
+    mapsUrl?: string | null;
+  },
 ): string {
   const zone = input.timezone;
   const start = DateTime.fromJSDate(input.startsAt, { zone }).setLocale(
@@ -86,19 +105,29 @@ export function manualReminderText(
   );
   const today = DateTime.fromJSDate(input.now, { zone }).startOf("day");
   const days = Math.round(start.startOf("day").diff(today, "days").days);
+  const date = `${start.toFormat("cccc")} (${start.toFormat("dd/LL")})`;
   const when =
     days === 0
-      ? "hoje"
+      ? `hoje, ${date}`
       : days === 1
-        ? "amanhã"
-        : `no dia ${start.toFormat("dd/LL")}`;
+        ? `amanhã, ${date}`
+        : `do dia ${start.toFormat("dd/LL")} (${start.toFormat("cccc")})`;
   const name = firstName(input.patientName);
-  return (
-    `Olá${name ? `, ${name}` : ""}! Lembrete da ${input.clinicName.trim()}: ` +
-    `seu horário é ${when}, ${start.toFormat("cccc")}, às ` +
-    `${start.toFormat("HH:mm")} (${input.serviceName.trim()}). Se não ` +
-    `puder ir, avise a clínica com antecedência.`
-  );
+  const address = input.address?.trim() || null;
+  const map = clinicMapsLink(address, input.mapsUrl ?? null);
+  const lines = [
+    `Olá${name ? `, ${name}` : ""}! 😊`,
+    `Passando aqui para lembrar do seu horário ${when}, às ` +
+      `${start.toFormat("HH:mm")} — ${input.serviceName.trim()}, na ` +
+      `${input.clinicName.trim()}.`,
+  ];
+  if (address || map) {
+    lines.push("");
+    if (address) lines.push(`📍 ${address}`);
+    if (map) lines.push(`🗺️ Como chegar: ${map}`);
+  }
+  lines.push("", "Se não puder vir, é só avisar por aqui. Até lá! 💜");
+  return lines.join("\n");
 }
 
 // A wa.me link that opens the conversation with the text ready to send.

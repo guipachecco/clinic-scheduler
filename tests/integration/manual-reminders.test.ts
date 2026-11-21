@@ -119,7 +119,7 @@ describe("listDayReminders", () => {
     expect(item!.reminded).toBe(false);
     expect(item!.link).toMatch(/^https:\/\/wa\.me\/5500000000001\?text=/);
     expect(decodeURIComponent(item!.link!.split("text=")[1]!)).toContain(
-      "seu horário é amanhã, quinta-feira, às 14:30 (Limpeza fictícia)",
+      "seu horário amanhã, quinta-feira (19/11), às 14:30 — Limpeza fictícia",
     );
   });
 

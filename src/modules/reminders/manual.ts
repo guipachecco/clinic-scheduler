@@ -44,6 +44,8 @@ export async function listDayReminders(
         name: clinics.name,
         displayName: clinics.displayName,
         timezone: clinics.timezone,
+        address: clinics.address,
+        mapsUrl: clinics.mapsUrl,
       })
       .from(clinics)
       .where(eq(clinics.id, clinicId))
@@ -99,6 +101,8 @@ export async function listDayReminders(
                 serviceName: row.serviceName,
                 startsAt: row.startsAt,
                 timezone: clinic.timezone,
+                address: clinic.address,
+                mapsUrl: clinic.mapsUrl,
                 now,
               }),
             )

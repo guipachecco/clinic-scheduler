@@ -106,15 +106,46 @@ describe("manualReminderText", () => {
     now: new Date("2026-11-18T13:00:00Z"),
   };
 
-  it("says amanhã for the next day, with the first name", () => {
+  it("says amanhã, with the address and the clinic's map link", () => {
     expect(
       manualReminderText({
         ...base,
         startsAt: new Date("2026-11-19T17:30:00Z"),
+        address: "Rua Fictícia, 100 - Centro",
+        mapsUrl: "https://maps.app.goo.gl/exemplo",
       }),
     ).toBe(
-      "Olá, Maria! Lembrete da Clínica Teste: seu horário é amanhã, quinta-feira, às 14:30 (Limpeza de pele). Se não puder ir, avise a clínica com antecedência.",
+      [
+        "Olá, Maria! 😊",
+        "Passando aqui para lembrar do seu horário amanhã, quinta-feira (19/11), às 14:30 — Limpeza de pele, na Clínica Teste.",
+        "",
+        "📍 Rua Fictícia, 100 - Centro",
+        "🗺️ Como chegar: https://maps.app.goo.gl/exemplo",
+        "",
+        "Se não puder vir, é só avisar por aqui. Até lá! 💜",
+      ].join("\n"),
     );
+  });
+
+  it("searches the address on Google Maps without a map link", () => {
+    expect(
+      manualReminderText({
+        ...base,
+        startsAt: new Date("2026-11-19T17:30:00Z"),
+        address: "Rua Fictícia, 100",
+      }),
+    ).toContain(
+      "🗺️ Como chegar: https://www.google.com/maps/search/?api=1&query=Rua%20Fict%C3%ADcia%2C%20100",
+    );
+  });
+
+  it("leaves the place out without an address", () => {
+    const text = manualReminderText({
+      ...base,
+      startsAt: new Date("2026-11-19T17:30:00Z"),
+    });
+    expect(text).not.toContain("📍");
+    expect(text).not.toContain("Como chegar");
   });
 
   it("says hoje for the same day and the date further ahead", () => {
@@ -123,13 +154,13 @@ describe("manualReminderText", () => {
         ...base,
         startsAt: new Date("2026-11-18T20:00:00Z"),
       }),
-    ).toContain("seu horário é hoje, quarta-feira, às 17:00");
+    ).toContain("seu horário hoje, quarta-feira (18/11), às 17:00");
     expect(
       manualReminderText({
         ...base,
         startsAt: new Date("2026-11-21T12:00:00Z"),
       }),
-    ).toContain("seu horário é no dia 21/11, sábado, às 09:00");
+    ).toContain("seu horário do dia 21/11 (sábado), às 09:00");
   });
 
   it("counts days in the clinic's zone, late at night", () => {
