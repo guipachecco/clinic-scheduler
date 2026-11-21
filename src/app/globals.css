@@ -168,6 +168,8 @@
   /* NativeSelect: our own chevron instead of the browser's, and an option
      list that follows the theme (the dark list was white-on-grey). */
   [data-slot="native-select"] {
+    appearance: none;
+    padding-right: 2.5rem;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e5868' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.875rem center;
@@ -195,6 +197,125 @@
   input::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
     background-color: var(--accent);
+  }
+  /* DateInput draws its own calendar button. */
+  [data-slot="date-input"] input::-webkit-calendar-picker-indicator {
+    display: none;
+  }
+
+  /* Customizable select (Chrome/Edge 135+), mouse only: phones keep their
+     own picker. The open list becomes a themed menu instead of the
+     browser's grey box. Other browsers keep the plain select above. */
+  @media (pointer: fine) {
+    @supports (appearance: base-select) {
+      [data-slot="native-select"],
+      [data-slot="calendar-select"],
+      [data-slot="native-select"]::picker(select),
+      [data-slot="calendar-select"]::picker(select) {
+        appearance: base-select;
+      }
+      [data-slot="native-select"],
+      .dark [data-slot="native-select"] {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding-right: 0.875rem;
+        background-image: none;
+      }
+      [data-slot="native-select"]::picker-icon,
+      [data-slot="calendar-select"]::picker-icon {
+        content: "";
+        width: 1.125rem;
+        height: 1.125rem;
+        margin-left: auto;
+        background-color: var(--muted-foreground);
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+          center / contain no-repeat;
+        transition: rotate 150ms;
+      }
+      [data-slot="calendar-select"]::picker-icon {
+        width: 0.875rem;
+        height: 0.875rem;
+      }
+      [data-slot="native-select"]:open::picker-icon,
+      [data-slot="calendar-select"]:open::picker-icon {
+        rotate: 180deg;
+      }
+      [data-slot="calendar-select"] {
+        gap: 0.25rem;
+        border: 0;
+      }
+      [data-slot="native-select"]::picker(select),
+      [data-slot="calendar-select"]::picker(select) {
+        margin-block: 0.375rem;
+        padding: 0.375rem;
+        border: 1px solid var(--border);
+        border-radius: 0.875rem;
+        background: var(--popover);
+        color: var(--popover-foreground);
+        box-shadow: 0 24px 48px -16px rgb(0 0 0 / 0.4);
+        max-height: min(22rem, 60vh);
+        scrollbar-width: thin;
+      }
+      [data-slot="calendar-select"]::picker(select) {
+        max-height: 16rem;
+      }
+      [data-slot="native-select"] option,
+      [data-slot="calendar-select"] option {
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.5rem;
+        background: transparent;
+        font-family: var(--font-sans);
+        font-size: 0.875rem;
+        font-weight: 400;
+        letter-spacing: normal;
+        text-transform: none;
+        color: var(--popover-foreground);
+        cursor: pointer;
+        transition: background-color 120ms;
+      }
+      [data-slot="native-select"] option:hover,
+      [data-slot="native-select"] option:focus-visible,
+      [data-slot="calendar-select"] option:hover,
+      [data-slot="calendar-select"] option:focus-visible {
+        background: var(--accent);
+        outline: none;
+      }
+      [data-slot="native-select"] option:checked,
+      [data-slot="calendar-select"] option:checked {
+        background: color-mix(in srgb, var(--primary) 14%, transparent);
+        color: var(--primary-text);
+        font-weight: 600;
+      }
+      [data-slot="native-select"] option::checkmark,
+      [data-slot="calendar-select"] option::checkmark {
+        order: 1;
+        margin-left: auto;
+        color: var(--primary-text);
+      }
+      [data-slot="native-select"] option:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      /* Group label: small caps line above its options. */
+      [data-slot="native-select"] optgroup {
+        padding: 0.625rem 0 0 0.75rem;
+        background: transparent;
+        font-size: 0.6875rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      [data-slot="native-select"] optgroup option {
+        margin-left: -0.75rem;
+      }
+      [data-slot="native-select"] optgroup + optgroup {
+        margin-top: 0.375rem;
+        border-top: 1px solid var(--border);
+      }
+    }
   }
 }
 

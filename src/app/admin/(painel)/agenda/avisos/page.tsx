@@ -2,6 +2,8 @@ import { DateTime } from "luxon";
 import type { Metadata, Route } from "next";
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { requireAdmin } from "@/modules/auth/session";
 import { listDayReminders } from "@/modules/reminders/manual";
 import { CLINIC_TIME_ZONE, todayLocal } from "@/modules/schedule/time";
@@ -88,19 +90,17 @@ export default async function RemindersPage({
           <label htmlFor="avisos-dia" className="sr-only">
             Escolher dia
           </label>
-          <input
+          <Input
+            key={date}
             id="avisos-dia"
             type="date"
             name="dia"
             defaultValue={date}
-            className="h-10 rounded-lg border bg-background px-3 text-sm"
+            className="w-44"
           />
-          <button
-            type="submit"
-            className="h-10 rounded-lg border px-3 text-sm font-semibold hover:bg-muted"
-          >
+          <Button type="submit" variant="outline">
             Ir
-          </button>
+          </Button>
         </form>
       </nav>
 

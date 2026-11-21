@@ -2,7 +2,11 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+import { DateInput } from "./date-input";
+
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
+  // Dates get our own calendar instead of the browser's.
+  if (type === "date") return <DateInput className={className} {...props} />;
   return (
     <input
       type={type}
