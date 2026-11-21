@@ -73,3 +73,39 @@ export function reminderText(params: string[]): string {
 export function whatsappNumber(phone: string): string | null {
   return /^\+[1-9]\d{7,14}$/.test(phone) ? phone.slice(1) : null;
 }
+
+// The reminder the clinic sends by hand from its own WhatsApp (the "Avisar
+// pelo WhatsApp" queue of the agenda): the same words as the template, with
+// "hoje", "amanhã" or the date, since the owner may pick any day.
+export function manualReminderText(
+  input: ReminderInput & { now: Date },
+): string {
+  const zone = input.timezone;
+  const start = DateTime.fromJSDate(input.startsAt, { zone }).setLocale(
+    "pt-BR",
+  );
+  const today = DateTime.fromJSDate(input.now, { zone }).startOf("day");
+  const days = Math.round(start.startOf("day").diff(today, "days").days);
+  const when =
+    days === 0
+      ? "hoje"
+      : days === 1
+        ? "amanhã"
+        : `no dia ${start.toFormat("dd/LL")}`;
+  const name = firstName(input.patientName);
+  return (
+    `Olá${name ? `, ${name}` : ""}! Lembrete da ${input.clinicName.trim()}: ` +
+    `seu horário é ${when}, ${start.toFormat("cccc")}, às ` +
+    `${start.toFormat("HH:mm")} (${input.serviceName.trim()}). Se não ` +
+    `puder ir, avise a clínica com antecedência.`
+  );
+}
+
+// A wa.me link that opens the conversation with the text ready to send.
+// Null when the phone is not E.164.
+export function whatsappLink(phone: string, text: string): string | null {
+  const number = whatsappNumber(phone);
+  return number
+    ? `https://wa.me/${number}?text=${encodeURIComponent(text)}`
+    : null;
+}

@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   firstName,
+  manualReminderText,
   reminderParams,
   reminderText,
   templateText,
   tomorrowRange,
+  whatsappLink,
   whatsappNumber,
 } from "./message";
 
@@ -91,5 +93,65 @@ describe("whatsappNumber", () => {
   it("refuses anything else", () => {
     expect(whatsappNumber("11987654321")).toBeNull();
     expect(whatsappNumber("+55 11 98765-4321")).toBeNull();
+  });
+});
+
+describe("manualReminderText", () => {
+  const base = {
+    patientName: "Maria Fictícia",
+    clinicName: "Clínica Teste",
+    serviceName: "Limpeza de pele",
+    timezone: ZONE,
+    // Wednesday 18/11/2026, 10h in Brasília.
+    now: new Date("2026-11-18T13:00:00Z"),
+  };
+
+  it("says amanhã for the next day, with the first name", () => {
+    expect(
+      manualReminderText({
+        ...base,
+        startsAt: new Date("2026-11-19T17:30:00Z"),
+      }),
+    ).toBe(
+      "Olá, Maria! Lembrete da Clínica Teste: seu horário é amanhã, quinta-feira, às 14:30 (Limpeza de pele). Se não puder ir, avise a clínica com antecedência.",
+    );
+  });
+
+  it("says hoje for the same day and the date further ahead", () => {
+    expect(
+      manualReminderText({
+        ...base,
+        startsAt: new Date("2026-11-18T20:00:00Z"),
+      }),
+    ).toContain("seu horário é hoje, quarta-feira, às 17:00");
+    expect(
+      manualReminderText({
+        ...base,
+        startsAt: new Date("2026-11-21T12:00:00Z"),
+      }),
+    ).toContain("seu horário é no dia 21/11, sábado, às 09:00");
+  });
+
+  it("counts days in the clinic's zone, late at night", () => {
+    // 22h30 on the 18th in Brasília (already the 19th in UTC).
+    expect(
+      manualReminderText({
+        ...base,
+        now: new Date("2026-11-19T01:30:00Z"),
+        startsAt: new Date("2026-11-19T12:00:00Z"),
+      }),
+    ).toContain("amanhã");
+  });
+});
+
+describe("whatsappLink", () => {
+  it("opens the conversation with the text encoded", () => {
+    expect(whatsappLink("+5511900000001", "Olá, Maria! 14:30 (pele)")).toBe(
+      "https://wa.me/5511900000001?text=Ol%C3%A1%2C%20Maria!%2014%3A30%20(pele)",
+    );
+  });
+
+  it("is null for a number out of E.164", () => {
+    expect(whatsappLink("11900000001", "Olá")).toBeNull();
   });
 });
