@@ -11,7 +11,7 @@ export type QueueItem = {
   time: string;
   patientName: string;
   serviceName: string;
-  // wa.me link with the message; null without a usable phone.
+  // WhatsApp link with the message; null without a usable phone.
   link: string | null;
   reminded: boolean;
 };

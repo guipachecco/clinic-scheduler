@@ -178,7 +178,13 @@ describe("manualReminderText", () => {
 describe("whatsappLink", () => {
   it("opens the conversation with the text encoded", () => {
     expect(whatsappLink("+5511900000001", "Olá, Maria! 14:30 (pele)")).toBe(
-      "https://wa.me/5511900000001?text=Ol%C3%A1%2C%20Maria!%2014%3A30%20(pele)",
+      "https://api.whatsapp.com/send?phone=5511900000001&text=Ol%C3%A1%2C%20Maria!%2014%3A30%20(pele)",
+    );
+  });
+
+  it("keeps emoji (wa.me would turn them into U+FFFD)", () => {
+    expect(whatsappLink("+5511900000001", "Até lá! 💜")).toContain(
+      "%F0%9F%92%9C",
     );
   });
 

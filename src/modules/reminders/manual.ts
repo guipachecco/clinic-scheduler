@@ -9,7 +9,7 @@ import { appointments, auditLogs, clinics, patients } from "@/db/schema";
 import { manualReminderText, whatsappLink } from "./message";
 
 // The "Avisar pelo WhatsApp" queue of the agenda: the clinic reminds the day's
-// patients from its own WhatsApp, one tap each (a wa.me link with the text
+// patients from its own WhatsApp, one tap each (a WhatsApp link with the text
 // ready). Without the Cloud API nothing can send on the owner's behalf, so
 // each message still needs her tap on "enviar".
 //

@@ -130,11 +130,12 @@ export function manualReminderText(
   return lines.join("\n");
 }
 
-// A wa.me link that opens the conversation with the text ready to send.
-// Null when the phone is not E.164.
+// A link that opens the conversation with the text ready to send. It goes
+// straight to api.whatsapp.com: wa.me redirects there and, on the way, turns
+// emoji into "�". Null when the phone is not E.164.
 export function whatsappLink(phone: string, text: string): string | null {
   const number = whatsappNumber(phone);
   return number
-    ? `https://wa.me/${number}?text=${encodeURIComponent(text)}`
+    ? `https://api.whatsapp.com/send?phone=${number}&text=${encodeURIComponent(text)}`
     : null;
 }

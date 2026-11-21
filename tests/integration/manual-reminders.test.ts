@@ -117,7 +117,9 @@ describe("listDayReminders", () => {
     expect(day?.items.map((item) => item.id)).toEqual([id]);
     const [item] = day!.items;
     expect(item!.reminded).toBe(false);
-    expect(item!.link).toMatch(/^https:\/\/wa\.me\/5500000000001\?text=/);
+    expect(item!.link).toMatch(
+      /^https:\/\/api\.whatsapp\.com\/send\?phone=5500000000001&text=/,
+    );
     expect(decodeURIComponent(item!.link!.split("text=")[1]!)).toContain(
       "seu horário amanhã, quinta-feira (19/11), às 14:30 — Limpeza fictícia",
     );
