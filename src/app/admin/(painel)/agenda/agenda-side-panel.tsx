@@ -1,4 +1,5 @@
 import { DateTime } from "luxon";
+import Link from "next/link";
 
 import type {
   CalendarEvent,
@@ -73,6 +74,14 @@ export function AgendaSidePanel({
 
   return (
     <aside aria-label="Resumo da agenda" className="grid content-start gap-4">
+      {/* The day before is when reminders go out: the queue opens on
+          tomorrow. */}
+      <Link
+        href="/admin/agenda/avisos"
+        className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+      >
+        Avisar clientes de amanhã pelo WhatsApp
+      </Link>
       <section aria-labelledby="agenda-requested" className={cardClass}>
         <div className="flex items-center justify-between gap-2">
           <h2
