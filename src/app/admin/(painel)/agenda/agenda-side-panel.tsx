@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 import Link from "next/link";
 
+import { Icon } from "@/components/icon";
 import type {
   CalendarEvent,
   RequestedItem,
@@ -78,9 +79,26 @@ export function AgendaSidePanel({
           tomorrow. */}
       <Link
         href="/admin/agenda/avisos"
-        className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        className="group flex items-center gap-3 rounded-2xl border bg-card p-3.5 pr-4 shadow-sm transition-colors outline-none hover:border-primary/40 hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
       >
-        Avisar clientes de amanhã pelo WhatsApp
+        <span
+          aria-hidden="true"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#25d366]/15 text-[#13883f] dark:text-[#25d366]"
+        >
+          <Icon name="chat" />
+        </span>
+        <span className="grid min-w-0 flex-1 gap-0.5">
+          <span className="text-[15px] leading-tight font-semibold">
+            Avisar clientes de amanhã
+          </span>
+          <span className="text-xs text-muted-foreground">
+            Lembretes prontos pelo WhatsApp
+          </span>
+        </span>
+        <Icon
+          name="chevronRight"
+          className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+        />
       </Link>
       <section aria-labelledby="agenda-requested" className={cardClass}>
         <div className="flex items-center justify-between gap-2">

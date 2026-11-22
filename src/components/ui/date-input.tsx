@@ -6,6 +6,8 @@ import * as React from "react";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
+import { NativeSelect } from "./native-select";
+
 const MONTHS = [
   "janeiro",
   "fevereiro",
@@ -189,36 +191,34 @@ export function DateInput({
                 <Icon name="chevronRight" className="size-4 rotate-180" />
               </button>
               <div className="flex min-w-0 flex-1 items-center justify-center gap-1">
-                <select
+                <NativeSelect
                   aria-label="Mês"
                   value={view.m}
                   onChange={(event) =>
                     setView((v) => ({ ...v, m: Number(event.target.value) }))
                   }
-                  data-slot="calendar-select"
-                  className="h-9 min-w-0 cursor-pointer rounded-lg bg-transparent px-2 font-heading text-[15px] font-bold capitalize outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="h-9 w-auto min-w-0 border-transparent bg-transparent [background-position:right_0.375rem_center] pr-7 pl-2 font-heading text-[15px] font-bold capitalize shadow-none hover:border-transparent hover:bg-accent"
                 >
                   {MONTHS.map((name, index) => (
                     <option key={name} value={index}>
                       {name}
                     </option>
                   ))}
-                </select>
-                <select
+                </NativeSelect>
+                <NativeSelect
                   aria-label="Ano"
                   value={view.y}
                   onChange={(event) =>
                     setView((v) => ({ ...v, y: Number(event.target.value) }))
                   }
-                  data-slot="calendar-select"
-                  className="h-9 cursor-pointer rounded-lg bg-transparent px-2 font-heading text-[15px] font-bold tabular-nums outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="h-9 w-auto border-transparent bg-transparent [background-position:right_0.375rem_center] pr-7 pl-2 font-heading text-[15px] font-bold tabular-nums shadow-none hover:border-transparent hover:bg-accent"
                 >
                   {years.map((year) => (
                     <option key={year} value={year}>
                       {year}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
               <button
                 type="button"
