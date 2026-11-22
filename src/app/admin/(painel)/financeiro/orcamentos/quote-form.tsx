@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
+import { useLiveSearch } from "@/lib/use-live-search";
 import {
   QUOTE_ITEM_KIND_LABELS,
   type QuoteFormInput,
@@ -117,10 +118,17 @@ export function QuoteForm({
     );
   }
 
-  async function search() {
-    const result = await searchPatientsAction({ term });
-    setResults(result.items);
-  }
+  // Suggestions appear while typing; Buscar and Enter still search at once.
+  const searchNow = useLiveSearch(term, async (value, isLatest) => {
+    let result;
+    try {
+      result = await searchPatientsAction({ term: value });
+    } catch {
+      return;
+    }
+    if (isLatest()) setResults(result.items);
+  });
+  const search = () => searchNow(term.trim());
 
   // Live totals; invalid values count as zero until fixed.
   const priced = items.map((item) => ({
@@ -207,22 +215,21 @@ export function QuoteForm({
                 id="orcamento-busca"
                 value={term}
                 autoComplete="off"
-                onChange={(event) => setTerm(event.target.value)}
+                onChange={(event) => {
+                  setTerm(event.target.value);
+                  if (event.target.value.trim().length < 2) setResults(null);
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
-                    void search();
+                    search();
                   }
                 }}
                 aria-describedby={
                   errors.patientId ? "orcamento-paciente-erro" : undefined
                 }
               />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void search()}
-              >
+              <Button type="button" variant="outline" onClick={search}>
                 Buscar
               </Button>
             </div>

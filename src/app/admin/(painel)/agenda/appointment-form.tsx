@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import { useLiveSearch } from "@/lib/use-live-search";
 import type { AppointmentResult } from "@/modules/appointments/appointments";
 import {
   appointmentFormSchema,
@@ -146,24 +147,29 @@ function PatientPicker({
     onSelect(patient);
   }
 
-  async function search() {
+  // Suggestions appear while typing; Buscar and Enter still search at once.
+  const searchNow = useLiveSearch(term, async (value, isLatest) => {
     setPending(true);
     setSearchError(null);
     let result;
     try {
-      result = await searchPatientsAction({ term: term.trim() });
+      result = await searchPatientsAction({ term: value });
     } catch {
-      setSearchError(SEARCH_ERROR);
+      if (isLatest()) {
+        setPending(false);
+        setSearchError(SEARCH_ERROR);
+      }
       return;
-    } finally {
-      setPending(false);
     }
+    if (!isLatest()) return;
+    setPending(false);
     if (result.error) {
       setSearchError(result.error);
       return;
     }
     setItems(result.items);
-  }
+  });
+  const search = () => searchNow(term.trim());
 
   if (selected) {
     return (
@@ -195,12 +201,19 @@ function PatientPicker({
             id="patient-search"
             type="search"
             value={term}
-            onChange={(event) => setTerm(event.target.value)}
+            onChange={(event) => {
+              setTerm(event.target.value);
+              // Cleared: no stale suggestions under an empty box.
+              if (event.target.value.trim().length < 2) {
+                setItems(null);
+                setPending(false);
+              }
+            }}
             onKeyDown={(event) => {
               // Enter searches instead of submitting the appointment form.
               if (event.key === "Enter") {
                 event.preventDefault();
-                void search();
+                search();
               }
             }}
             maxLength={100}
@@ -210,7 +223,7 @@ function PatientPicker({
             aria-describedby={error ? errorId : undefined}
           />
         </div>
-        <Button type="button" disabled={pending} onClick={() => void search()}>
+        <Button type="button" disabled={pending} onClick={search}>
           {pending ? "Buscando..." : "Buscar"}
         </Button>
       </div>

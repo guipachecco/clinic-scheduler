@@ -156,7 +156,7 @@ export function DateInput({
         max={max}
         disabled={disabled}
         className={cn(
-          "h-11 w-full min-w-0 rounded-lg border border-input bg-card py-1 pr-12 pl-3.5 text-base shadow-xs transition-[color,box-shadow,border-color] outline-none hover:border-muted-foreground/60 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+          "h-11 w-full min-w-0 rounded-lg border border-input bg-card py-1 pl-3.5 text-base shadow-xs transition-[color,box-shadow,border-color] outline-none hover:border-muted-foreground/60 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
           "focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50",
           "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
           inputClassName,
@@ -169,7 +169,7 @@ export function DateInput({
             type="button"
             disabled={disabled}
             aria-label="Abrir calendário"
-            className="absolute top-1/2 right-1.5 inline-flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 data-[state=open]:bg-accent data-[state=open]:text-primary-text"
+            className="absolute top-1/2 right-1.5 inline-flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md bg-card text-muted-foreground transition-colors outline-none hover:bg-accent hover:text-primary-text focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-50 data-[state=open]:bg-accent data-[state=open]:text-primary-text"
           >
             <Icon name="calendar" className="size-[1.125rem]" />
           </button>

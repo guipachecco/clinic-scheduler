@@ -198,9 +198,19 @@
     opacity: 1;
     background-color: var(--accent);
   }
-  /* DateInput draws its own calendar button. */
+  /* DateInput draws its own calendar button. Chrome and Edge hide theirs;
+     Firefox's cannot be hidden, so there the field keeps little right
+     padding and our (opaque) button sits on top of it. */
+  [data-slot="date-input"] input {
+    padding-right: 3rem;
+  }
   [data-slot="date-input"] input::-webkit-calendar-picker-indicator {
     display: none;
+  }
+  @supports (-moz-appearance: none) {
+    [data-slot="date-input"] input {
+      padding-right: 0.625rem;
+    }
   }
 }
 
