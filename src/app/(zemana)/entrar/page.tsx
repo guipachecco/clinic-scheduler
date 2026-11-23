@@ -7,7 +7,11 @@ import { PageTitle } from "@/app/[slug]/ui";
 import { getSession } from "@/modules/auth/session";
 
 import { AuthArt } from "../auth-art";
-import { AuthShell, authLinkClass } from "../auth-shell";
+import {
+  AuthShell,
+  authLinkClass,
+  authStandaloneLinkClass,
+} from "../auth-shell";
 
 export const metadata: Metadata = { title: "Entrar" };
 
@@ -34,8 +38,8 @@ export default async function ZemanaLoginPage() {
         next="/minhas-clinicas"
         panelMessage="Essa conta entra pelo painel."
       />
-      <div className="grid gap-2 text-center text-sm">
-        <Link href="/esqueci-senha" className={authLinkClass}>
+      <div className="grid gap-1 text-center text-sm">
+        <Link href="/esqueci-senha" className={authStandaloneLinkClass}>
           Esqueci minha senha
         </Link>
         <p className="text-muted-foreground">
@@ -44,7 +48,7 @@ export default async function ZemanaLoginPage() {
             Criar conta
           </Link>
         </p>
-        <Link href="/admin/entrar" className={authLinkClass}>
+        <Link href="/admin/entrar" className={authStandaloneLinkClass}>
           É profissional? Entre no painel
         </Link>
       </div>

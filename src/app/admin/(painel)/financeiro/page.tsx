@@ -77,13 +77,23 @@ export default async function FinancePage() {
             iconTone="pink"
             label="A receber"
             value={money(summary.receivableDatedCents)}
-            hint={`Mais ${money(summary.receivableUnscheduledCents)} de sessões ainda não agendadas`}
+            hint={
+              summary.receivableUnscheduledCents > 0
+                ? `Mais ${money(summary.receivableUnscheduledCents)} de sessões ainda não agendadas`
+                : undefined
+            }
           />
           <Stat
             icon="alert"
             label="Parcelas atrasadas"
             value={money(summary.overdueCents)}
-            hint={`${summary.overdueCount} parcela(s)`}
+            hint={
+              summary.overdueCount === 0
+                ? "Nenhuma em atraso"
+                : summary.overdueCount === 1
+                  ? "1 parcela"
+                  : `${summary.overdueCount} parcelas`
+            }
             tone={summary.overdueCount > 0 ? "alert" : "default"}
           />
         </div>
@@ -96,7 +106,7 @@ export default async function FinancePage() {
           </h2>
           <Link
             href="/admin/financeiro/receber"
-            className="text-sm font-medium underline underline-offset-2"
+            className="inline-flex min-h-11 items-center text-sm font-semibold text-brand underline-offset-4 hover:underline dark:text-foreground"
           >
             Ver todas
           </Link>

@@ -57,3 +57,6 @@ export async function AuthShell({
 
 export const authLinkClass =
   "font-semibold text-primary underline underline-offset-4";
+
+// A link on its own line: a 44 px tap target, like the rest of the app.
+export const authStandaloneLinkClass = `${authLinkClass} inline-flex min-h-11 items-center justify-center`;

@@ -1,6 +1,10 @@
 import Link from "next/link";
 
-import { AuthShell, authLinkClass } from "./auth-shell";
+import {
+  AuthShell,
+  authLinkClass,
+  authStandaloneLinkClass,
+} from "./auth-shell";
 
 // Shared frame of the privacy policy and the terms of use: same shell as the
 // sign-in pages, readable on a 360 px phone.
@@ -28,14 +32,14 @@ export function LegalPage({
           </p>
         </header>
         {children}
-        <footer className="flex flex-wrap gap-x-4 gap-y-2 border-t pt-4">
-          <Link href="/" className={authLinkClass}>
+        <footer className="flex flex-wrap gap-x-4 border-t pt-2">
+          <Link href="/" className={authStandaloneLinkClass}>
             Página inicial
           </Link>
-          <Link href="/privacidade" className={authLinkClass}>
+          <Link href="/privacidade" className={authStandaloneLinkClass}>
             Privacidade
           </Link>
-          <Link href="/termos" className={authLinkClass}>
+          <Link href="/termos" className={authStandaloneLinkClass}>
             Termos de uso
           </Link>
         </footer>

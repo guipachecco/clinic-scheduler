@@ -6,7 +6,7 @@ import { PageTitle } from "@/app/[slug]/ui";
 import { MIN_PASSWORD_LENGTH } from "@/modules/auth/password-policy";
 
 import { AuthArt } from "../auth-art";
-import { AuthShell, authLinkClass } from "../auth-shell";
+import { AuthShell, authStandaloneLinkClass } from "../auth-shell";
 
 export const metadata: Metadata = { title: "Nova senha" };
 
@@ -31,7 +31,7 @@ export default async function ZemanaNewPasswordPage({
         <PageTitle description="O link está incompleto ou já foi usado.">
           Link inválido
         </PageTitle>
-        <Link href="/esqueci-senha" className={authLinkClass}>
+        <Link href="/esqueci-senha" className={authStandaloneLinkClass}>
           Pedir um novo link
         </Link>
       </AuthShell>
