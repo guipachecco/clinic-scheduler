@@ -14,6 +14,7 @@ import { PricingSection } from "./landing/pricing-section";
 import { SiteFooter } from "./landing/site-footer";
 import { SiteHeader } from "./landing/site-header";
 import { ScrollStory } from "./landing/scroll-story";
+import { SourceTag } from "./landing/source-tag";
 import { SITE_URL } from "./site-url";
 
 const TITLE = "Zemana — agenda online para profissionais de beleza e saúde";
@@ -93,6 +94,7 @@ export default function HomePage() {
       <SiteFooter />
       <JsonLd data={jsonLd} />
       <CookieNotice />
+      <SourceTag />
     </div>
   );
 }
