@@ -135,7 +135,7 @@ export function PricingSection() {
           <Sticker className="-rotate-1 bg-[#ffd3f0]">1º mês grátis</Sticker>
           {launch ? (
             <Sticker className="rotate-1 bg-[#f5c700]">
-              Preço de lançamento até 31/12: garanta esse preço
+              Preço de lançamento até 31/12: garanta esse preço por 12 meses
             </Sticker>
           ) : null}
         </div>
