@@ -18,6 +18,9 @@ export type WhatsAppTemplate = {
   // Digits only, with the country code: "5511987654321".
   to: string;
   params: string[];
+  // The full free text for Z-API and the outbox; the Cloud API ignores it
+  // (Meta only takes the approved template).
+  text?: string;
 };
 
 export type WhatsAppOutboxMessage = WhatsAppTemplate & {
@@ -82,7 +85,7 @@ async function sendWithZApi(
         recipient: { identifier: message.to },
         content: {
           type: "TEXT",
-          body: { message: reminderText(message.params) },
+          body: { message: message.text ?? reminderText(message.params) },
         },
       }),
       signal: AbortSignal.timeout(15_000),
@@ -166,7 +169,7 @@ async function writeToOutbox(message: WhatsAppTemplate) {
   const entry: WhatsAppOutboxMessage = {
     ...message,
     template: env.WHATSAPP_TEMPLATE,
-    text: reminderText(message.params),
+    text: message.text ?? reminderText(message.params),
     sentAt,
   };
   // Time first so the names sort in sending order.

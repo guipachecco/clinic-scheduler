@@ -6,7 +6,7 @@ import { inClinic, platformDb } from "@/db/client";
 import { appointments, auditLogs, clinics, patients } from "@/db/schema";
 import { logger } from "@/lib/logger";
 
-import { reminderParams, whatsappNumber } from "./message";
+import { manualReminderText, reminderParams, whatsappNumber } from "./message";
 import { sendWhatsAppTemplate, type WhatsAppTemplate } from "./whatsapp";
 
 // The run of the WhatsApp reminder (GET /api/cron/lembretes, every 15 min from
@@ -44,6 +44,9 @@ export async function sendDueReminders(
       name: clinics.name,
       displayName: clinics.displayName,
       timezone: clinics.timezone,
+      address: clinics.address,
+      mapsUrl: clinics.mapsUrl,
+      whatsappPhone: clinics.whatsappPhone,
     })
     .from(clinics)
     .where(eq(clinics.isActive, true))
@@ -71,6 +74,9 @@ async function remindClinic(
     name: string;
     displayName: string | null;
     timezone: string;
+    address: string | null;
+    mapsUrl: string | null;
+    whatsappPhone: string | null;
   },
   now: Date,
   send: Send,
@@ -114,15 +120,24 @@ async function remindClinic(
     const to = whatsappNumber(row.phone);
     if (!to) continue;
     if (!(await claim(clinic.id, row))) continue;
+    const input = {
+      patientName: row.patientName,
+      clinicName,
+      serviceName: row.serviceName,
+      startsAt: row.startsAt,
+      timezone: clinic.timezone,
+    };
     try {
       await send({
         to,
-        params: reminderParams({
-          patientName: row.patientName,
-          clinicName,
-          serviceName: row.serviceName,
-          startsAt: row.startsAt,
-          timezone: clinic.timezone,
+        params: reminderParams(input),
+        // The clinic page's address, map and WhatsApp (Z-API only).
+        text: manualReminderText({
+          ...input,
+          now,
+          address: clinic.address,
+          mapsUrl: clinic.mapsUrl,
+          clinicPhone: clinic.whatsappPhone,
         }),
       });
     } catch (error) {

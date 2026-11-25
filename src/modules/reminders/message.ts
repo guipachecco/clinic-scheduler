@@ -86,6 +86,10 @@ export function manualReminderText(
     now: Date;
     address?: string | null;
     mapsUrl?: string | null;
+    // Set when the message goes out from another number (the automatic
+    // reminder via Z-API): "avisar por aqui" would reach Zemana, so the
+    // closing line links to the clinic's own WhatsApp instead.
+    clinicPhone?: string | null;
   },
 ): string {
   const zone = input.timezone;
@@ -115,7 +119,18 @@ export function manualReminderText(
     if (address) lines.push(`📍 ${address}`);
     if (map) lines.push(`🗺️ Como chegar: ${map}`);
   }
-  lines.push("", "Se não puder vir, é só avisar por aqui. Até lá! 💜");
+  if (input.clinicPhone === undefined) {
+    lines.push("", "Se não puder vir, é só avisar por aqui. Até lá! 💜");
+  } else {
+    const contact = input.clinicPhone && whatsappNumber(input.clinicPhone);
+    lines.push(
+      "",
+      contact
+        ? `Se não puder vir, avise a ${input.clinicName.trim()} pelo WhatsApp: https://wa.me/${contact}`
+        : "Se não puder vir, avise a clínica com antecedência.",
+      "Até lá! 💜",
+    );
+  }
   return lines.join("\n");
 }
 
