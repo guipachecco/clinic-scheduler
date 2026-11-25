@@ -4,9 +4,9 @@ import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { sendDueReminders } from "@/modules/reminders/reminders";
 
-// The daily WhatsApp reminder (vercel.json: 13:00 UTC, 10h in Brasília). The
-// Vercel cron calls it with "Authorization: Bearer <CRON_SECRET>"; any other
-// call is refused. Answers only the counts.
+// The WhatsApp reminder run: every 15 min from cron-job.org, plus the daily
+// Vercel cron (vercel.json). Both call it with "Authorization: Bearer
+// <CRON_SECRET>"; any other call is refused. Answers only the counts.
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
