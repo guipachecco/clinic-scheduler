@@ -18,6 +18,8 @@ import {
 import { Icon } from "../icons";
 
 import { BookingDone } from "./booking-done";
+import { DEFAULT_REMINDER_LEAD } from "@/modules/reminders/lead";
+
 import { ConfirmSheet } from "./confirm-sheet";
 import { DayStrip, dayLabel, STRIP_SPAN, stripDays } from "./day-strip";
 import { PixStep } from "./pix-step";
@@ -85,6 +87,7 @@ export function BookingFlow({
   const [cpf, setCpf] = useState("");
   // Opt-in: unticked until she ticks it.
   const [remind, setRemind] = useState(false);
+  const [lead, setLead] = useState<number>(DEFAULT_REMINDER_LEAD);
   const [deposit, setDeposit] = useState<DepositPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -195,7 +198,9 @@ export function BookingFlow({
         serviceId: service.id,
         startsAt: slot,
         ...(offer?.needsCpf ? { cpf } : {}),
-        ...(reminderAvailable && remind ? { whatsappReminder: true } : {}),
+        ...(reminderAvailable && remind
+          ? { whatsappReminder: true, reminderLeadMinutes: lead }
+          : {}),
       });
       if (result.ok) {
         setConfirmation(result.confirmation);
@@ -351,7 +356,12 @@ export function BookingFlow({
               onCpf={setCpf}
               reminder={
                 reminderAvailable
-                  ? { checked: remind, onChange: setRemind }
+                  ? {
+                      checked: remind,
+                      onChange: setRemind,
+                      lead,
+                      onLead: setLead,
+                    }
                   : null
               }
               error={error}

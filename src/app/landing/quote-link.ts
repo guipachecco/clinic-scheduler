@@ -12,7 +12,10 @@ export const QUOTE_URL = whatsappUrl(
 
 // The ad source (utm_source) cut to a short plain word, or null when absent.
 export function cleanSource(raw: string | null): string | null {
-  const s = raw?.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
+  const s = raw
+    ?.toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 30);
   return s || null;
 }
 

@@ -15,20 +15,6 @@ export type ReminderInput = {
   timezone: string;
 };
 
-// The whole of "tomorrow" in the clinic's zone: [from, to).
-export function tomorrowRange(
-  now: Date,
-  timezone: string,
-): { from: Date; to: Date } {
-  const start = DateTime.fromJSDate(now, { zone: timezone })
-    .startOf("day")
-    .plus({ days: 1 });
-  return {
-    from: start.toJSDate(),
-    to: start.plus({ days: 1 }).toJSDate(),
-  };
-}
-
 // Meta refuses a variable with a line break, a tab or more than four spaces in
 // a row, and an empty one. Long names are cut.
 export function templateText(value: string, max = 60): string {
@@ -59,11 +45,14 @@ export function reminderParams(input: ReminderInput): string[] {
   ];
 }
 
-// The message as the patient reads it, for the outbox and the tests.
+// The message as the patient reads it (Z-API, outbox, tests). No "amanhã":
+// the lead may be 3 h or 1 h.
+// shortcut: the Meta template still says "amanhã"; submit a new one before
+// going back to the Cloud API with leads under a day.
 export function reminderText(params: string[]): string {
   const [name, clinic, day, time, service] = params;
   return (
-    `Olá, ${name}! Lembrete da ${clinic}: seu horário é amanhã, ${day}, ` +
+    `Olá, ${name}! Lembrete da ${clinic}: seu horário é ${day}, ` +
     `às ${time} (${service}). Se não puder ir, avise a clínica com antecedência.`
   );
 }

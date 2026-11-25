@@ -6,36 +6,12 @@ import {
   reminderParams,
   reminderText,
   templateText,
-  tomorrowRange,
   whatsappLink,
   whatsappNumber,
 } from "./message";
 
 // Fictitious names and numbers only.
 const ZONE = "America/Sao_Paulo";
-
-describe("tomorrowRange", () => {
-  it("is the whole next day in the clinic's zone", () => {
-    // 10h in Brasília (13:00 UTC) on Wednesday 18/11/2026.
-    const { from, to } = tomorrowRange(new Date("2026-11-18T13:00:00Z"), ZONE);
-    expect(from.toISOString()).toBe("2026-11-19T03:00:00.000Z");
-    expect(to.toISOString()).toBe("2026-11-20T03:00:00.000Z");
-  });
-
-  it("uses the clinic's date, not UTC's, late at night", () => {
-    // 22h30 in Brasília is already the 19th in UTC.
-    const { from } = tomorrowRange(new Date("2026-11-19T01:30:00Z"), ZONE);
-    expect(from.toISOString()).toBe("2026-11-19T03:00:00.000Z");
-  });
-
-  it("follows another zone", () => {
-    const { from } = tomorrowRange(
-      new Date("2026-11-18T13:00:00Z"),
-      "America/Manaus",
-    );
-    expect(from.toISOString()).toBe("2026-11-19T04:00:00.000Z");
-  });
-});
 
 describe("templateText", () => {
   it("drops line breaks, tabs and runs of spaces, which Meta refuses", () => {
@@ -72,7 +48,7 @@ describe("reminderParams", () => {
       "Design de sobrancelha",
     ]);
     expect(reminderText(params)).toBe(
-      "Olá, Maria! Lembrete da Clínica Teste: seu horário é amanhã, " +
+      "Olá, Maria! Lembrete da Clínica Teste: seu horário é " +
         "quinta-feira, 19/11, às 14:30 (Design de sobrancelha). " +
         "Se não puder ir, avise a clínica com antecedência.",
     );

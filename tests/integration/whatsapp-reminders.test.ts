@@ -24,10 +24,10 @@ import { CLINIC } from "../helpers/clinic";
 // Every record here is fictitious and exists only during the test.
 
 const MINUTE = 60_000;
-// Wednesday 2026-11-18, 10:00 in São Paulo: the daily run.
-const NOW = new Date("2026-11-18T13:00:00Z");
 // Thursday 19/11 at 14:30 in São Paulo.
 const TOMORROW = new Date("2026-11-19T17:30:00Z");
+// Exactly one day before it: a 1-day reminder is now due.
+const NOW = new Date("2026-11-18T17:30:00Z");
 
 let actorId: string;
 let patientId: string;
@@ -193,8 +193,30 @@ describe("sendDueReminders", () => {
       })
       .where(eq(appointments.id, id));
 
-    expect(await sendDueReminders(NOW, send)).toEqual({ sent: 1, failed: 0 });
+    // Due again one day before the new time.
+    const later = new Date(NOW.getTime() + 2 * 60 * MINUTE);
+    expect(await sendDueReminders(later, send)).toEqual({ sent: 1, failed: 0 });
     expect(sent[1]!.params[3]).toBe("16:30");
+  });
+
+  it("follows the chosen lead: 3 h before goes out, 1 h before waits", async () => {
+    const inTwoHours = new Date(NOW.getTime() + 2 * 60 * MINUTE);
+    await insertAppointment({ startsAt: inTwoHours, reminderLeadMinutes: 180 });
+    await insertAppointment({
+      startsAt: new Date(inTwoHours.getTime() + 60 * MINUTE),
+      reminderLeadMinutes: 60,
+    });
+    const { sent, send } = recorder();
+
+    expect(await sendDueReminders(NOW, send)).toEqual({ sent: 1, failed: 0 });
+    expect(sent[0]!.params[3]).toBe("16:30");
+  });
+
+  it("waits until one day before for the 1-day lead", async () => {
+    await insertAppointment();
+    const { send } = recorder();
+    const early = new Date(NOW.getTime() - 15 * MINUTE);
+    expect(await sendDueReminders(early, send)).toEqual({ sent: 0, failed: 0 });
   });
 
   it("gives the claim back when the message fails", async () => {
@@ -259,6 +281,35 @@ describe("the panel's checkbox", () => {
     expect(
       (await getAppointment(CLINIC, result.id, NOW))?.whatsappReminder,
     ).toBe(false);
+  });
+
+  it("saves how long before, and changes it on an edit", async () => {
+    const result = await createAppointment(
+      CLINIC,
+      form({ whatsappReminder: true, reminderLeadMinutes: "180" }),
+      actorId,
+      NOW,
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    expect(
+      (await getAppointment(CLINIC, result.id, NOW))?.reminderLeadMinutes,
+    ).toBe(180);
+
+    const changed = await updateAppointment(
+      CLINIC,
+      result.id,
+      form({ whatsappReminder: true, reminderLeadMinutes: "60" }),
+      actorId,
+      NOW,
+    );
+    expect(changed.ok).toBe(true);
+    expect(
+      (await getAppointment(CLINIC, result.id, NOW))?.reminderLeadMinutes,
+    ).toBe(60);
+  });
+
+  it("refuses a lead that is not offered", () => {
+    expect(() => form({ reminderLeadMinutes: "30" })).toThrow();
   });
 
   it("is off when the box is left unticked", async () => {

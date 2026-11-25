@@ -5,6 +5,7 @@ import type {
   appointmentStatus,
   CANCELLATION_REASONS,
 } from "@/db/schema/clinic";
+import { reminderLeadSchema } from "@/modules/reminders/lead";
 import { CLINIC_TIME_ZONE, localToUtc } from "@/modules/schedule/time";
 
 // Form schemas, labels and status transition rules for appointments.
@@ -169,6 +170,8 @@ export const appointmentFormSchema = z
       .transform((value) =>
         value === undefined ? undefined : value === true || value === "on",
       ),
+    // How long before; absent like the checkbox.
+    reminderLeadMinutes: reminderLeadSchema.optional(),
   })
   .superRefine((value, ctx) => {
     // Zod still runs this when a field failed; there is nothing to check then.
@@ -201,6 +204,7 @@ export const appointmentFormSchema = z
       idempotencyKey: value.idempotencyKey,
       acknowledgeWarnings: value.acknowledgeWarnings,
       whatsappReminder: value.whatsappReminder,
+      reminderLeadMinutes: value.reminderLeadMinutes,
     };
   });
 

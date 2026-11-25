@@ -33,6 +33,7 @@ import {
   formatLocal,
   todayLocal,
 } from "@/modules/schedule/time";
+import { reminderLeadLabel } from "@/modules/reminders/lead";
 import { whatsappRemindersAvailable } from "@/modules/reminders/whatsapp";
 import { listActiveServices } from "@/modules/services/services";
 import {
@@ -280,7 +281,9 @@ export default async function AppointmentPage({
           <Fact label="Origem">{SOURCE_LABELS[appointment.source]}</Fact>
           {appointment.whatsappReminder ? (
             <Fact label="Lembrete por WhatsApp">
-              {appointment.reminderSent ? "enviado" : "1 dia antes"}
+              {appointment.reminderSent
+                ? "enviado"
+                : reminderLeadLabel(appointment.reminderLeadMinutes)}
             </Fact>
           ) : null}
           {appointment.status === "cancelled" &&
@@ -479,7 +482,10 @@ export default async function AppointmentPage({
               idempotencyKey: appointment.id,
               acknowledgeWarnings: false,
               ...(reminderAvailable
-                ? { whatsappReminder: appointment.whatsappReminder }
+                ? {
+                    whatsappReminder: appointment.whatsappReminder,
+                    reminderLeadMinutes: appointment.reminderLeadMinutes,
+                  }
                 : {}),
             }}
           />
