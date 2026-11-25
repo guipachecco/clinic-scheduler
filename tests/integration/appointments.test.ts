@@ -1013,6 +1013,7 @@ describe("getAppointment", () => {
       cancellationReason: null,
       confirmedAt: NOW,
       whatsappReminder: false,
+      reminderLeadMinutes: 1440,
       reminderSent: false,
       editable: true,
       allowedTransitions: ["cancelled"],
