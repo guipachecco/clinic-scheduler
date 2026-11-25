@@ -12,6 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
+import {
+  DEFAULT_REMINDER_LEAD,
+  REMINDER_LEADS,
+} from "@/modules/reminders/lead";
 import { useLiveSearch } from "@/lib/use-live-search";
 import type { AppointmentResult } from "@/modules/appointments/appointments";
 import {
@@ -293,7 +297,12 @@ export function AppointmentForm(props: Props) {
           extraServiceIds: [],
           idempotencyKey,
           acknowledgeWarnings: false,
-          ...(props.reminderAvailable ? { whatsappReminder: false } : {}),
+          ...(props.reminderAvailable
+            ? {
+                whatsappReminder: false,
+                reminderLeadMinutes: DEFAULT_REMINDER_LEAD,
+              }
+            : {}),
         };
   const [patient, setPatient] = useState(initialPatient);
   const [warnings, setWarnings] = useState<Warning[] | null>(null);
@@ -369,6 +378,7 @@ export function AppointmentForm(props: Props) {
 
   // The registration page sends the user back here with the same slot. Only
   // the time travels in the URL, and only when the fields are valid.
+  const remind = useWatch({ control, name: "whatsappReminder" });
   const watchedDate = useWatch({ control, name: "date" });
   const watchedTime = useWatch({ control, name: "startTime" });
   const inicio = `${watchedDate}T${watchedTime}`;
@@ -680,8 +690,23 @@ export function AppointmentForm(props: Props) {
             className="size-5 shrink-0 accent-primary"
             {...register("whatsappReminder")}
           />
-          Avisar a paciente 1 dia antes pelo WhatsApp
+          Avisar a paciente pelo WhatsApp
         </label>
+      ) : null}
+      {props.reminderAvailable && remind ? (
+        <div className="grid content-start gap-2 sm:max-w-xs">
+          <Label htmlFor="reminderLeadMinutes">Quando avisar</Label>
+          <NativeSelect
+            id="reminderLeadMinutes"
+            {...register("reminderLeadMinutes")}
+          >
+            {REMINDER_LEADS.map((lead) => (
+              <option key={lead.minutes} value={lead.minutes}>
+                {lead.label}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
       ) : null}
 
       {warnings ? (

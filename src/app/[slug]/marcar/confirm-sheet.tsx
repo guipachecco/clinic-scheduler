@@ -7,6 +7,8 @@ import { FormError } from "@/components/form-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { REMINDER_LEADS } from "@/modules/reminders/lead";
 
 import { Icon, type IconName } from "../icons";
 
@@ -77,8 +79,13 @@ export function ConfirmSheet({
   deposit: DepositOffer | null;
   cpf: string;
   onCpf: (value: string) => void;
-  // The WhatsApp reminder checkbox; null hides it.
-  reminder: { checked: boolean; onChange: (value: boolean) => void } | null;
+  // The WhatsApp reminder checkbox and how long before; null hides it.
+  reminder: {
+    checked: boolean;
+    onChange: (value: boolean) => void;
+    lead: number;
+    onLead: (minutes: number) => void;
+  } | null;
   error: string | null;
   pending: boolean;
   onConfirm: () => void;
@@ -221,8 +228,25 @@ export function ConfirmSheet({
               disabled={pending}
               onChange={(event) => reminder.onChange(event.target.checked)}
             />
-            Me avise 1 dia antes pelo WhatsApp
+            Me avise pelo WhatsApp
           </label>
+        ) : null}
+        {reminder?.checked ? (
+          <div className="grid gap-2">
+            <Label htmlFor="lembrete-antecedencia">Quando avisar</Label>
+            <NativeSelect
+              id="lembrete-antecedencia"
+              value={reminder.lead}
+              disabled={pending}
+              onChange={(event) => reminder.onLead(Number(event.target.value))}
+            >
+              {REMINDER_LEADS.map((lead) => (
+                <option key={lead.minutes} value={lead.minutes}>
+                  {lead.label}
+                </option>
+              ))}
+            </NativeSelect>
+          </div>
         ) : null}
         <FormError message={error} />
         <Button

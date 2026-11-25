@@ -1,18 +1,19 @@
 import "server-only";
 
-import { and, asc, eq, gte, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
 
 import { inClinic, platformDb } from "@/db/client";
 import { appointments, auditLogs, clinics, patients } from "@/db/schema";
 import { logger } from "@/lib/logger";
 
-import { reminderParams, tomorrowRange, whatsappNumber } from "./message";
+import { reminderParams, whatsappNumber } from "./message";
 import { sendWhatsAppTemplate, type WhatsAppTemplate } from "./whatsapp";
 
-// The daily run of the WhatsApp reminder (GET /api/cron/lembretes, 10h in
-// Brasília). For every active clinic, the confirmed appointments of tomorrow
-// in the clinic's zone whose patient asked for the reminder (or whose owner
-// ticked it) and have not had one for this start yet.
+// The run of the WhatsApp reminder (GET /api/cron/lembretes, every 15 min from
+// cron-job.org plus the daily Vercel cron). For every active clinic, the
+// confirmed appointments whose patient asked for the reminder (or whose owner
+// ticked it), now inside their chosen lead, not started, and without one for
+// this start yet.
 //
 // Root's role (app_platform) only lists the clinics; each clinic's
 // appointments are read as app_panel inside that clinic (inClinic), like the
@@ -75,7 +76,6 @@ async function remindClinic(
   send: Send,
 ): Promise<ReminderRun> {
   const run: ReminderRun = { sent: 0, failed: 0 };
-  const { from, to } = tomorrowRange(now, clinic.timezone);
   const due = await inClinic(clinic.id, (tx) =>
     tx
       .select({
@@ -98,8 +98,9 @@ async function remindClinic(
           eq(appointments.clinicId, clinic.id),
           eq(appointments.whatsappReminder, true),
           eq(appointments.status, "confirmed"),
-          gte(appointments.startsAt, from),
-          lt(appointments.startsAt, to),
+          // Inside its chosen lead (1 day, 3 h or 1 h) and not started yet.
+          gt(appointments.startsAt, now),
+          sql`${appointments.startsAt} - make_interval(mins => ${appointments.reminderLeadMinutes}) <= ${now}`,
           notSentForThisStart(),
           isNotNull(patients.phone),
           isNull(patients.anonymizedAt),

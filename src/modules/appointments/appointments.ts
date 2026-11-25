@@ -93,6 +93,7 @@ export type AppointmentRecord = {
   // The WhatsApp reminder the day before: asked for, and whether it already
   // went out for the current start.
   whatsappReminder: boolean;
+  reminderLeadMinutes: number;
   reminderSent: boolean;
   editable: boolean;
   allowedTransitions: Status[];
@@ -641,6 +642,9 @@ export async function createAppointment(
           confirmedAt: now,
           idempotencyKey: values.idempotencyKey,
           whatsappReminder: values.whatsappReminder === true,
+          ...(values.reminderLeadMinutes !== undefined
+            ? { reminderLeadMinutes: values.reminderLeadMinutes }
+            : {}),
         })
         .returning({ id: appointments.id });
       if (extras.length > 0) {
@@ -666,7 +670,12 @@ export async function createAppointment(
           ...period(values.startsAt, values.endsAt),
           status: "confirmed",
           ...(warned.codes.length > 0 ? { warnings: warned.codes } : {}),
-          ...(values.whatsappReminder ? { whatsappReminder: true } : {}),
+          ...(values.whatsappReminder
+            ? {
+                whatsappReminder: true,
+                reminderLeadMinutes: values.reminderLeadMinutes,
+              }
+            : {}),
         },
       });
       return { ok: true, id: row!.id };
@@ -891,9 +900,13 @@ export async function updateAppointment(
       const professionalChanged = professional.id !== current.professionalId;
       const labelChanged = values.customLabel !== current.customLabel;
       // Undefined when the form had no checkbox: keep what was saved.
+      const leadChanged =
+        values.reminderLeadMinutes !== undefined &&
+        values.reminderLeadMinutes !== current.reminderLeadMinutes;
       const reminderChanged =
-        values.whatsappReminder !== undefined &&
-        values.whatsappReminder !== current.whatsappReminder;
+        leadChanged ||
+        (values.whatsappReminder !== undefined &&
+          values.whatsappReminder !== current.whatsappReminder);
       const timeChanged =
         values.startsAt.getTime() !== current.startsAt.getTime() ||
         values.endsAt.getTime() !== current.endsAt.getTime();
@@ -966,7 +979,10 @@ export async function updateAppointment(
           endsAt: values.endsAt,
           ...occupied,
           ...(reminderChanged
-            ? { whatsappReminder: values.whatsappReminder }
+            ? {
+                whatsappReminder: values.whatsappReminder,
+                reminderLeadMinutes: values.reminderLeadMinutes,
+              }
             : {}),
         })
         .where(
@@ -998,7 +1014,10 @@ export async function updateAppointment(
         : {};
       const otherChanges = {
         ...(reminderChanged
-          ? { whatsappReminder: values.whatsappReminder }
+          ? {
+              whatsappReminder: values.whatsappReminder,
+              reminderLeadMinutes: values.reminderLeadMinutes,
+            }
           : {}),
         ...(labelChanged ? { labelChanged: true } : {}),
         ...(extrasChanged
@@ -1291,6 +1310,7 @@ export async function getAppointment(
         cancellationReason: appointments.cancellationReason,
         confirmedAt: appointments.confirmedAt,
         whatsappReminder: appointments.whatsappReminder,
+        reminderLeadMinutes: appointments.reminderLeadMinutes,
         reminderSentFor: appointments.reminderSentFor,
       })
       .from(appointments)
@@ -1379,6 +1399,7 @@ export async function getAppointment(
       : null,
     confirmedAt: row.confirmedAt,
     whatsappReminder: row.whatsappReminder,
+    reminderLeadMinutes: row.reminderLeadMinutes,
     reminderSent:
       row.reminderSentFor !== null &&
       row.reminderSentFor.getTime() === row.startsAt.getTime(),

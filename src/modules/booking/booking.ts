@@ -29,6 +29,7 @@ import {
   undoHold,
   validCpf,
 } from "@/modules/asaas/deposits";
+import { DEFAULT_REMINDER_LEAD } from "@/modules/reminders/lead";
 import type { DayHours } from "@/modules/schedule/schedule";
 
 import { type BusyInterval, freeSlots, parseLocalDate } from "./slots";
@@ -70,6 +71,8 @@ export type BookInput = {
   startsAt: string | Date;
   cpf?: string;
   whatsappReminder?: boolean;
+  // How long before (reminders/lead.ts); validated by the caller.
+  reminderLeadMinutes?: number;
 };
 
 // deposit is the Pix deposit to pay when the booking is held for one, null
@@ -500,6 +503,7 @@ async function book(
     held: quote !== null,
     now,
     whatsappReminder: input.whatsappReminder === true,
+    reminderLeadMinutes: input.reminderLeadMinutes ?? DEFAULT_REMINDER_LEAD,
   });
   if (!inserted.ok) {
     if (inserted.reason === "taken" && quote && !Number.isNaN(+startsAt)) {
@@ -596,7 +600,13 @@ async function insertOnline(
     held,
     now,
     whatsappReminder,
-  }: { held: boolean; now: Date; whatsappReminder: boolean },
+    reminderLeadMinutes,
+  }: {
+    held: boolean;
+    now: Date;
+    whatsappReminder: boolean;
+    reminderLeadMinutes: number;
+  },
 ): Promise<Inserted> {
   const status = held ? "requested" : "confirmed";
   try {
@@ -664,6 +674,7 @@ async function insertOnline(
             source: "online",
             confirmedAt: held ? null : now,
             whatsappReminder,
+            reminderLeadMinutes,
           })
           .returning({ id: appointments.id }),
       );
@@ -684,7 +695,9 @@ async function insertOnline(
           durationMinutes: service.durationMinutes,
           status,
           source: "online",
-          ...(whatsappReminder ? { whatsappReminder: true } : {}),
+          ...(whatsappReminder
+            ? { whatsappReminder: true, reminderLeadMinutes }
+            : {}),
         },
       });
       // app_client cannot lock her row (that needs UPDATE), but the insert's

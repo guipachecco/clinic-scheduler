@@ -17,6 +17,10 @@ import {
 } from "@/modules/booking/booking";
 import { requireClient } from "@/modules/clients/session";
 import { BOOKING_LIMIT, consumeRateLimit } from "@/modules/platform/rate-limit";
+import {
+  DEFAULT_REMINDER_LEAD,
+  reminderLeadSchema,
+} from "@/modules/reminders/lead";
 import { whatsappRemindersAvailable } from "@/modules/reminders/whatsapp";
 
 // The booking steps of /<slug>/marcar. Each action rebuilds who she is from
@@ -32,8 +36,9 @@ export type Confirmation = {
   address: string | null;
   mapsUrl: string | null;
   preparationInstructions: string | null;
-  // She asked for the WhatsApp reminder the day before.
+  // She asked for the WhatsApp reminder, this many minutes before.
   whatsappReminder: boolean;
+  reminderLeadMinutes: number;
 };
 
 // The Pix deposit as the browser gets it. The QR image and the code only go
@@ -81,6 +86,7 @@ const bookSchema = z.object({
   startsAt: z.iso.datetime({ offset: true }),
   cpf: z.string().max(20).optional(),
   whatsappReminder: z.boolean().optional(),
+  reminderLeadMinutes: reminderLeadSchema.optional(),
 });
 const appointmentId = z.uuid();
 
@@ -169,9 +175,15 @@ export async function book(slug: string, input: unknown): Promise<BookResult> {
   // anyway is dropped.
   const whatsappReminder =
     parsed.data.whatsappReminder === true && whatsappRemindersAvailable();
+  const reminderLeadMinutes =
+    parsed.data.reminderLeadMinutes ?? DEFAULT_REMINDER_LEAD;
   let result;
   try {
-    result = await bookOnline(ctx, { ...parsed.data, whatsappReminder });
+    result = await bookOnline(ctx, {
+      ...parsed.data,
+      whatsappReminder,
+      reminderLeadMinutes,
+    });
   } catch (error) {
     logger.error("online booking failed", { error });
     return { ok: false, reason: "unavailable" };
@@ -198,6 +210,7 @@ export async function book(slug: string, input: unknown): Promise<BookResult> {
       mapsUrl: clinic.mapsUrl,
       preparationInstructions: service?.preparationInstructions ?? null,
       whatsappReminder,
+      reminderLeadMinutes,
     },
     deposit,
   };

@@ -804,6 +804,10 @@ export const appointments = pgTable(
     // the panel. reminder_sent_for is the starts_at the reminder went out for,
     // so a rescheduled appointment gets a new one.
     whatsappReminder: boolean("whatsapp_reminder").notNull().default(false),
+    // 1440, 180 or 60 minutes before the start (migration 0042, reminders/lead.ts).
+    reminderLeadMinutes: smallint("reminder_lead_minutes")
+      .notNull()
+      .default(1440),
     reminderSentFor: timestamp("reminder_sent_for", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -830,6 +834,10 @@ export const appointments = pgTable(
     index("appointments_patient_id_idx").on(t.patientId),
     index("appointments_service_id_idx").on(t.serviceId),
     check("appointments_period_check", sql`${t.startsAt} < ${t.endsAt}`),
+    check(
+      "appointments_reminder_lead_check",
+      sql`${t.reminderLeadMinutes} in (60, 180, 1440)`,
+    ),
     check(
       "appointments_occupied_check",
       sql`${t.occupiedFrom} <= ${t.startsAt} and ${t.occupiedUntil} >= ${t.endsAt}`,

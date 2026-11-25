@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
+import { reminderLeadLabel } from "@/modules/reminders/lead";
 
 import { Icon } from "../icons";
 
@@ -292,7 +293,8 @@ export function BookingDone({
               name="whatsapp"
               className="size-5 shrink-0 text-primary-text"
             />
-            Vamos te lembrar pelo WhatsApp um dia antes.
+            Vamos te lembrar pelo WhatsApp{" "}
+            {reminderLeadLabel(confirmation.reminderLeadMinutes)}.
           </motion.p>
         ) : null}
 
