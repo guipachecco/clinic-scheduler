@@ -103,6 +103,30 @@ describe("manualReminderText", () => {
     );
   });
 
+  it("sent from another number, points to the clinic's WhatsApp", () => {
+    const text = manualReminderText({
+      ...base,
+      // Today, 1 hour ahead: the 1-hour lead.
+      startsAt: new Date("2026-11-18T14:00:00Z"),
+      clinicPhone: "+5547900000001",
+    });
+    expect(text).toContain("seu horário hoje, quarta-feira (18/11), às 11:00");
+    expect(text).toContain(
+      "Se não puder vir, avise a Clínica Teste pelo WhatsApp: https://wa.me/5547900000001",
+    );
+    expect(text).not.toContain("por aqui");
+  });
+
+  it("without the clinic's WhatsApp, asks to warn the clinic", () => {
+    const text = manualReminderText({
+      ...base,
+      startsAt: new Date("2026-11-19T17:30:00Z"),
+      clinicPhone: null,
+    });
+    expect(text).toContain("avise a clínica com antecedência");
+    expect(text).not.toContain("por aqui");
+  });
+
   it("searches the address on Google Maps without a map link", () => {
     expect(
       manualReminderText({
