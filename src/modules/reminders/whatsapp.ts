@@ -31,7 +31,11 @@ type Fetch = typeof fetch;
 // The checkbox shows only where a reminder can go out: the real site with the
 // Meta keys, or a local run (the outbox).
 export function whatsappRemindersAvailable(): boolean {
-  return env.WHATSAPP_TOKEN !== undefined || isLocalhost(env.BETTER_AUTH_URL);
+  return (
+    env.WHATSAPP_TOKEN !== undefined ||
+    env.ZAPI_TOKEN !== undefined ||
+    isLocalhost(env.BETTER_AUTH_URL)
+  );
 }
 
 export function messagesUrl(): string {
@@ -46,7 +50,54 @@ export async function sendWhatsAppTemplate(
     await sendWithCloudApi(env.WHATSAPP_TOKEN, message, fetchImpl);
     return;
   }
+  if (env.ZAPI_INSTANCE_ID && env.ZAPI_TOKEN) {
+    await sendWithZApi(
+      env.ZAPI_INSTANCE_ID,
+      env.ZAPI_TOKEN,
+      message,
+      fetchImpl,
+    );
+    return;
+  }
   await writeToOutbox(message);
+}
+
+// Z-API Omni has no templates here: the same reminder goes as plain text.
+// ZAPI_INSTANCE_ID holds the Omni "ID do canal".
+async function sendWithZApi(
+  channelId: string,
+  token: string,
+  message: WhatsAppTemplate,
+  fetchImpl: Fetch,
+) {
+  const response = await fetchImpl(
+    `https://api.omni.z-api.io/v1/channels/${channelId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        recipient: { identifier: message.to },
+        content: {
+          type: "TEXT",
+          body: { message: reminderText(message.params) },
+        },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  if (!response.ok) {
+    const reason = redactText(await response.text().catch(() => "")).slice(
+      0,
+      500,
+    );
+    throw new Error(
+      `Falha ao enviar o WhatsApp (Z-API ${response.status})` +
+        (reason ? `: ${reason}` : "."),
+    );
+  }
 }
 
 async function sendWithCloudApi(

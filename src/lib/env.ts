@@ -94,6 +94,12 @@ export const serverEnvSchema = z
     WHATSAPP_OUTBOX_DIR: optionalText().transform(
       (value) => value ?? ".whatsapp",
     ),
+    // Z-API (unofficial, QR-code WhatsApp Web), the bridge while the Meta
+    // portfolio is blocked. Used only when the Meta keys are absent; sends the
+    // reminder as plain text. ZAPI_INSTANCE_ID is the Omni "ID do canal";
+    // ZAPI_TOKEN is the workspace Secret Key (Security), not the channel token.
+    ZAPI_INSTANCE_ID: optionalText(),
+    ZAPI_TOKEN: optionalText(),
     // Sent by the Vercel cron as "Authorization: Bearer <CRON_SECRET>" to
     // /api/cron/lembretes. Without it the route refuses every call.
     CRON_SECRET: optionalText(),
@@ -105,6 +111,14 @@ export const serverEnvSchema = z
     {
       error: "defina WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID juntas",
       path: ["WHATSAPP_PHONE_NUMBER_ID"],
+    },
+  )
+  .refine(
+    (env) =>
+      (env.ZAPI_INSTANCE_ID === undefined) === (env.ZAPI_TOKEN === undefined),
+    {
+      error: "defina ZAPI_INSTANCE_ID e ZAPI_TOKEN juntas",
+      path: ["ZAPI_TOKEN"],
     },
   )
   .refine(

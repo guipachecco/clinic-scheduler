@@ -87,6 +87,38 @@ describe("sendWhatsAppTemplate", () => {
     expect(await readWhatsAppOutbox(outbox)).toEqual([]);
   });
 
+  it("without the Meta keys but with Z-API Omni sends the reminder as text", async () => {
+    vi.stubEnv("WHATSAPP_TOKEN", "");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "");
+    vi.stubEnv("ZAPI_INSTANCE_ID", "CANALFICTICIO");
+    vi.stubEnv("ZAPI_TOKEN", "token-ficticio-zapi");
+    vi.stubEnv("WHATSAPP_OUTBOX_DIR", outbox);
+    vi.resetModules();
+    const { readWhatsAppOutbox, sendWhatsAppTemplate } =
+      await import("./whatsapp");
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ messageId: "x" })),
+    );
+
+    await sendWhatsAppTemplate(message, fetchMock);
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe(
+      "https://api.omni.z-api.io/v1/channels/CANALFICTICIO/messages",
+    );
+    expect(init.headers).toMatchObject({
+      Authorization: "Bearer token-ficticio-zapi",
+    });
+    const body = JSON.parse(init.body as string);
+    expect(body.recipient).toEqual({ identifier: "5511987654321" });
+    expect(body.content.type).toBe("TEXT");
+    expect(body.content.body.message).toContain("Olá, Maria!");
+    expect(await readWhatsAppOutbox(outbox)).toEqual([]);
+  });
+
   it("throws Meta's reason without the phone number", async () => {
     vi.stubEnv("WHATSAPP_TOKEN", "token-ficticio-da-meta");
     vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "123456789012345");
