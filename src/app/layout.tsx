@@ -19,6 +19,10 @@ export const metadata: Metadata = {
     template: "%s | Zemana",
   },
   description: "Agendamento online de serviços da clínica.",
+  // Meta Business domain verification for zemana.com.br.
+  verification: {
+    other: { "facebook-domain-verification": "7hl3hjakv4oniiwrt0qi3dzwr6p0u4" },
+  },
 };
 
 // Lets fixed bars use env(safe-area-inset-*) on notched phones.
