@@ -95,6 +95,8 @@ export type AppointmentRecord = {
   whatsappReminder: boolean;
   reminderLeadMinutes: number;
   reminderSent: boolean;
+  // Her answer to the reminder ("1" or "2"), if any.
+  patientReply: "confirmed" | "declined" | null;
   editable: boolean;
   allowedTransitions: Status[];
   // The other procedures of the block, in order; `active` is whether the
@@ -1312,6 +1314,7 @@ export async function getAppointment(
         whatsappReminder: appointments.whatsappReminder,
         reminderLeadMinutes: appointments.reminderLeadMinutes,
         reminderSentFor: appointments.reminderSentFor,
+        patientReply: appointments.patientReply,
       })
       .from(appointments)
       .innerJoin(patients, eq(appointments.patientId, patients.id))
@@ -1400,6 +1403,10 @@ export async function getAppointment(
     confirmedAt: row.confirmedAt,
     whatsappReminder: row.whatsappReminder,
     reminderLeadMinutes: row.reminderLeadMinutes,
+    patientReply:
+      row.patientReply === "confirmed" || row.patientReply === "declined"
+        ? row.patientReply
+        : null,
     reminderSent:
       row.reminderSentFor !== null &&
       row.reminderSentFor.getTime() === row.startsAt.getTime(),

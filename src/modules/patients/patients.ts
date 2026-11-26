@@ -228,7 +228,13 @@ export async function updatePatient(
 
       await tx
         .update(patients)
-        .set(rowValues(values))
+        .set({
+          ...rowValues(values),
+          // Another phone has not written to Zemana's number yet.
+          ...(values.phone !== current.phone
+            ? { whatsappOptInAt: null, whatsappSenderId: null }
+            : {}),
+        })
         .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)));
       await tx.insert(auditLogs).values({
         clinicId,
@@ -488,6 +494,8 @@ export async function anonymizePatient(
         notes: null,
         // The account no longer books as this patient.
         userId: null,
+        whatsappOptInAt: null,
+        whatsappSenderId: null,
         anonymizedAt: new Date(),
       })
       .where(and(eq(patients.id, id), eq(patients.clinicId, clinicId)));

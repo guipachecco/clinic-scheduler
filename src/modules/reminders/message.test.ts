@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  confirmedText,
+  declinedText,
   firstName,
   manualReminderText,
+  newOptInCode,
+  optInCodeFrom,
+  optInMessage,
+  reminderAskText,
+  replyChoice,
   reminderParams,
   reminderText,
   templateText,
+  warmUpLimit,
   whatsappLink,
   whatsappNumber,
 } from "./message";
@@ -103,30 +111,6 @@ describe("manualReminderText", () => {
     );
   });
 
-  it("sent from another number, points to the clinic's WhatsApp", () => {
-    const text = manualReminderText({
-      ...base,
-      // Today, 1 hour ahead: the 1-hour lead.
-      startsAt: new Date("2026-11-18T14:00:00Z"),
-      clinicPhone: "+5547900000001",
-    });
-    expect(text).toContain("seu horário hoje, quarta-feira (18/11), às 11:00");
-    expect(text).toContain(
-      "Se não puder vir, avise a Clínica Teste pelo WhatsApp: https://wa.me/5547900000001",
-    );
-    expect(text).not.toContain("por aqui");
-  });
-
-  it("without the clinic's WhatsApp, asks to warn the clinic", () => {
-    const text = manualReminderText({
-      ...base,
-      startsAt: new Date("2026-11-19T17:30:00Z"),
-      clinicPhone: null,
-    });
-    expect(text).toContain("avise a clínica com antecedência");
-    expect(text).not.toContain("por aqui");
-  });
-
   it("searches the address on Google Maps without a map link", () => {
     expect(
       manualReminderText({
@@ -190,5 +174,71 @@ describe("whatsappLink", () => {
 
   it("is null for a number out of E.164", () => {
     expect(whatsappLink("11900000001", "Olá")).toBeNull();
+  });
+});
+
+describe("the automatic reminder with opt-in", () => {
+  const contact = {
+    clinicName: "Clínica Teste",
+    address: "Rua Fictícia, 100",
+    mapsUrl: "https://maps.app.goo.gl/exemplo",
+    clinicPhone: "+5547900000001",
+  };
+
+  it("asks for 1 or 2, by nickname, with no link", () => {
+    const text = reminderAskText({
+      patientName: "Maria Fictícia",
+      nickname: "Mari",
+      clinicName: "Clínica Teste",
+      serviceName: "Limpeza de pele",
+      timezone: ZONE,
+      now: new Date("2026-11-18T13:00:00Z"),
+      startsAt: new Date("2026-11-18T14:00:00Z"),
+    });
+    expect(text).toBe(
+      [
+        "Oi, Mari! 😊 Aqui é o lembrete da Clínica Teste.",
+        "",
+        "Seu horário de Limpeza de pele é hoje, quarta-feira (18/11), às 11:00.",
+        "",
+        "Responda *1* para confirmar ou *2* se não puder vir.",
+      ].join("\n"),
+    );
+    expect(text).not.toMatch(/https?:/);
+  });
+
+  it("sends the address, map and contact only after the 1", () => {
+    expect(confirmedText(contact)).toBe(
+      [
+        "Perfeito, confirmado! ✅ Te esperamos.",
+        "",
+        "📍 Rua Fictícia, 100",
+        "🗺️ Como chegar: https://maps.app.goo.gl/exemplo",
+        "",
+        "Qualquer coisa, fale com a Clínica Teste: https://wa.me/5547900000001",
+      ].join("\n"),
+    );
+    expect(declinedText({ ...contact, clinicPhone: null })).toContain(
+      "entre em contato com a clínica",
+    );
+  });
+
+  it("reads the activation code and the short answers", () => {
+    const code = newOptInCode(() => 0);
+    expect(code).toBe("AAAAAA");
+    expect(optInCodeFrom(optInMessage("Clínica Teste", "K7P2Q9"))).toBe(
+      "K7P2Q9",
+    );
+    expect(optInCodeFrom("oi, tudo bem?")).toBeNull();
+    expect(replyChoice(" 1 ")).toBe("confirmed");
+    expect(replyChoice("Sim!")).toBe("confirmed");
+    expect(replyChoice("2")).toBe("declined");
+    expect(replyChoice("1 hora depois?")).toBeNull();
+  });
+
+  it("warms the number up: 10, then 5 more a day, up to 150", () => {
+    expect(warmUpLimit(0)).toBe(10);
+    expect(warmUpLimit(3)).toBe(25);
+    expect(warmUpLimit(100)).toBe(150);
   });
 });

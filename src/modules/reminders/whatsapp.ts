@@ -65,6 +65,26 @@ export async function sendWhatsAppTemplate(
   await writeToOutbox(message);
 }
 
+// Free text through Z-API only (the answers to her messages); without it
+// the text goes to the outbox like any other message.
+export async function sendWhatsAppText(
+  to: string,
+  text: string,
+  fetchImpl: Fetch = fetch,
+): Promise<void> {
+  const message = { to, params: [], text };
+  if (env.ZAPI_INSTANCE_ID && env.ZAPI_TOKEN) {
+    await sendWithZApi(
+      env.ZAPI_INSTANCE_ID,
+      env.ZAPI_TOKEN,
+      message,
+      fetchImpl,
+    );
+    return;
+  }
+  await writeToOutbox(message);
+}
+
 // Z-API Omni has no templates here: the same reminder goes as plain text.
 // ZAPI_INSTANCE_ID holds the Omni "ID do canal".
 async function sendWithZApi(

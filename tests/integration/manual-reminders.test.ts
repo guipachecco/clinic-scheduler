@@ -15,6 +15,9 @@ import { sendDueReminders } from "@/modules/reminders/reminders";
 
 import { CLINIC } from "../helpers/clinic";
 
+// No real pauses between messages in the tests.
+const FAST = { sleep: async () => {}, random: () => 0, elapsedMs: () => 0 };
+
 // Every record here is fictitious and exists only during the test.
 
 const MINUTE = 60_000;
@@ -55,7 +58,7 @@ async function insertAppointment(
 
 beforeEach(async () => {
   await db.execute(
-    sql`truncate table audit_logs, appointments, patients, services, service_categories, users cascade`,
+    sql`truncate table audit_logs, appointments, patients, services, service_categories, users, whatsapp_daily_sends, whatsapp_pending, whatsapp_opt_in_codes cascade`,
   );
   const [user] = await db
     .insert(users)
@@ -153,7 +156,10 @@ describe("markReminded", () => {
     expect(audit[0]!.actorUserId).toBe(actorId);
 
     const send = vi.fn(async () => {});
-    expect(await sendDueReminders(NOW, send)).toEqual({ sent: 0, failed: 0 });
+    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
+      sent: 0,
+      failed: 0,
+    });
     expect(send).not.toHaveBeenCalled();
   });
 

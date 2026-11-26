@@ -539,6 +539,12 @@ export const patients = pgTable(
     referralSource: patientReferralSource("referral_source"),
     referredBy: text("referred_by"),
     notes: text("notes"),
+    // She messaged Zemana's WhatsApp with her activation code (migration
+    // 0043): only then does the automatic reminder go to her. sender_id is the
+    // identifier Z-API gave her message, which her "1"/"2" replies carry too.
+    // A new phone clears both.
+    whatsappOptInAt: timestamp("whatsapp_opt_in_at", { withTimezone: true }),
+    whatsappSenderId: text("whatsapp_sender_id"),
     anonymizedAt: timestamp("anonymized_at", { withTimezone: true }),
     // The client account that books online as this patient (one per clinic).
     userId: uuid("user_id").references(() => users.id, {
@@ -574,7 +580,7 @@ export const patients = pgTable(
     ),
     check(
       "patients_anonymized_check",
-      sql`${t.anonymizedAt} is null or (${t.phone} is null and ${t.email} is null and ${t.nameNormalized} is null and ${t.nickname} is null and ${t.cpf} is null and ${t.rg} is null and ${t.landlinePhone} is null and ${t.birthDate} is null and ${t.gender} is null and ${t.referralSource} is null and ${t.referredBy} is null and ${t.notes} is null and ${t.userId} is null)`,
+      sql`${t.anonymizedAt} is null or (${t.phone} is null and ${t.email} is null and ${t.nameNormalized} is null and ${t.nickname} is null and ${t.cpf} is null and ${t.rg} is null and ${t.landlinePhone} is null and ${t.birthDate} is null and ${t.gender} is null and ${t.referralSource} is null and ${t.referredBy} is null and ${t.notes} is null and ${t.userId} is null and ${t.whatsappSenderId} is null)`,
     ),
     check(
       "patients_phone_check",
@@ -809,6 +815,10 @@ export const appointments = pgTable(
       .notNull()
       .default(1440),
     reminderSentFor: timestamp("reminder_sent_for", { withTimezone: true }),
+    // Her answer to the reminder: "1" confirmed, "2" she cannot come
+    // (migration 0043). Shown to the owner; it never cancels by itself.
+    patientReply: text("patient_reply"),
+    patientReplyAt: timestamp("patient_reply_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -834,6 +844,10 @@ export const appointments = pgTable(
     index("appointments_patient_id_idx").on(t.patientId),
     index("appointments_service_id_idx").on(t.serviceId),
     check("appointments_period_check", sql`${t.startsAt} < ${t.endsAt}`),
+    check(
+      "appointments_patient_reply_check",
+      sql`${t.patientReply} in ('confirmed', 'declined')`,
+    ),
     check(
       "appointments_reminder_lead_check",
       sql`${t.reminderLeadMinutes} in (60, 180, 1440)`,
