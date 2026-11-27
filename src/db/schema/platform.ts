@@ -1,4 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
+  boolean,
+  check,
   date,
   index,
   integer,
@@ -83,3 +86,50 @@ export const whatsappDailySends = pgTable("whatsapp_daily_sends", {
   day: date("day", { mode: "string" }).primaryKey(),
   sent: integer("sent").notNull().default(0),
 });
+
+// Every WhatsApp message Zemana's number sent, one row each, for root's
+// "Mensagens" screen: the proof of what went to each clinic's patients. The
+// phone keeps only its last 4 digits; the text is exactly what was sent.
+// Only app_platform reads and writes it (migration 0044).
+export const whatsappMessages = pgTable(
+  "whatsapp_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clinicId: uuid("clinic_id").notNull(),
+    appointmentId: uuid("appointment_id"),
+    // "reminder", "opt_in" (activation reply) or "reply" (after her 1/2).
+    kind: text("kind").notNull(),
+    phoneLast4: text("phone_last4").notNull(),
+    body: text("body").notNull(),
+    ok: boolean("ok").notNull(),
+    // Why it failed, redacted (src/lib/logger.ts).
+    error: text("error"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("whatsapp_messages_clinic_created_idx").on(t.clinicId, t.createdAt),
+    index("whatsapp_messages_created_at_idx").on(t.createdAt),
+  ],
+);
+
+// Zemana's own money, typed in by root: what came in (a clinic's monthly
+// fee) and the bills to pay (Neon, Z-API, accountant...). Cents.
+export const zemanaLedger = pgTable(
+  "zemana_ledger",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    // "in" money received, "out" a bill.
+    direction: text("direction").notNull(),
+    description: text("description").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    dueOn: date("due_on", { mode: "string" }).notNull(),
+    paidOn: date("paid_on", { mode: "string" }),
+    clinicId: uuid("clinic_id"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("zemana_ledger_due_on_idx").on(t.dueOn),
+    check("zemana_ledger_direction_check", sql`${t.direction} in ('in', 'out')`),
+    check("zemana_ledger_amount_check", sql`${t.amountCents} > 0`),
+  ],
+);

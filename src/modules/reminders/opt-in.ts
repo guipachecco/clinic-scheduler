@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { recordMessage } from "@/modules/platform/message-log";
 
 import {
   confirmedText,
@@ -35,6 +36,22 @@ import { sendWhatsAppText } from "./whatsapp";
 // their clinic (inClinic), like the rest of the panel.
 
 type Send = (to: string, text: string) => Promise<void>;
+
+// Sends and writes it to root's message log, sent or failed.
+async function sendLogged(
+  send: Send,
+  to: string,
+  body: string,
+  log: Omit<Parameters<typeof recordMessage>[0], "to" | "body" | "error">,
+) {
+  try {
+    await send(to, body);
+  } catch (error) {
+    await recordMessage({ ...log, to, body, error });
+    throw error;
+  }
+  await recordMessage({ ...log, to, body });
+}
 
 // The activation link for a patient, or null when Zemana's number is not set
 // or she already activated.
@@ -117,7 +134,10 @@ async function activate(code: string, senderId: string, now: Date, send: Send) {
   const to = result.phone ? whatsappNumber(result.phone) : null;
   if (to) {
     const name = result.clinic.displayName?.trim() || result.clinic.name;
-    await send(to, optInAckText(name));
+    await sendLogged(send, to, optInAckText(name), {
+      clinicId: row.clinicId,
+      kind: "opt_in",
+    });
   }
 }
 
@@ -195,9 +215,15 @@ async function answer(
     mapsUrl: result.clinic.mapsUrl,
     clinicPhone: result.clinic.whatsappPhone,
   };
-  await send(
+  await sendLogged(
+    send,
     to,
     choice === "confirmed" ? confirmedText(contact) : declinedText(contact),
+    {
+      clinicId: pending.clinicId,
+      appointmentId: pending.appointmentId,
+      kind: "reply",
+    },
   ).catch((error: unknown) => {
     logger.error("whatsapp reply: follow-up failed", {
       clinicId: pending.clinicId,
