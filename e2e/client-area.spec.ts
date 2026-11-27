@@ -57,7 +57,7 @@ async function signUp(page: Page, person: typeof CLIENT) {
   await phone.pressSequentially(person.phone.replace(/\D/g, ""));
   await expect(phone).toHaveValue(person.phone);
   await page.getByLabel("E-mail").fill(person.email);
-  await page.getByLabel("Senha").fill(person.password);
+  await page.getByLabel("Senha", { exact: true }).fill(person.password);
   await page.getByRole("button", { name: "Criar conta" }).click();
   await expect(page).toHaveURL(new RegExp(`/${A.slug}/marcar$`));
 }
@@ -65,7 +65,7 @@ async function signUp(page: Page, person: typeof CLIENT) {
 async function signIn(page: Page, slug: string, password: string) {
   await page.goto(`/${slug}/entrar`);
   await page.getByLabel("E-mail").fill(CLIENT.email);
-  await page.getByLabel("Senha").fill(password);
+  await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Entrar" }).click();
 }
 
@@ -243,7 +243,7 @@ test.describe("client area", () => {
     await page.goto(`/${A.slug}/marcar?servico=${service!.id}`);
     await expect(page).toHaveURL(/\/entrar\?next=/);
     await page.getByLabel("E-mail").fill(CLIENT.email);
-    await page.getByLabel("Senha").fill(NEW_PASSWORD);
+    await page.getByLabel("Senha", { exact: true }).fill(NEW_PASSWORD);
     await page.getByRole("button", { name: "Entrar" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/${A.slug}/marcar\\?servico=${service!.id}$`),
@@ -609,7 +609,7 @@ test.describe("client area", () => {
     await expect(page.getByRole("button", { name: "Criar conta" })).toHaveCount(
       0,
     );
-    await expect(page.getByLabel("Senha")).toHaveCount(0);
+    await expect(page.getByLabel("Senha", { exact: true })).toHaveCount(0);
 
     await page.goto("/clinica-que-nao-existe");
     await expect(page.getByText("Página não encontrada")).toBeVisible();

@@ -1,11 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import * as z from "zod";
 
-import { platformDb, type Tx } from "@/db/client";
+import { inClinic, platformDb, type Tx } from "@/db/client";
 import {
   accounts,
   auditLogs,
   clinics,
+  patients,
   sessions,
   twoFactors,
   users,
@@ -154,27 +155,104 @@ export async function resetAdminPassword(input: {
 
   await platformDb.transaction(async (tx) => {
     const userId = await findUserIdByEmail(tx, email);
-    const updated = await tx
-      .update(accounts)
-      .set({ password: passwordHash })
-      .where(
-        and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")),
-      )
-      .returning({ id: accounts.id });
-    if (updated.length === 0) {
-      await tx.insert(accounts).values({
-        userId,
-        accountId: userId,
-        providerId: "credential",
-        password: passwordHash,
-      });
-    }
-    await tx.delete(sessions).where(eq(sessions.userId, userId));
+    await replacePassword(tx, userId, passwordHash);
     await tx.insert(auditLogs).values({
       actorType: "system",
       action: "admin.password_reset",
       entityType: "user",
       entityId: userId,
+    });
+  });
+}
+
+// Writes the credential password and ends the account's sessions.
+async function replacePassword(tx: Tx, userId: string, passwordHash: string) {
+  const updated = await tx
+    .update(accounts)
+    .set({ password: passwordHash })
+    .where(
+      and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")),
+    )
+    .returning({ id: accounts.id });
+  if (updated.length === 0) {
+    await tx.insert(accounts).values({
+      userId,
+      accountId: userId,
+      providerId: "credential",
+      password: passwordHash,
+    });
+  }
+  await tx.delete(sessions).where(eq(sessions.userId, userId));
+}
+
+// Root's "Mudar senha" screen: the clinic's owner accounts (admin) or the
+// client accounts linked to one of its patients.
+export type ClinicAccountKind = "owner" | "patient";
+
+export type ClinicAccount = { id: string; name: string; email: string };
+
+// app_platform cannot read patients, so the clinic's links come through the
+// panel's clinic-scoped connection.
+async function patientUserIds(clinicId: string) {
+  const rows = await inClinic(clinicId, (tx) =>
+    tx
+      .select({ userId: patients.userId })
+      .from(patients)
+      .where(and(eq(patients.clinicId, clinicId), isNotNull(patients.userId))),
+  );
+  return rows.flatMap((row) => (row.userId ? [row.userId] : []));
+}
+
+export async function listClinicAccounts(
+  clinicId: string,
+  kind: ClinicAccountKind,
+): Promise<ClinicAccount[]> {
+  const columns = { id: users.id, name: users.name, email: users.email };
+  if (kind === "owner") {
+    return platformDb
+      .select(columns)
+      .from(users)
+      .where(and(eq(users.role, "admin"), eq(users.clinicId, clinicId)))
+      .orderBy(asc(users.name));
+  }
+  const ids = await patientUserIds(clinicId);
+  if (ids.length === 0) return [];
+  return platformDb
+    .select(columns)
+    .from(users)
+    .where(and(eq(users.role, "client"), inArray(users.id, ids)))
+    .orderBy(asc(users.name));
+}
+
+// Root sets a new password for an account of the clinic. The account must be
+// of that clinic and of that kind, so a forged id cannot reach root or
+// another clinic's owner.
+export async function setClinicAccountPassword(input: {
+  clinicId: string;
+  kind: ClinicAccountKind;
+  userId: string;
+  password: string;
+  actorUserId: string;
+}) {
+  const password = parse(passwordSchema, input.password);
+  const allowed = await listClinicAccounts(input.clinicId, input.kind);
+  if (!allowed.some((account) => account.id === input.userId)) {
+    throw new AdminAccountError("Essa conta não é dessa clínica.");
+  }
+  const passwordHash = await hashPassword(password);
+
+  await platformDb.transaction(async (tx) => {
+    await replacePassword(tx, input.userId, passwordHash);
+    await tx.insert(auditLogs).values({
+      clinicId: input.clinicId,
+      actorType: "admin",
+      actorUserId: input.actorUserId,
+      action:
+        input.kind === "owner"
+          ? "admin.password_reset"
+          : "client.password_reset",
+      entityType: "user",
+      entityId: input.userId,
     });
   });
 }

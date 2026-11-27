@@ -103,7 +103,7 @@ async function cleanUp(db: Client) {
 async function signInAt(page: Page, email: string, password: string) {
   await page.goto("/entrar");
   await page.getByLabel("E-mail").fill(email);
-  await page.getByLabel("Senha").fill(password);
+  await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Entrar" }).click();
 }
 
@@ -339,7 +339,7 @@ test("a new client signs up from /entrar through the clinic list", async ({
   await page.getByLabel("Nome").fill(newcomer.name);
   await page.getByLabel("Celular (WhatsApp)").fill("(11) 98765-8899");
   await page.getByLabel("E-mail").fill(newcomer.email);
-  await page.getByLabel("Senha").fill(PASSWORD);
+  await page.getByLabel("Senha", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Criar conta" }).click();
 
   await expect(page).toHaveURL(/\/minhas-clinicas$/);
@@ -415,7 +415,7 @@ test("forgot password from Zemana e-mails a /nova-senha link", async ({
   await expect(page).toHaveURL(/\/entrar$/);
 
   await page.getByLabel("E-mail").fill(people.client.email);
-  await page.getByLabel("Senha").fill(NEW_PASSWORD);
+  await page.getByLabel("Senha", { exact: true }).fill(NEW_PASSWORD);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/\/minhas-clinicas$/);
 });

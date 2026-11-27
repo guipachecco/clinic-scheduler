@@ -23,6 +23,7 @@ import {
   TEST_ADMIN_PAGE_BUILDER,
   TEST_ADMIN_PANEL_HOME,
   TEST_ADMIN_PANEL_MOBILE,
+  TEST_ADMIN_PASSWORD_RESET,
   TEST_ADMIN_PATIENT_LINKS,
   TEST_ROOT,
   TEST_ROOT_ANAMNESIS,
@@ -87,6 +88,7 @@ export default async function globalSetup() {
     await createAdmin(TEST_ROOT_AUTH);
     await createAdmin(TEST_ADMIN_ANAMNESIS);
     await createAdmin(TEST_ROOT_ANAMNESIS);
+    await createAdmin(TEST_ADMIN_PASSWORD_RESET);
   } finally {
     await endPools();
   }
