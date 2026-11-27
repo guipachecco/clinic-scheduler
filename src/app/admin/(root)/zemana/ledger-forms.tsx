@@ -72,7 +72,7 @@ export function LedgerForm({
       <div
         role="radiogroup"
         aria-label="Tipo de lançamento"
-        className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1"
+        className="grid grid-cols-2 gap-px border bg-border"
       >
         {(
           [
@@ -87,10 +87,10 @@ export function LedgerForm({
             aria-checked={direction === value}
             onClick={() => setDirection(value)}
             className={cn(
-              "h-10 rounded-lg text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "h-11 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring",
               direction === value
-                ? "bg-card shadow-xs"
-                : "text-muted-foreground hover:text-foreground",
+                ? "bg-primary text-primary-foreground"
+                : "bg-card text-muted-foreground hover:text-foreground",
             )}
           >
             {label}
@@ -103,6 +103,7 @@ export function LedgerForm({
             {direction === "in" ? "De onde veio" : "O que é"}
           </Label>
           <Input
+            className="rounded-none"
             id="lanc-desc"
             value={description}
             placeholder={
@@ -118,6 +119,7 @@ export function LedgerForm({
         <div className="grid content-start gap-1">
           <Label htmlFor="lanc-valor">Valor (R$)</Label>
           <Input
+            className="rounded-none"
             id="lanc-valor"
             inputMode="decimal"
             value={amount}
@@ -130,6 +132,7 @@ export function LedgerForm({
         <div className="grid content-start gap-1">
           <Label htmlFor="lanc-data">Vencimento</Label>
           <Input
+            className="rounded-none"
             id="lanc-data"
             type="date"
             value={dueOn}
@@ -141,6 +144,7 @@ export function LedgerForm({
         <div className="grid content-start gap-1 md:col-span-2">
           <Label htmlFor="lanc-clinica">Clínica (opcional)</Label>
           <NativeSelect
+            className="rounded-none"
             id="lanc-clinica"
             value={clinicId}
             onChange={(event) => setClinicId(event.target.value)}
@@ -164,7 +168,7 @@ export function LedgerForm({
         {direction === "in" ? "Já recebi" : "Já paguei"}
       </label>
       <FormError message={formError} />
-      <Button type="submit" disabled={saving}>
+      <Button type="submit" disabled={saving} className="rounded-none">
         {saving ? "Salvando…" : "Lançar"}
       </Button>
     </form>
@@ -198,6 +202,7 @@ export function LedgerRowActions({
       <Button
         type="button"
         size="sm"
+        className="rounded-none"
         variant={paid ? "ghost" : "outline"}
         disabled={busy}
         onClick={() =>
@@ -211,7 +216,7 @@ export function LedgerRowActions({
         size="sm"
         variant="ghost"
         disabled={busy}
-        className="text-destructive"
+        className="rounded-none text-destructive"
         onClick={() => {
           if (window.confirm("Excluir este lançamento?"))
             void run(() => deleteLedgerEntryAction(id));

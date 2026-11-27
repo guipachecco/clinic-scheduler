@@ -8,8 +8,9 @@ import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
 // Sections of root's area, under the purple header: a bar of tabs with icons,
-// the current one filled purple.
+// square, the current one filled purple with a yellow edge. Financeiro first.
 const ITEMS: { href: Route; label: string; icon: IconName }[] = [
+  { href: "/admin/zemana" as Route, label: "Financeiro", icon: "wallet" },
   { href: "/admin/clinicas" as Route, label: "Clínicas", icon: "globe" },
   { href: "/admin/recursos" as Route, label: "Recursos", icon: "box" },
   {
@@ -18,7 +19,6 @@ const ITEMS: { href: Route; label: string; icon: IconName }[] = [
     icon: "pulse",
   },
   { href: "/admin/mensagens" as Route, label: "Mensagens", icon: "chat" },
-  { href: "/admin/zemana" as Route, label: "Financeiro", icon: "wallet" },
 ];
 
 export function RootNav() {
@@ -28,7 +28,7 @@ export function RootNav() {
       aria-label="Administração geral"
       className="-mx-1 overflow-x-auto print:hidden"
     >
-      <ul className="flex w-max min-w-full gap-1 rounded-2xl border bg-card p-1.5 shadow-sm">
+      <ul className="flex w-max min-w-full gap-px border bg-border">
         {ITEMS.map((item) => {
           const current =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -38,10 +38,10 @@ export function RootNav() {
                 href={item.href}
                 aria-current={current ? "page" : undefined}
                 className={cn(
-                  "flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "flex h-12 items-center justify-center gap-2 border-b-4 px-5 text-sm font-semibold whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   current
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    ? "border-highlight bg-primary text-primary-foreground"
+                    : "border-transparent bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
                 <Icon name={item.icon} className="size-[18px]" />
