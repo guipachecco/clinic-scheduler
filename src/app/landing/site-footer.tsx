@@ -18,6 +18,10 @@ export function SiteFooter() {
           <p className="text-sm text-muted-foreground">
             Agenda online para profissionais de beleza e saúde.
           </p>
+          {/* Legal name + CNPJ: Meta Business verification checks the site for them. */}
+          <p className="text-xs text-muted-foreground">
+            70.329.136 GUILHERME MARTINS PACHECO · CNPJ 70.329.136/0001-25
+          </p>
         </div>
         <nav aria-label="Acesso" className="grid gap-1 sm:justify-items-end">
           <Link href="/entrar" className={linkClass}>
