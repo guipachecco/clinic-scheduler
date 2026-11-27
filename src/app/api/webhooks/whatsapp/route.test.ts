@@ -68,9 +68,9 @@ describe("POST /api/webhooks/whatsapp", () => {
   });
 
   it("refuses a body without a signature", async () => {
-    const response = await (await route()).POST(
-      new Request(URL_BASE, { method: "POST", body }),
-    );
+    const response = await (
+      await route()
+    ).POST(new Request(URL_BASE, { method: "POST", body }));
     expect(response.status).toBe(401);
   });
 });
