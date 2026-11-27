@@ -94,6 +94,11 @@ export const serverEnvSchema = z
     WHATSAPP_OUTBOX_DIR: optionalText().transform(
       (value) => value ?? ".whatsapp",
     ),
+    // Meta webhook (/api/webhooks/whatsapp). The verify token is typed in the
+    // app panel ("Verificar token"); the app secret (App settings > Basic)
+    // signs each POST as X-Hub-Signature-256. Without both the route says 503.
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN: optionalText(),
+    WHATSAPP_APP_SECRET: optionalText(),
     // Z-API (unofficial, QR-code WhatsApp Web), the bridge while the Meta
     // portfolio is blocked. Used only when the Meta keys are absent; sends the
     // reminder as plain text. ZAPI_INSTANCE_ID is the Omni "ID do canal";
@@ -119,6 +124,15 @@ export const serverEnvSchema = z
     {
       error: "defina ZAPI_INSTANCE_ID e ZAPI_TOKEN juntas",
       path: ["ZAPI_TOKEN"],
+    },
+  )
+  .refine(
+    (env) =>
+      env.WHATSAPP_WEBHOOK_VERIFY_TOKEN === undefined ||
+      env.WHATSAPP_WEBHOOK_VERIFY_TOKEN.length >= 32,
+    {
+      error: "deve ter ao menos 32 caracteres",
+      path: ["WHATSAPP_WEBHOOK_VERIFY_TOKEN"],
     },
   )
   .refine(
