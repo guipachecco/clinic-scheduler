@@ -8,7 +8,7 @@ export function PrintButton({ label = "Imprimir / PDF" }: { label?: string }) {
     <Button
       type="button"
       variant="outline"
-      className="print:hidden"
+      className="rounded-none print:hidden"
       onClick={() => window.print()}
     >
       {label}
