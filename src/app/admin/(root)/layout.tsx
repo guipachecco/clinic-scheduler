@@ -19,7 +19,7 @@ export default async function RootAreaLayout({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between gap-3 bg-brand print:hidden px-4 py-3 text-brand-foreground md:px-8">
+      <header className="flex items-center justify-between gap-3 bg-brand px-4 py-3 text-brand-foreground md:px-8 print:hidden">
         <div className="flex min-w-0 items-center gap-4">
           <BrandImage kind="horizontal" size={140} onBrand />
           <p className="hidden font-heading text-lg font-bold tracking-wide sm:block">

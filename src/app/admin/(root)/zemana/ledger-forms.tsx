@@ -106,7 +106,9 @@ export function LedgerForm({
             id="lanc-desc"
             value={description}
             placeholder={
-              direction === "in" ? "Mensalidade de novembro" : "Neon, Z-API, contador…"
+              direction === "in"
+                ? "Mensalidade de novembro"
+                : "Neon, Z-API, contador…"
             }
             aria-invalid={Boolean(errors.description)}
             onChange={(event) => setDescription(event.target.value)}

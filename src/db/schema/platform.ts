@@ -129,7 +129,10 @@ export const zemanaLedger = pgTable(
   },
   (t) => [
     index("zemana_ledger_due_on_idx").on(t.dueOn),
-    check("zemana_ledger_direction_check", sql`${t.direction} in ('in', 'out')`),
+    check(
+      "zemana_ledger_direction_check",
+      sql`${t.direction} in ('in', 'out')`,
+    ),
     check("zemana_ledger_amount_check", sql`${t.amountCents} > 0`),
   ],
 );

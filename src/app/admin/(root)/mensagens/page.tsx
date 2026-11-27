@@ -256,8 +256,8 @@ export default async function MessagesPage({
         )}
         {messages.length === LIMIT ? (
           <p className="text-xs text-muted-foreground">
-            Mostrando as {n(LIMIT)} mais recentes; diminua o período para ver
-            o resto.
+            Mostrando as {n(LIMIT)} mais recentes; diminua o período para ver o
+            resto.
           </p>
         ) : null}
       </section>

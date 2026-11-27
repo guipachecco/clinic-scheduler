@@ -49,8 +49,7 @@ export async function addLedgerEntryAction(
       ok: false,
       fieldErrors: issuesToFieldErrors(parsed.error.issues),
     };
-  const { direction, description, amount, dueOn, paid, clinicId } =
-    parsed.data;
+  const { direction, description, amount, dueOn, paid, clinicId } = parsed.data;
   try {
     await addLedgerEntry({
       direction,

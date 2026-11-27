@@ -49,7 +49,10 @@ export default async function ZemanaFinancePage({
 
   return (
     <div className="grid grid-cols-1 gap-6">
-      <PageHeader title="Financeiro da Zemana" eyebrow="Seu dinheiro, mês a mês">
+      <PageHeader
+        title="Financeiro da Zemana"
+        eyebrow="Seu dinheiro, mês a mês"
+      >
         <PrintButton />
       </PageHeader>
 
@@ -176,7 +179,7 @@ function Money({
       </span>
       <span
         className={cn(
-          "font-heading text-2xl font-extrabold tabular-nums break-words",
+          "font-heading text-2xl font-extrabold break-words tabular-nums",
           !strong && tone === "good" && "text-primary-text",
           !strong && tone === "bad" && "text-destructive",
         )}
@@ -224,7 +227,8 @@ function EntryList({
       ) : (
         <ul className="grid divide-y">
           {rows.map((r) => {
-            const overdue = !r.paidOn && r.direction === "out" && r.dueOn < today;
+            const overdue =
+              !r.paidOn && r.direction === "out" && r.dueOn < today;
             return (
               <li
                 key={r.id}
@@ -269,7 +273,8 @@ function EntryList({
                     r.direction === "in" && "text-primary-text",
                   )}
                 >
-                  {r.direction === "in" ? "+" : "−"} {formatCents(r.amountCents)}
+                  {r.direction === "in" ? "+" : "−"}{" "}
+                  {formatCents(r.amountCents)}
                 </span>
                 <LedgerRowActions
                   id={r.id}

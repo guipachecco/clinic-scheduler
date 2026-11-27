@@ -36,7 +36,11 @@ describe("ledgerSummary", () => {
   });
 
   it("keeps an old unpaid bill in the month's to-pay", () => {
-    const s = ledgerSummary([e("out", 500, "2026-09-01")], "2026-11", "2026-11-01");
+    const s = ledgerSummary(
+      [e("out", 500, "2026-09-01")],
+      "2026-11",
+      "2026-11-01",
+    );
     expect(s.toPayCents).toBe(500);
     expect(s.overdueBills).toBe(1);
   });
