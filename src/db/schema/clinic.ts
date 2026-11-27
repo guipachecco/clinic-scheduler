@@ -541,7 +541,7 @@ export const patients = pgTable(
     notes: text("notes"),
     // She messaged Zemana's WhatsApp with her activation code (migration
     // 0043): only then does the automatic reminder go to her. sender_id is the
-    // identifier Z-API gave her message, which her "1"/"2" replies carry too.
+    // wa_id Meta gave her message, which her "1"/"2" replies carry too.
     // A new phone clears both.
     whatsappOptInAt: timestamp("whatsapp_opt_in_at", { withTimezone: true }),
     whatsappSenderId: text("whatsapp_sender_id"),

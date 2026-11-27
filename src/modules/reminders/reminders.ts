@@ -14,12 +14,7 @@ import {
 } from "@/db/schema";
 import { logger } from "@/lib/logger";
 
-import {
-  reminderAskText,
-  reminderParams,
-  warmUpLimit,
-  whatsappNumber,
-} from "./message";
+import { reminderParams, warmUpLimit, whatsappNumber } from "./message";
 import { sendWhatsAppTemplate, type WhatsAppTemplate } from "./whatsapp";
 
 // The run of the WhatsApp reminder (GET /api/cron/lembretes, every 15 min from
@@ -28,9 +23,10 @@ import { sendWhatsAppTemplate, type WhatsAppTemplate } from "./whatsapp";
 // ticked it) AND activated it by writing to Zemana's number first, now inside
 // their chosen lead, not started, and without one for this start yet.
 //
-// To keep the number from being restricted: at most the warm-up limit per day
-// (whatsapp_daily_sends), a random 30-120 s pause between messages, and a run
-// stops before the route's time limit; what is left goes on the next run.
+// To keep the number's quality up while it is new: at most the warm-up limit
+// per day (whatsapp_daily_sends), a random 30-120 s pause between messages,
+// and a run stops before the route's time limit; what is left goes on the
+// next run.
 //
 // Root's role (app_platform) lists the clinics and keeps the counters; each
 // clinic's appointments are read as app_panel inside that clinic (inClinic).
@@ -65,8 +61,10 @@ function realPace(): Pace {
 
 type Clinic = {
   id: string;
+  slug: string;
   name: string;
   displayName: string | null;
+  address: string | null;
   timezone: string;
 };
 
@@ -76,7 +74,6 @@ type Due = {
   startsAt: Date;
   serviceName: string;
   patientName: string;
-  nickname: string | null;
   phone: string;
   senderId: string | null;
 };
@@ -93,8 +90,10 @@ export async function sendDueReminders(
   const list = await platformDb
     .select({
       id: clinics.id,
+      slug: clinics.slug,
       name: clinics.name,
       displayName: clinics.displayName,
+      address: clinics.address,
       timezone: clinics.timezone,
     })
     .from(clinics)
@@ -130,20 +129,19 @@ export async function sendDueReminders(
     }
     first = false;
     if (!(await claim(row))) continue;
-    const clinicName = row.clinic.displayName?.trim() || row.clinic.name;
-    const input = {
-      patientName: row.patientName,
-      clinicName,
-      serviceName: row.serviceName,
-      startsAt: row.startsAt,
-      timezone: row.clinic.timezone,
-    };
     try {
       await send({
         to,
-        params: reminderParams(input),
-        // No link: her nickname and a "1"/"2" question (Z-API only).
-        text: reminderAskText({ ...input, now, nickname: row.nickname }),
+        params: reminderParams({
+          patientName: row.patientName,
+          clinicName: row.clinic.displayName?.trim() || row.clinic.name,
+          serviceName: row.serviceName,
+          startsAt: row.startsAt,
+          timezone: row.clinic.timezone,
+          address: row.clinic.address,
+        }),
+        // The template's "Ver endereço no mapa" opens the clinic page.
+        button: row.clinic.slug,
       });
     } catch (error) {
       run.failed += 1;
@@ -231,7 +229,6 @@ async function dueInClinic(clinic: Clinic, now: Date): Promise<Due[]> {
         startsAt: appointments.startsAt,
         serviceName: appointments.serviceName,
         patientName: patients.name,
-        nickname: patients.nickname,
         phone: patients.phone,
         senderId: patients.whatsappSenderId,
       })

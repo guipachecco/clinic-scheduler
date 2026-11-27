@@ -50,13 +50,14 @@ export const platformHealthChecks = pgTable(
   (t) => [index("platform_health_checks_created_at_idx").on(t.createdAt)],
 );
 
-// WhatsApp reminders through Z-API (src/modules/reminders, migration 0043).
+// WhatsApp reminders through the Cloud API of Meta (src/modules/reminders,
+// migration 0043).
 // Zemana's one number serves every clinic, so these live outside any clinic
 // and only app_platform reads and writes them.
 
 // The code a patient sends to activate her reminders (the button on the
 // booking confirmation). It says whose message it is whatever form the
-// phone arrives in from Z-API.
+// phone arrives in from Meta (its wa_id may drop the 9 of a Brazilian cell).
 export const whatsappOptInCodes = pgTable(
   "whatsapp_opt_in_codes",
   {

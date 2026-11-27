@@ -1,11 +1,21 @@
 import { DateTime } from "luxon";
 
 // The pure part of the WhatsApp reminder: which appointments are due and the
-// words of the message. The template approved at Meta (docs/lembrete-whatsapp.md)
-// has five body variables, in this order:
+// words of the message. The template approved at Meta, lembrete_horario_v2
+// (docs/lembrete-whatsapp.md), has a fixed header "Lembrete de horário", six
+// body variables in this order, and a URL button https://zemana.com.br/{{1}}
+// filled with the clinic slug:
 //
-//   Olá, {{1}}! Lembrete da {{2}}: seu horário é amanhã, {{3}}, às {{4}}
-//   ({{5}}). Se não puder ir, avise a clínica com antecedência.
+//   Olá, {{1}}.
+//
+//   Este é um lembrete do seu horário na {{2}}:
+//
+//   Data: {{3}}
+//   Horário: {{4}}
+//   Serviço: {{5}}
+//   Endereço: {{6}}
+//
+//   Caso não possa comparecer, pedimos que avise a clínica com antecedência.
 
 export type ReminderInput = {
   patientName: string;
@@ -13,7 +23,12 @@ export type ReminderInput = {
   serviceName: string;
   startsAt: Date;
   timezone: string;
+  address?: string | null;
 };
+
+// Meta refuses an empty variable: a clinic without an address sends her to
+// its page (the button).
+export const NO_ADDRESS = "Endereço na página da clínica";
 
 // Meta refuses a variable with a line break, a tab or more than four spaces in
 // a row, and an empty one. Long names are cut.
@@ -42,19 +57,26 @@ export function reminderParams(input: ReminderInput): string[] {
     templateText(start.toFormat("cccc, dd/LL")),
     templateText(start.toFormat("HH:mm")),
     templateText(input.serviceName),
+    input.address?.trim() ? templateText(input.address, 120) : NO_ADDRESS,
   ];
 }
 
-// The message as the patient reads it (Z-API, outbox, tests). No "amanhã":
+// The template's body as the patient reads it (outbox, tests). No "amanhã":
 // the lead may be 3 h or 1 h.
-// shortcut: the Meta template still says "amanhã"; submit a new one before
-// going back to the Cloud API with leads under a day.
 export function reminderText(params: string[]): string {
-  const [name, clinic, day, time, service] = params;
-  return (
-    `Olá, ${name}! Lembrete da ${clinic}: seu horário é ${day}, ` +
-    `às ${time} (${service}). Se não puder ir, avise a clínica com antecedência.`
-  );
+  const [name, clinic, day, time, service, address] = params;
+  return [
+    `Olá, ${name}.`,
+    "",
+    `Este é um lembrete do seu horário na ${clinic}:`,
+    "",
+    `Data: ${day}`,
+    `Horário: ${time}`,
+    `Serviço: ${service}`,
+    `Endereço: ${address ?? NO_ADDRESS}`,
+    "",
+    "Caso não possa comparecer, pedimos que avise a clínica com antecedência.",
+  ].join("\n");
 }
 
 // "+5511987654321" -> "5511987654321", the form the Cloud API takes. Null when
@@ -136,11 +158,10 @@ export function whatsappLink(phone: string, text: string): string | null {
     : null;
 }
 
-// ---- Automatic reminder through Z-API (Zemana's number, migration 0043) ----
-// The patient writes first (her activation code), the first message has no
-// link and asks for a "1" or "2"; the address, map and clinic contact only go
-// after she answers. All of it lowers the risk of WhatsApp restricting the
-// number.
+// ---- Opt-in and replies on Zemana's number (migration 0043) ----
+// The patient writes first (her activation code), which also opens the 24 h
+// window for the free-text answers below; a later "1" or "2" answers the last
+// reminder sent to her.
 
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 
@@ -183,21 +204,6 @@ export function optInAckText(clinicName: string): string {
     `Pronto! ✅ Você vai receber aqui os lembretes da ${clinicName.trim()}.`,
     "",
     "Salve este número como *Lembretes Zemana* para não perder nenhum. 💜",
-  ].join("\n");
-}
-
-// The first message: no link, her nickname or first name, a question.
-export function reminderAskText(
-  input: ReminderInput & { now: Date; nickname?: string | null },
-): string {
-  const { start, when } = whenLabel(input);
-  const name = input.nickname?.trim() || firstName(input.patientName);
-  return [
-    `Oi${name ? `, ${name}` : ""}! 😊 Aqui é o lembrete da ${input.clinicName.trim()}.`,
-    "",
-    `Seu horário de ${input.serviceName.trim()} é ${when}, às ${start.toFormat("HH:mm")}.`,
-    "",
-    "Responda *1* para confirmar ou *2* se não puder vir.",
   ].join("\n");
 }
 

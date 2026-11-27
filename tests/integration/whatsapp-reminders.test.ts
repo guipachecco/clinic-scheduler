@@ -146,11 +146,15 @@ describe("sendDueReminders", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]!.to).toBe("5500000000001");
     expect(sent[0]!.params[0]).toBe("Maria");
-    expect(sent[0]!.params.slice(2)).toEqual([
+    expect(sent[0]!.params.slice(2, 5)).toEqual([
       "quinta-feira, 19/11",
       "14:30",
       "Limpeza fictícia",
     ]);
+    // The address (or its fallback) and the clinic slug for the map button.
+    expect(sent[0]!.params).toHaveLength(6);
+    expect(sent[0]!.params[5]).not.toBe("");
+    expect(sent[0]!.button).toMatch(/^[a-z0-9-]+$/);
     expect((await sentFor(id))?.getTime()).toBe(TOMORROW.getTime());
     const audit = await db
       .select()
@@ -272,14 +276,6 @@ describe("only after she writes first", () => {
       failed: 0,
     });
     expect(sent).toEqual([]);
-  });
-
-  it("asks for 1 or 2 with no link", async () => {
-    await insertAppointment();
-    const { sent, send } = recorder();
-    await sendDueReminders(NOW, send, FAST);
-    expect(sent[0]!.text).toContain("Responda *1* para confirmar");
-    expect(sent[0]!.text).not.toMatch(/https?:/);
   });
 
   it("stops at the day's warm-up limit", async () => {

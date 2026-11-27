@@ -81,7 +81,7 @@ export const serverEnvSchema = z
       { error: "deve ser o número (só dígitos) do Phone Number ID da Meta" },
     ),
     WHATSAPP_TEMPLATE: optionalText().transform(
-      (value) => value ?? "lembrete_horario",
+      (value) => value ?? "lembrete_horario_v2",
     ),
     WHATSAPP_TEMPLATE_LANGUAGE: optionalText().transform(
       (value) => value ?? "pt_BR",
@@ -99,23 +99,11 @@ export const serverEnvSchema = z
     // signs each POST as X-Hub-Signature-256. Without both the route says 503.
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: optionalText(),
     WHATSAPP_APP_SECRET: optionalText(),
-    // Z-API (unofficial, QR-code WhatsApp Web), the bridge while the Meta
-    // portfolio is blocked. Used only when the Meta keys are absent; sends the
-    // reminder as plain text. ZAPI_INSTANCE_ID is the Omni "ID do canal";
-    // ZAPI_TOKEN is the workspace Secret Key (Security), not the channel token.
-    ZAPI_INSTANCE_ID: optionalText(),
-    ZAPI_TOKEN: optionalText(),
     // Zemana's WhatsApp number (digits, with 55), where the patient sends her
     // activation code. Without it the activation button stays hidden.
-    ZAPI_PHONE: optionalText().refine(
+    WHATSAPP_PHONE: optionalText().refine(
       (value) => value === undefined || /^55\d{10,11}$/.test(value),
-      { error: "só dígitos, com 55 e DDD, como 5547984777512" },
-    ),
-    // Sent by Z-API as "Authorization: Bearer <token>" on /api/webhooks/zapi.
-    // Without it every webhook call is refused.
-    ZAPI_WEBHOOK_TOKEN: optionalText().refine(
-      (value) => value === undefined || value.length >= 32,
-      { error: "deve ter ao menos 32 caracteres" },
+      { error: "só dígitos, com 55 e DDD, como 554784777512" },
     ),
     // Sent by the Vercel cron as "Authorization: Bearer <CRON_SECRET>" to
     // /api/cron/lembretes. Without it the route refuses every call.
@@ -128,14 +116,6 @@ export const serverEnvSchema = z
     {
       error: "defina WHATSAPP_TOKEN e WHATSAPP_PHONE_NUMBER_ID juntas",
       path: ["WHATSAPP_PHONE_NUMBER_ID"],
-    },
-  )
-  .refine(
-    (env) =>
-      (env.ZAPI_INSTANCE_ID === undefined) === (env.ZAPI_TOKEN === undefined),
-    {
-      error: "defina ZAPI_INSTANCE_ID e ZAPI_TOKEN juntas",
-      path: ["ZAPI_TOKEN"],
     },
   )
   .refine(
