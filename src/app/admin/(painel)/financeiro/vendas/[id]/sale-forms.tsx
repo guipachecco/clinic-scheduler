@@ -307,7 +307,7 @@ export function ScheduleForm({
           >
             {items.map((i) => (
               <option key={i.id} value={i.id}>
-                {i.serviceName} ({i.remaining} a agendar)
+                {i.serviceName} ({i.remaining} pagas a agendar)
               </option>
             ))}
           </NativeSelect>

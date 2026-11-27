@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 import {
   approveSchema,
+  paymentSchema,
   quoteFormSchema,
   receiptSchema,
   scheduleSessionsSchema,
@@ -28,7 +29,11 @@ import {
   reverseReceipt,
 } from "@/modules/finance/receipts";
 import { financeSummary, listCash } from "@/modules/finance/reports";
-import { getSale, scheduleSessions } from "@/modules/finance/sales";
+import {
+  getSale,
+  receivePayment,
+  scheduleSessions,
+} from "@/modules/finance/sales";
 
 import { CLINIC, otherClinic } from "../helpers/clinic";
 
@@ -288,7 +293,21 @@ describe("receipts", () => {
       TODAY,
     );
     if (!sale.ok || !sale.saleId) throw new Error(JSON.stringify(sale));
-    const item = (await getSale(CLINIC, sale.saleId, TODAY))!.items[0]!;
+    const found = (await getSale(CLINIC, sale.saleId, TODAY))!;
+    const item = found.items[0]!;
+    // Sessions are only scheduled once paid.
+    const paid = await receivePayment(
+      CLINIC,
+      paymentSchema.parse({
+        installmentId: found.installments[0]!.id,
+        paidOn: TODAY,
+        amount: "35,00",
+        paymentMethodId: pixId,
+        notes: "",
+      }),
+      actorId,
+    );
+    expect(paid.ok).toBe(true);
     const scheduled = await scheduleSessions(
       CLINIC,
       scheduleSessionsSchema.parse({

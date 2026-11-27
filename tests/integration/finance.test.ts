@@ -151,9 +151,30 @@ async function sale(id: string) {
 async function schedule(
   saleId: string,
   dates: string[],
-  options: { startTime?: string; acknowledgeWarnings?: boolean } = {},
+  options: {
+    startTime?: string;
+    acknowledgeWarnings?: boolean;
+    // Pay before scheduling (sessions need a paid installment): one open
+    // installment per date, or every open one when not "por sessão".
+    prepay?: boolean;
+  } = {},
 ) {
-  const item = (await sale(saleId)).items[0]!;
+  const found = await sale(saleId);
+  const item = found.items[0]!;
+  if (options.prepay ?? true) {
+    const open = found.installments.filter(
+      (i) =>
+        i.state !== "cancelled" &&
+        i.paidCents < i.amountCents &&
+        i.sessionStartsAt === null,
+    );
+    const toPay =
+      found.paymentPlan === "per_session" ? open.slice(0, dates.length) : open;
+    for (const part of toPay) {
+      const cents = part.amountCents - part.paidCents;
+      await pay(part.id, (cents / 100).toFixed(2).replace(".", ","));
+    }
+  }
   return scheduleSessions(
     CLINIC,
     scheduleSessionsSchema.parse({
@@ -423,6 +444,41 @@ describe("package sessions", () => {
     ]);
   });
 
+  it("only schedules sessions already paid", async () => {
+    const saleId = await approved({ plan: "per_session" });
+    expect(
+      await schedule(saleId, ["2026-11-10"], { prepay: false }),
+    ).toMatchObject({ ok: false });
+    await pay((await sale(saleId)).installments[0]!.id, "150,00");
+    expect(
+      (await schedule(saleId, ["2026-11-10", "2026-11-17"], { prepay: false }))
+        .ok,
+    ).toBe(false);
+    expect((await schedule(saleId, ["2026-11-10"], { prepay: false })).ok).toBe(
+      true,
+    );
+    expect((await sale(saleId)).items[0]).toMatchObject({
+      used: 1,
+      bookable: 0,
+    });
+
+    // Parcelado in 2: each paid installment frees half of the 4 sessions.
+    const split = await approved({
+      plan: "installments",
+      installmentsCount: "2",
+    });
+    await pay((await sale(split)).installments[0]!.id, "300,00");
+    expect((await sale(split)).items[0]!.bookable).toBe(2);
+    expect(
+      (
+        await schedule(split, ["2026-11-11", "2026-11-12", "2026-11-13"], {
+          prepay: false,
+        })
+      ).ok,
+    ).toBe(false);
+    expect(await db.select().from(appointments)).toHaveLength(1);
+  });
+
   it("refuses more sessions than were sold", async () => {
     const saleId = await approved({ plan: "per_session" });
     const result = await schedule(saleId, [
@@ -579,9 +635,7 @@ describe("changing a sale", () => {
 
   it("cancelling keeps what was paid and cancels the future sessions", async () => {
     const saleId = await approved({ plan: "per_session" });
-    await schedule(saleId, ["2026-11-10", "2026-11-17"]);
-    const found = await sale(saleId);
-    await pay(found.installments[0]!.id, "150,00");
+    await schedule(saleId, ["2026-11-10"]);
 
     const result = await cancelSale(
       CLINIC,

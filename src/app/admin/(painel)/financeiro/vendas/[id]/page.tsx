@@ -162,7 +162,8 @@ export default async function SalePage({
               ) : (
                 <p className="text-sm text-muted-foreground">
                   {item.sessions} contratadas · {item.used} agendadas ou feitas
-                  · {item.done} feitas · {item.remaining} a agendar
+                  · {item.done} feitas · {item.remaining} a agendar,{" "}
+                  {item.bookable} já pagas
                 </p>
               )}
               {item.appointments.length > 0 ? (
@@ -184,7 +185,14 @@ export default async function SalePage({
             </li>
           ))}
         </ul>
-        {active && serviceItems.length > 0 ? (
+        {active &&
+        serviceItems.some((item) => item.remaining > 0) &&
+        !serviceItems.some((item) => item.bookable > 0) ? (
+          <p className="text-sm text-muted-foreground">
+            Para agendar sessões, receba a parcela delas primeiro.
+          </p>
+        ) : null}
+        {active && serviceItems.some((item) => item.bookable > 0) ? (
           <details className="rounded-2xl border bg-card p-5 shadow-sm md:p-6">
             <summary className="cursor-pointer font-medium">
               Agendar sessões
@@ -193,11 +201,11 @@ export default async function SalePage({
               <ScheduleForm
                 today={today}
                 items={serviceItems
-                  .filter((item) => item.remaining > 0)
+                  .filter((item) => item.bookable > 0)
                   .map((item) => ({
                     id: item.id,
                     serviceName: item.serviceName,
-                    remaining: item.remaining,
+                    remaining: item.bookable,
                     durationMinutes: duration(item.serviceId),
                   }))}
               />

@@ -7,7 +7,9 @@ import {
   appointmentServices,
   auditLogs,
   businessHours,
+  installments,
   patients,
+  paymentMethods,
   saleItems,
   saleSessions,
   serviceCategories,
@@ -33,11 +35,12 @@ import {
 
 import {
   approveSchema,
+  paymentSchema,
   quoteFormSchema,
   scheduleSessionsSchema,
 } from "@/modules/finance/fields";
 import { approveQuote, createQuote } from "@/modules/finance/quotes";
-import { scheduleSessions } from "@/modules/finance/sales";
+import { receivePayment, scheduleSessions } from "@/modules/finance/sales";
 
 import { CLINIC, defaultProfessional, otherClinic } from "../helpers/clinic";
 
@@ -112,7 +115,29 @@ async function packageSession(startTime = "10:00"): Promise<string> {
     actorId,
     "2026-11-03",
   );
-  if (!sale.ok) throw new Error(JSON.stringify(sale));
+  if (!sale.ok || !sale.saleId) throw new Error(JSON.stringify(sale));
+  // Sessions are only scheduled once paid.
+  const [part] = await db
+    .select({ id: installments.id })
+    .from(installments)
+    .where(eq(installments.saleId, sale.saleId));
+  const [pix] = await db
+    .select({ id: paymentMethods.id })
+    .from(paymentMethods)
+    .where(eq(paymentMethods.clinicId, CLINIC))
+    .limit(1);
+  const paid = await receivePayment(
+    CLINIC,
+    paymentSchema.parse({
+      installmentId: part!.id,
+      paidOn: "2026-11-03",
+      amount: "300,00",
+      paymentMethodId: pix!.id,
+      notes: "",
+    }),
+    actorId,
+  );
+  if (!paid.ok) throw new Error(JSON.stringify(paid));
   const [item] = await db.select({ id: saleItems.id }).from(saleItems);
   const scheduled = await scheduleSessions(
     CLINIC,

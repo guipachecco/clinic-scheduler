@@ -34,6 +34,8 @@ import type {
 import { installmentState, sessionAmounts, splitAmount } from "./money";
 import { monthlyDueDates } from "./recurrence";
 import {
+  bookableSessions,
+  paidSessions,
   SESSION_COUNTING_STATUSES,
   syncSessionInstallment,
 } from "./session-links";
@@ -81,6 +83,7 @@ export type SaleDetail = {
     used: number;
     done: number;
     remaining: number;
+    bookable: number;
     appointments: { id: string; startsAt: Date; status: string }[];
   }[];
   installments: {
@@ -379,6 +382,25 @@ export async function getSale(
         used,
         done: mine.filter((s) => s.status === "completed").length,
         remaining: product ? 0 : Math.max(0, item.sessions - used),
+        // Paid for and not yet scheduled: what may be scheduled now.
+        bookable:
+          product || cancelled
+            ? 0
+            : Math.max(
+                0,
+                paidSessions({
+                  plan: sale.paymentPlan,
+                  sessions: item.sessions,
+                  paidInstallments: installmentsOut.filter(
+                    (part) =>
+                      part.saleItemId === item.id &&
+                      part.state !== "cancelled" &&
+                      part.paidCents >= part.amountCents,
+                  ).length,
+                  salePaidCents: paidCents,
+                  saleTotalCents: sale.totalCents,
+                }) - used,
+              ),
         appointments: mine.map((s) => ({
           id: s.id,
           startsAt: s.startsAt,
@@ -843,6 +865,14 @@ export async function scheduleSessions(
           remaining === 0
             ? "Todas as sessões deste item já estão agendadas."
             : `Faltam só ${remaining} sessões para agendar neste item.`,
+        );
+      }
+      const paid = await bookableSessions(tx, clinicId, item.id);
+      if (values.slots.length > paid) {
+        return fail(
+          paid === 0
+            ? "Nenhuma sessão paga para agendar: receba a parcela antes."
+            : `Só ${paid} ${paid === 1 ? "sessão paga" : "sessões pagas"} para agendar neste item.`,
         );
       }
 
