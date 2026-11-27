@@ -7,7 +7,8 @@ import { SignOutButton } from "../(painel)/sign-out-button";
 import { RootNav } from "./root-nav";
 
 // Pages outside any clinic, only for root: the clinic list, what each clinic
-// has (resources) and how the system is doing (monitoring).
+// has (resources), how the system is doing (monitoring), every WhatsApp
+// message sent per clinic (messages) and Zemana's own money (financeiro).
 export default async function RootAreaLayout({
   children,
 }: {
@@ -18,7 +19,7 @@ export default async function RootAreaLayout({
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="flex items-center justify-between gap-3 bg-brand px-4 py-3 text-brand-foreground md:px-8">
+      <header className="flex items-center justify-between gap-3 bg-brand px-4 py-3 text-brand-foreground md:px-8 print:hidden">
         <div className="flex min-w-0 items-center gap-4">
           <BrandImage kind="horizontal" size={140} onBrand />
           <p className="hidden font-heading text-lg font-bold tracking-wide sm:block">

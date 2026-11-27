@@ -48,10 +48,11 @@ export function messagesUrl(): string {
 export async function sendWhatsAppTemplate(
   message: WhatsAppTemplate,
   fetchImpl: Fetch = fetch,
-): Promise<void> {
+): Promise<string> {
+  // Returns the text the patient got, for the message log.
   if (env.WHATSAPP_TOKEN && env.WHATSAPP_PHONE_NUMBER_ID) {
     await sendWithCloudApi(env.WHATSAPP_TOKEN, message, fetchImpl);
-    return;
+    return reminderText(message.params);
   }
   if (env.ZAPI_INSTANCE_ID && env.ZAPI_TOKEN) {
     await sendWithZApi(
@@ -60,9 +61,10 @@ export async function sendWhatsAppTemplate(
       message,
       fetchImpl,
     );
-    return;
+    return message.text ?? reminderText(message.params);
   }
   await writeToOutbox(message);
+  return message.text ?? reminderText(message.params);
 }
 
 // Free text through Z-API only (the answers to her messages); without it

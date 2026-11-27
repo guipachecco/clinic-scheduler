@@ -13,6 +13,7 @@ import {
   whatsappPending,
 } from "@/db/schema";
 import { logger } from "@/lib/logger";
+import { recordMessage } from "@/modules/platform/message-log";
 
 import {
   reminderAskText,
@@ -40,7 +41,7 @@ import { sendWhatsAppTemplate, type WhatsAppTemplate } from "./whatsapp";
 
 export type ReminderRun = { sent: number; failed: number };
 
-type Send = (message: WhatsAppTemplate) => Promise<void>;
+type Send = (message: WhatsAppTemplate) => Promise<string | void>;
 
 export type Pace = {
   sleep: (ms: number) => Promise<void>;
@@ -138,14 +139,14 @@ export async function sendDueReminders(
       startsAt: row.startsAt,
       timezone: row.clinic.timezone,
     };
+    // No link: her nickname and a "1"/"2" question (Z-API only).
+    const text = reminderAskText({ ...input, now, nickname: row.nickname });
+    const log = { clinicId: row.clinic.id, appointmentId: row.id, to };
     try {
-      await send({
-        to,
-        params: reminderParams(input),
-        // No link: her nickname and a "1"/"2" question (Z-API only).
-        text: reminderAskText({ ...input, now, nickname: row.nickname }),
-      });
+      const body = await send({ to, params: reminderParams(input), text });
+      await recordMessage({ ...log, kind: "reminder", body: body || text });
     } catch (error) {
+      await recordMessage({ ...log, kind: "reminder", body: text, error });
       run.failed += 1;
       logger.error("whatsapp reminder: send failed", {
         clinicId: row.clinic.id,
