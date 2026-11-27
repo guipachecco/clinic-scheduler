@@ -11,6 +11,7 @@ import {
 } from "@/modules/asaas/deposits";
 import {
   bookOnline,
+  hasPaidPackageSession,
   listBookableServices,
   listDaysWithSlots,
   listFreeSlots,
@@ -138,6 +139,10 @@ export async function loadDepositOffer(
   const { ctx } = await requireClient(slug, back(slug));
   const id = serviceId.safeParse(service);
   if (!id.success) return null;
+  // Same rule as bookOnline: a paid package session asks no deposit.
+  if (await hasPaidPackageSession(ctx.clinicId, ctx.patientId, id.data)) {
+    return null;
+  }
   const quote = await depositQuote(ctx.clinicId, id.data, ctx.patientId);
   if (!quote) return null;
   const item = (await listBookableServices(ctx)).find(

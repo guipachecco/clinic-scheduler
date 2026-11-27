@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { DateTime } from "luxon";
 
 import type { Tx } from "@/db/client";
@@ -125,4 +125,110 @@ export async function syncSessionInstallment(
     .update(installments)
     .set({ appointmentId, dueDate })
     .where(eq(installments.id, free.id));
+}
+
+// How many sessions of an item the payments so far cover ("parcela da
+// sessão paga"). Por sessão: one per paid installment of the item. À vista
+// and parcelado: the paid share of the sale, so 10 installments for 10
+// sessions free one session per installment. A free sale covers them all.
+export function paidSessions(input: {
+  plan: "upfront" | "installments" | "per_session";
+  sessions: number;
+  paidInstallments: number;
+  salePaidCents: number;
+  saleTotalCents: number;
+}): number {
+  if (input.plan === "per_session") {
+    return Math.min(input.sessions, input.paidInstallments);
+  }
+  if (input.saleTotalCents <= 0) return input.sessions;
+  return Math.min(
+    input.sessions,
+    Math.floor((input.sessions * input.salePaidCents) / input.saleTotalCents),
+  );
+}
+
+// Sessions of the item that may still be scheduled: paid for and not yet
+// used. Zero for a cancelled sale or a product.
+export async function bookableSessions(
+  tx: Tx,
+  clinicId: string,
+  saleItemId: string,
+): Promise<number> {
+  const [item] = await tx
+    .select({
+      saleId: saleItems.saleId,
+      serviceId: saleItems.serviceId,
+      sessions: saleItems.sessions,
+      plan: sales.paymentPlan,
+      saleTotalCents: sales.totalCents,
+      cancelledAt: sales.cancelledAt,
+    })
+    .from(saleItems)
+    .innerJoin(sales, eq(saleItems.saleId, sales.id))
+    .where(and(eq(saleItems.id, saleItemId), eq(saleItems.clinicId, clinicId)))
+    .limit(1);
+  if (!item || item.cancelledAt || item.serviceId === null) return 0;
+
+  const [used] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(saleSessions)
+    .innerJoin(appointments, eq(saleSessions.appointmentId, appointments.id))
+    .where(
+      and(
+        eq(saleSessions.saleItemId, saleItemId),
+        inArray(appointments.status, [...SESSION_COUNTING_STATUSES]),
+      ),
+    );
+  const paidSql = sql<number>`coalesce((
+    select sum(p.amount_cents) from payments p
+    where p.installment_id = "installments"."id"
+      and p.reversed_at is null), 0)`;
+  const [paid] = await tx
+    .select({
+      cents: sql<number>`coalesce(sum(${paidSql}), 0)::int`,
+      itemPaid: sql<number>`count(*) filter (where ${installments.saleItemId} = ${saleItemId} and ${installments.cancelledAt} is null and ${paidSql} >= ${installments.amountCents})::int`,
+    })
+    .from(installments)
+    .where(
+      and(
+        eq(installments.clinicId, clinicId),
+        eq(installments.saleId, item.saleId),
+      ),
+    );
+  const covered = paidSessions({
+    plan: item.plan,
+    sessions: item.sessions,
+    paidInstallments: paid?.itemPaid ?? 0,
+    salePaidCents: paid?.cents ?? 0,
+    saleTotalCents: item.saleTotalCents,
+  });
+  return Math.max(0, covered - (used?.count ?? 0));
+}
+
+// The oldest package item of the patient for this service with a paid
+// session left to schedule, or null.
+export async function findPaidPackageItem(
+  tx: Tx,
+  clinicId: string,
+  patientId: string,
+  serviceId: string,
+): Promise<string | null> {
+  const items = await tx
+    .select({ id: saleItems.id })
+    .from(saleItems)
+    .innerJoin(sales, eq(saleItems.saleId, sales.id))
+    .where(
+      and(
+        eq(saleItems.clinicId, clinicId),
+        eq(saleItems.serviceId, serviceId),
+        eq(sales.patientId, patientId),
+        isNull(sales.cancelledAt),
+      ),
+    )
+    .orderBy(asc(sales.createdAt), asc(saleItems.sortOrder));
+  for (const item of items) {
+    if ((await bookableSessions(tx, clinicId, item.id)) > 0) return item.id;
+  }
+  return null;
 }

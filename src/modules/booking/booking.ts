@@ -3,13 +3,14 @@ import "server-only";
 import { and, asc, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { DateTime } from "luxon";
 
-import { asClient, type Tx } from "@/db/client";
+import { asClient, inClinic, type Tx } from "@/db/client";
 import { findPgError, isAppointmentOverlapError } from "@/db/errors";
 import {
   appointments,
   auditLogs,
   clinics,
   patients,
+  saleSessions,
   services,
 } from "@/db/schema";
 import { logger } from "@/lib/logger";
@@ -29,6 +30,10 @@ import {
   undoHold,
   validCpf,
 } from "@/modules/asaas/deposits";
+import {
+  findPaidPackageItem,
+  syncSessionInstallment,
+} from "@/modules/finance/session-links";
 import { DEFAULT_REMINDER_LEAD } from "@/modules/reminders/lead";
 import type { DayHours } from "@/modules/schedule/schedule";
 
@@ -488,11 +493,15 @@ async function book(
   const now = new Date();
 
   await sweepExpiredDeposits(ctx.clinicId, now, fetchImpl);
-  const quote = await depositQuote(
+  // A paid package session needs no deposit: it is already paid.
+  const fromPackage = await hasPaidPackageSession(
     ctx.clinicId,
-    input.serviceId,
     ctx.patientId,
+    input.serviceId,
   );
+  const quote = fromPackage
+    ? null
+    : await depositQuote(ctx.clinicId, input.serviceId, ctx.patientId);
   const cpf = input.cpf?.trim() || undefined;
   if (quote?.needsCpf) {
     if (!cpf) return { ok: false, reason: "cpf_required" };
@@ -529,6 +538,17 @@ async function book(
     return inserted;
   }
   if (!quote) {
+    if (fromPackage) {
+      // The booking is done; a failed link leaves it a single appointment.
+      await linkPackageSession(ctx, inserted.appointmentId).catch(
+        (error: unknown) =>
+          logger.error("online booking: package link failed", {
+            clinicId: ctx.clinicId,
+            appointmentId: inserted.appointmentId,
+            error,
+          }),
+      );
+    }
     return { ok: true, appointmentId: inserted.appointmentId, deposit: null };
   }
 
@@ -578,6 +598,59 @@ async function book(
     }
     return { ok: false, reason: "unavailable" };
   }
+}
+
+// Package sales and payments are not visible to app_client, so these run as
+// the clinic (inClinic), only for her own patient id from the session.
+export function hasPaidPackageSession(
+  clinicId: string,
+  patientId: string,
+  serviceId: string,
+): Promise<boolean> {
+  return inClinic(clinicId, async (tx) =>
+    Boolean(await findPaidPackageItem(tx, clinicId, patientId, serviceId)),
+  );
+}
+
+// Makes the new online appointment a session of her oldest paid package for
+// the service. shortcut: a credit used up between the check and here (the
+// clinic scheduling the same last session) leaves it a single appointment
+// without deposit; the agenda shows it, rare enough to fix by hand.
+async function linkPackageSession(ctx: BookingContext, appointmentId: string) {
+  await inClinic(ctx.clinicId, async (tx) => {
+    await lockAgenda(tx, ctx.clinicId);
+    const [row] = await tx
+      .select({ serviceId: appointments.serviceId })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.id, appointmentId),
+          eq(appointments.clinicId, ctx.clinicId),
+          eq(appointments.patientId, ctx.patientId),
+        ),
+      );
+    if (!row?.serviceId) return;
+    const saleItemId = await findPaidPackageItem(
+      tx,
+      ctx.clinicId,
+      ctx.patientId,
+      row.serviceId,
+    );
+    if (!saleItemId) return;
+    await tx
+      .insert(saleSessions)
+      .values({ clinicId: ctx.clinicId, saleItemId, appointmentId });
+    await syncSessionInstallment(tx, ctx.clinicId, appointmentId);
+    await tx.insert(auditLogs).values({
+      clinicId: ctx.clinicId,
+      actorType: "patient",
+      actorUserId: ctx.userId,
+      action: "sale.sessions_scheduled",
+      entityType: "sale_item",
+      entityId: saleItemId,
+      changes: { appointmentId, count: 1 },
+    });
+  });
 }
 
 type Inserted =
