@@ -5,6 +5,7 @@ import type { UseFormRegisterReturn } from "react-hook-form";
 import { FieldError } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { applyMask } from "@/lib/input-mask";
 
 // A labelled input with its error, as in the panel's forms. With `mask`, the
@@ -31,10 +32,12 @@ export function TextField({
         return registration.onChange(event);
       }
     : registration.onChange;
+  // Password fields get the show/hide eye.
+  const Field = input.type === "password" ? PasswordInput : Input;
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input
+      <Field
         id={id}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}

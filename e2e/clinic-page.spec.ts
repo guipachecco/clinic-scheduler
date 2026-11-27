@@ -92,7 +92,7 @@ async function signUp(page: Page, person: typeof PEOPLE.done) {
   await page.getByLabel("Nome").fill(person.name);
   await page.getByLabel("Celular (WhatsApp)").fill(person.phone);
   await page.getByLabel("E-mail").fill(person.email);
-  await page.getByLabel("Senha").fill(person.password);
+  await page.getByLabel("Senha", { exact: true }).fill(person.password);
   await page.getByRole("button", { name: "Criar conta" }).click();
   await expect(page).toHaveURL(new RegExp(`/${REVIEW.slug}/marcar$`));
 }
@@ -100,7 +100,7 @@ async function signUp(page: Page, person: typeof PEOPLE.done) {
 async function signIn(page: Page, person: typeof PEOPLE.done) {
   await page.goto(`/${REVIEW.slug}/entrar`);
   await page.getByLabel("E-mail").fill(person.email);
-  await page.getByLabel("Senha").fill(person.password);
+  await page.getByLabel("Senha", { exact: true }).fill(person.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).not.toHaveURL(/\/entrar/);
 }

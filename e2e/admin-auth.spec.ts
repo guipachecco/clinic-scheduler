@@ -1,7 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { Secret, TOTP } from "otpauth";
 
-import { TEST_ADMIN, TEST_ROOT_AUTH } from "./test-account";
+import { clearRateLimits, signInToPanel } from "./helpers";
+import {
+  TEST_ADMIN,
+  TEST_ADMIN_PASSWORD_RESET,
+  TEST_ROOT_AUTH,
+} from "./test-account";
 
 // One story, in order: the clinic owner signs in with the password alone;
 // root sets up the mandatory 2FA on first access, signs out, and signs in
@@ -21,7 +26,7 @@ async function signInWithPassword(
 ) {
   await page.goto("/admin/entrar");
   await page.getByLabel("E-mail").fill(account.email);
-  await page.getByLabel("Senha").fill(password);
+  await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Entrar" }).click();
 }
 
@@ -182,4 +187,67 @@ test("root's later sign-ins ask for the authenticator code", async ({
   await page.getByLabel("Código do aplicativo").fill(currentCode());
   await page.getByRole("button", { name: "Verificar" }).click();
   await expect(page).toHaveURL(/\/admin\/clinicas$/);
+});
+
+test("both sign-in forms show and hide the password with the eye", async ({
+  page,
+}) => {
+  for (const path of ["/admin/entrar", "/entrar"]) {
+    await page.goto(path);
+    const password = page.getByLabel("Senha", { exact: true });
+    const eye = page.getByRole("button", { name: "Mostrar senha" });
+    await password.fill("segredo-de-teste");
+    await expect(password).toHaveAttribute("type", "password");
+    await expect(eye).toHaveAttribute("aria-pressed", "false");
+
+    await eye.click();
+    await expect(password).toHaveAttribute("type", "text");
+    const hide = page.getByRole("button", { name: "Ocultar senha" });
+    await expect(hide).toHaveAttribute("aria-pressed", "true");
+
+    await hide.click();
+    await expect(password).toHaveAttribute("type", "password");
+    await expect(password).toHaveValue("segredo-de-teste");
+  }
+});
+
+test("root sets a clinic owner's password and she signs in with it", async ({
+  page,
+}) => {
+  // The sign-ins above used up this minute's limit: the helper clears it.
+  await signInToPanel(page, TEST_ROOT_AUTH, /\/admin\/clinicas$/);
+
+  await page.getByRole("link", { name: "Mudar senha" }).click();
+  await expect(page).toHaveURL(/\/admin\/senhas$/);
+  // Grais (drizzle/0007_multi_clinic.sql), by id: other suites rename it.
+  await page
+    .getByLabel("Clínica", { exact: true })
+    .selectOption("00000000-0000-4000-8000-000000000100");
+  await page.getByLabel("Tipo de conta").selectOption("owner");
+  await page.getByRole("button", { name: "Ver contas" }).click();
+  await expect(page).toHaveURL(/tipo=owner/);
+
+  await page.getByLabel("Conta", { exact: true }).selectOption({
+    label: `${TEST_ADMIN_PASSWORD_RESET.name} · ${TEST_ADMIN_PASSWORD_RESET.email}`,
+  });
+  // A short one is refused by the server's policy.
+  const field = page.getByLabel("Nova senha", { exact: true });
+  await field.fill("curta");
+  await page.getByRole("button", { name: "Salvar senha" }).click();
+  await expect(page.getByText(/pelo menos 12/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Gerar senha" }).click();
+  const generated = await field.inputValue();
+  expect(generated).toHaveLength(20);
+  await page.getByRole("button", { name: "Salvar senha" }).click();
+  await expect(page.getByRole("status")).toContainText(
+    `Senha de ${TEST_ADMIN_PASSWORD_RESET.email} trocada`,
+  );
+
+  await page.getByRole("button", { name: "Sair" }).click();
+  await clearRateLimits();
+  await signInWithPassword(page, TEST_ADMIN_PASSWORD_RESET);
+  await expect(page.getByText("E-mail ou senha incorretos.")).toBeVisible();
+  await signInWithPassword(page, TEST_ADMIN_PASSWORD_RESET, generated);
+  await expect(page).toHaveURL(/\/admin$/);
 });

@@ -92,7 +92,7 @@ test("header shows Entrar signed out and Suas clínicas for a signed-in client",
   try {
     await page.goto("/entrar");
     await page.getByLabel("E-mail").fill(CLIENT.email);
-    await page.getByLabel("Senha").fill(TEST_ADMIN.password);
+    await page.getByLabel("Senha", { exact: true }).fill(TEST_ADMIN.password);
     await page.getByRole("button", { name: "Entrar" }).click();
     await expect(page).toHaveURL(/\/minhas-clinicas$/);
 

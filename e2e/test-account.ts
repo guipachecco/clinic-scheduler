@@ -193,3 +193,13 @@ export const TEST_ROOT_AUTH = {
   name: "Root de Acesso",
   password: "senha-de-teste-root-acesso-bem-longa",
 };
+
+// Owner whose password root changes in e2e/admin-auth.spec.ts ("Mudar senha").
+// Its own account, so no other suite loses its sign-in.
+export const TEST_ADMIN_PASSWORD_RESET = {
+  role: "admin" as const,
+  clinicSlug: "grais",
+  email: "senha-trocada@example.test",
+  name: "Dona da Senha Trocada",
+  password: "senha-de-teste-senha-trocada-bem-longa",
+};

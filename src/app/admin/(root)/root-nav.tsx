@@ -19,6 +19,7 @@ const ITEMS: { href: Route; label: string; icon: IconName }[] = [
     icon: "pulse",
   },
   { href: "/admin/mensagens" as Route, label: "Mensagens", icon: "chat" },
+  { href: "/admin/senhas" as Route, label: "Mudar senha", icon: "key" },
 ];
 
 export function RootNav() {

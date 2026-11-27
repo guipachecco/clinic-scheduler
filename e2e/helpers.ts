@@ -62,7 +62,7 @@ export async function signInToPanel(
   if (account.role === "root") await resetTwoFactor(account.email);
   await page.goto("/admin/entrar");
   await page.getByLabel("E-mail").fill(account.email);
-  await page.getByLabel("Senha").fill(account.password);
+  await page.getByLabel("Senha", { exact: true }).fill(account.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   if (account.role === "admin") {
     await expect(page).toHaveURL(landing);
