@@ -105,6 +105,18 @@ export const serverEnvSchema = z
     // ZAPI_TOKEN is the workspace Secret Key (Security), not the channel token.
     ZAPI_INSTANCE_ID: optionalText(),
     ZAPI_TOKEN: optionalText(),
+    // Zemana's WhatsApp number (digits, with 55), where the patient sends her
+    // activation code. Without it the activation button stays hidden.
+    ZAPI_PHONE: optionalText().refine(
+      (value) => value === undefined || /^55\d{10,11}$/.test(value),
+      { error: "só dígitos, com 55 e DDD, como 5547984777512" },
+    ),
+    // Sent by Z-API as "Authorization: Bearer <token>" on /api/webhooks/zapi.
+    // Without it every webhook call is refused.
+    ZAPI_WEBHOOK_TOKEN: optionalText().refine(
+      (value) => value === undefined || value.length >= 32,
+      { error: "deve ter ao menos 32 caracteres" },
+    ),
     // Sent by the Vercel cron as "Authorization: Bearer <CRON_SECRET>" to
     // /api/cron/lembretes. Without it the route refuses every call.
     CRON_SECRET: optionalText(),

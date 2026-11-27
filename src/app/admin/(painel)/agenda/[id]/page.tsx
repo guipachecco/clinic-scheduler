@@ -286,6 +286,13 @@ export default async function AppointmentPage({
                 : reminderLeadLabel(appointment.reminderLeadMinutes)}
             </Fact>
           ) : null}
+          {appointment.patientReply ? (
+            <Fact label="Resposta da cliente">
+              {appointment.patientReply === "confirmed"
+                ? "Confirmou pelo WhatsApp ✅"
+                : "Avisou que não pode vir"}
+            </Fact>
+          ) : null}
           {appointment.status === "cancelled" &&
           appointment.cancellationReason ? (
             <Fact label="Motivo">

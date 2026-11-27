@@ -1,4 +1,12 @@
-import { index, integer, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import {
+  date,
+  index,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 import { createdAt } from "./columns";
 
@@ -41,3 +49,37 @@ export const platformHealthChecks = pgTable(
   },
   (t) => [index("platform_health_checks_created_at_idx").on(t.createdAt)],
 );
+
+// WhatsApp reminders through Z-API (src/modules/reminders, migration 0043).
+// Zemana's one number serves every clinic, so these live outside any clinic
+// and only app_platform reads and writes them.
+
+// The code a patient sends to activate her reminders (the button on the
+// booking confirmation). It says whose message it is whatever form the
+// phone arrives in from Z-API.
+export const whatsappOptInCodes = pgTable(
+  "whatsapp_opt_in_codes",
+  {
+    code: text("code").primaryKey(),
+    clinicId: uuid("clinic_id").notNull(),
+    patientId: uuid("patient_id").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("whatsapp_opt_in_codes_patient_idx").on(t.patientId)],
+);
+
+// The last reminder sent to each WhatsApp sender, so her "1" or "2" reaches
+// the right appointment.
+export const whatsappPending = pgTable("whatsapp_pending", {
+  senderId: text("sender_id").primaryKey(),
+  clinicId: uuid("clinic_id").notNull(),
+  appointmentId: uuid("appointment_id").notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }).notNull(),
+});
+
+// Reminders sent per day (Brasília), for the number's warm-up: the daily
+// limit grows from the first day in this table.
+export const whatsappDailySends = pgTable("whatsapp_daily_sends", {
+  day: date("day", { mode: "string" }).primaryKey(),
+  sent: integer("sent").notNull().default(0),
+});

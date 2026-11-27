@@ -287,7 +287,28 @@ export function BookingDone({
           ) : null}
         </motion.dl>
 
-        {confirmation.whatsappReminder ? (
+        {confirmation.whatsappReminder && confirmation.optInUrl ? (
+          <motion.div
+            className="grid gap-3 rounded-lg bg-highlight p-4 text-highlight-foreground"
+            {...rise(2)}
+          >
+            <p className="text-sm font-semibold">
+              Falta um passo para receber o lembrete{" "}
+              {reminderLeadLabel(confirmation.reminderLeadMinutes)}: mande a
+              mensagem pronta no WhatsApp.
+            </p>
+            <Button asChild size="lg">
+              <a
+                href={confirmation.optInUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Icon name="whatsapp" className="size-5 shrink-0" />
+                Ativar lembrete no WhatsApp
+              </a>
+            </Button>
+          </motion.div>
+        ) : confirmation.whatsappReminder ? (
           <motion.p className="flex items-center gap-2 text-sm" {...rise(2)}>
             <Icon
               name="whatsapp"

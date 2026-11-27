@@ -694,6 +694,12 @@ export function AppointmentForm(props: Props) {
         </label>
       ) : null}
       {props.reminderAvailable && remind ? (
+        <p className="-mt-3 text-sm text-muted-foreground">
+          Só sai para quem já ativou os lembretes pelo WhatsApp ao agendar
+          online.
+        </p>
+      ) : null}
+      {props.reminderAvailable && remind ? (
         <div className="grid content-start gap-2 sm:max-w-xs">
           <Label htmlFor="reminderLeadMinutes">Quando avisar</Label>
           <NativeSelect

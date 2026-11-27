@@ -1015,6 +1015,7 @@ describe("getAppointment", () => {
       whatsappReminder: false,
       reminderLeadMinutes: 1440,
       reminderSent: false,
+      patientReply: null,
       editable: true,
       allowedTransitions: ["cancelled"],
       extras: [],

@@ -293,6 +293,10 @@ describe("database roles", () => {
         and exists (select 1 from pg_attribute a
                     where a.attrelid = c.oid and a.attname = 'clinic_id'
                       and not a.attisdropped)
+        -- Platform-only tables (whatsapp_*, migration 0043) carry a clinic_id
+        -- but give app_panel nothing to read: there is no clinic data to
+        -- separate there.
+        and has_table_privilege('app_panel', c.oid, 'SELECT')
       order by c.relname
     `);
     expect(tables.rows.length).toBeGreaterThan(10);

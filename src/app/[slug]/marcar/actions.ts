@@ -21,6 +21,7 @@ import {
   DEFAULT_REMINDER_LEAD,
   reminderLeadSchema,
 } from "@/modules/reminders/lead";
+import { optInLink } from "@/modules/reminders/opt-in";
 import { whatsappRemindersAvailable } from "@/modules/reminders/whatsapp";
 
 // The booking steps of /<slug>/marcar. Each action rebuilds who she is from
@@ -39,6 +40,9 @@ export type Confirmation = {
   // She asked for the WhatsApp reminder, this many minutes before.
   whatsappReminder: boolean;
   reminderLeadMinutes: number;
+  // The WhatsApp link that activates her reminders (she writes to Zemana's
+  // number first). Null when she already did, or it is not set up.
+  optInUrl: string | null;
 };
 
 // The Pix deposit as the browser gets it. The QR image and the code only go
@@ -199,6 +203,20 @@ export async function book(slug: string, input: unknown): Promise<BookResult> {
   const start = DateTime.fromISO(parsed.data.startsAt, {
     zone: clinic.timezone,
   }).setLocale("pt-BR");
+  // The booking is done: a failure here only hides the activation button.
+  const optInUrl = whatsappReminder
+    ? await optInLink(
+        ctx.clinicId,
+        ctx.patientId,
+        clinic.displayName?.trim() || clinic.name,
+      ).catch((error: unknown) => {
+        logger.error("whatsapp opt-in link failed", {
+          clinicId: ctx.clinicId,
+          error,
+        });
+        return null;
+      })
+    : null;
   return {
     ok: true,
     confirmation: {
@@ -211,6 +229,7 @@ export async function book(slug: string, input: unknown): Promise<BookResult> {
       preparationInstructions: service?.preparationInstructions ?? null,
       whatsappReminder,
       reminderLeadMinutes,
+      optInUrl,
     },
     deposit,
   };
