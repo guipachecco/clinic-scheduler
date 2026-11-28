@@ -16,8 +16,8 @@ import { logger } from "@/lib/logger";
 import { recordMessage } from "@/modules/platform/message-log";
 
 import {
-  reminderAskText,
   reminderParams,
+  reminderText,
   warmUpLimit,
   whatsappNumber,
 } from "./message";
@@ -69,6 +69,8 @@ type Clinic = {
   name: string;
   displayName: string | null;
   timezone: string;
+  slug: string;
+  address: string | null;
 };
 
 type Due = {
@@ -77,7 +79,6 @@ type Due = {
   startsAt: Date;
   serviceName: string;
   patientName: string;
-  nickname: string | null;
   phone: string;
   senderId: string | null;
 };
@@ -97,6 +98,8 @@ export async function sendDueReminders(
       name: clinics.name,
       displayName: clinics.displayName,
       timezone: clinics.timezone,
+      slug: clinics.slug,
+      address: clinics.address,
     })
     .from(clinics)
     .where(eq(clinics.isActive, true))
@@ -132,18 +135,18 @@ export async function sendDueReminders(
     first = false;
     if (!(await claim(row))) continue;
     const clinicName = row.clinic.displayName?.trim() || row.clinic.name;
-    const input = {
+    const params = reminderParams({
       patientName: row.patientName,
       clinicName,
       serviceName: row.serviceName,
       startsAt: row.startsAt,
       timezone: row.clinic.timezone,
-    };
-    // No link: her nickname and a "1"/"2" question (Z-API only).
-    const text = reminderAskText({ ...input, now, nickname: row.nickname });
+      address: row.clinic.address,
+    });
+    const text = reminderText(params);
     const log = { clinicId: row.clinic.id, appointmentId: row.id, to };
     try {
-      const body = await send({ to, params: reminderParams(input), text });
+      const body = await send({ to, params, button: row.clinic.slug });
       await recordMessage({ ...log, kind: "reminder", body: body || text });
     } catch (error) {
       await recordMessage({ ...log, kind: "reminder", body: text, error });
@@ -232,7 +235,6 @@ async function dueInClinic(clinic: Clinic, now: Date): Promise<Due[]> {
         startsAt: appointments.startsAt,
         serviceName: appointments.serviceName,
         patientName: patients.name,
-        nickname: patients.nickname,
         phone: patients.phone,
         senderId: patients.whatsappSenderId,
       })

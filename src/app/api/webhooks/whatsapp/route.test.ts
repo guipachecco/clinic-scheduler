@@ -2,7 +2,18 @@ import { createHmac } from "node:crypto";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Fictitious tokens only.
+const { handleIncoming } = vi.hoisted(() => ({
+  handleIncoming: vi.fn<(from: string, text: string) => Promise<void>>(
+    async () => {},
+  ),
+}));
+vi.mock("@/modules/reminders/opt-in", () => ({ handleIncoming }));
+// Runs the after() work right away.
+vi.mock("next/server", () => ({
+  after: (task: () => Promise<void>) => task(),
+}));
+
+// Fictitious tokens and numbers only.
 const VERIFY = "verify-token-ficticio-com-32-caracteres!";
 const SECRET = "app-secret-ficticio";
 const URL_BASE = "https://zemana.test/api/webhooks/whatsapp";
@@ -60,6 +71,30 @@ describe("POST /api/webhooks/whatsapp", () => {
   it("accepts a body signed with the app secret", async () => {
     const response = await (await route()).POST(signed(body));
     expect(response.status).toBe(200);
+  });
+
+  it("hands her text messages to the opt-in handling", async () => {
+    handleIncoming.mockClear();
+    const incoming = JSON.stringify({
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                messages: [
+                  { from: "5500000000001", type: "text", text: { body: "1" } },
+                  { from: "5500000000001", type: "image" },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const response = await (await route()).POST(signed(incoming));
+    expect(response.status).toBe(200);
+    expect(handleIncoming).toHaveBeenCalledTimes(1);
+    expect(handleIncoming).toHaveBeenCalledWith("5500000000001", "1");
   });
 
   it("refuses a body signed with another secret", async () => {

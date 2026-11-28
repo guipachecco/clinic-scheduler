@@ -29,8 +29,8 @@ import {
 import { sendWhatsAppText } from "./whatsapp";
 
 // The patient writes first: the booking confirmation gives her a WhatsApp
-// link to Zemana's number with a code; the Z-API webhook (/api/webhooks/zapi)
-// sees the code and turns her reminders on. Later her "1" or "2" answers the
+// link to Zemana's number with a code; the Meta webhook
+// (/api/webhooks/whatsapp) sees the code and turns her reminders on. Later her "1" or "2" answers the
 // last reminder sent to her (whatsapp_pending). The codes and the pending map
 // are app_platform's; the patient and the appointment are written inside
 // their clinic (inClinic), like the rest of the panel.
@@ -60,7 +60,7 @@ export async function optInLink(
   patientId: string,
   clinicName: string,
 ): Promise<string | null> {
-  if (!env.ZAPI_PHONE) return null;
+  if (!env.WHATSAPP_PHONE) return null;
   const [patient] = await inClinic(clinicId, (tx) =>
     tx
       .select({ optIn: patients.whatsappOptInAt })
@@ -79,7 +79,7 @@ export async function optInLink(
       throw error;
     }
     // api.whatsapp.com, not wa.me: wa.me turns emoji into "�" on the way.
-    return `https://api.whatsapp.com/send?phone=${env.ZAPI_PHONE}&text=${encodeURIComponent(optInMessage(clinicName, code))}`;
+    return `https://api.whatsapp.com/send?phone=${env.WHATSAPP_PHONE}&text=${encodeURIComponent(optInMessage(clinicName, code))}`;
   }
   return null;
 }

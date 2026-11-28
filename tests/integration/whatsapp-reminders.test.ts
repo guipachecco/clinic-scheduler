@@ -146,7 +146,7 @@ describe("sendDueReminders", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]!.to).toBe("5500000000001");
     expect(sent[0]!.params[0]).toBe("Maria");
-    expect(sent[0]!.params.slice(2)).toEqual([
+    expect(sent[0]!.params.slice(2, 5)).toEqual([
       "quinta-feira, 19/11",
       "14:30",
       "Limpeza fictícia",
@@ -274,12 +274,12 @@ describe("only after she writes first", () => {
     expect(sent).toEqual([]);
   });
 
-  it("asks for 1 or 2 with no link", async () => {
+  it("sends the clinic's slug for the map button", async () => {
     await insertAppointment();
     const { sent, send } = recorder();
     await sendDueReminders(NOW, send, FAST);
-    expect(sent[0]!.text).toContain("Responda *1* para confirmar");
-    expect(sent[0]!.text).not.toMatch(/https?:/);
+    expect(sent[0]!.button).toMatch(/^[a-z0-9-]+$/);
+    expect(sent[0]!.params).toHaveLength(6);
   });
 
   it("stops at the day's warm-up limit", async () => {
