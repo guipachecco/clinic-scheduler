@@ -3,7 +3,9 @@ import { createHmac } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { handleIncoming } = vi.hoisted(() => ({
-  handleIncoming: vi.fn(async (_from: string, _text: string) => {}),
+  handleIncoming: vi.fn<(from: string, text: string) => Promise<void>>(
+    async () => {},
+  ),
 }));
 vi.mock("@/modules/reminders/opt-in", () => ({ handleIncoming }));
 // Runs the after() work right away.

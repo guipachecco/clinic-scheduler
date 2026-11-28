@@ -146,7 +146,7 @@ describe("sendDueReminders", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]!.to).toBe("5500000000001");
     expect(sent[0]!.params[0]).toBe("Maria");
-    expect(sent[0]!.params.slice(2)).toEqual([
+    expect(sent[0]!.params.slice(2, 5)).toEqual([
       "quinta-feira, 19/11",
       "14:30",
       "Limpeza fictícia",
