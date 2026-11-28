@@ -101,7 +101,9 @@ export async function sendDueReminders(
     const text = reminderText(params);
     const log = { clinicId: row.clinic.id, appointmentId: row.id, to };
     try {
-      const body = await send({ to, params, button: row.clinic.slug });
+      // No button value: the approved template's map button is a static URL
+      // (sending one gives Meta error 132018).
+      const body = await send({ to, params });
       await recordMessage({ ...log, kind: "reminder", body: body || text });
     } catch (error) {
       await recordMessage({ ...log, kind: "reminder", body: text, error });

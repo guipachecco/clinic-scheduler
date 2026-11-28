@@ -270,11 +270,11 @@ describe("the ticked box is enough", () => {
     expect(sent).toHaveLength(1);
   });
 
-  it("sends the clinic's slug for the map button", async () => {
+  it("sends no button value: the template's button is a static URL", async () => {
     await insertAppointment();
     const { sent, send } = recorder();
     await sendDueReminders(NOW, send);
-    expect(sent[0]!.button).toMatch(/^[a-z0-9-]+$/);
+    expect(sent[0]!.button).toBeUndefined();
     expect(sent[0]!.params).toHaveLength(6);
   });
 
