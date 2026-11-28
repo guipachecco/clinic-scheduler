@@ -97,6 +97,43 @@ describe("POST /api/webhooks/whatsapp", () => {
     expect(handleIncoming).toHaveBeenCalledWith("5500000000001", "1");
   });
 
+  it("logs why Meta did not deliver, without the phone number", async () => {
+    const { POST } = await route();
+    const { logger } = await import("@/lib/logger");
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const failed = JSON.stringify({
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                statuses: [
+                  { status: "delivered" },
+                  {
+                    status: "failed",
+                    recipient_id: "5500000000001",
+                    errors: [
+                      {
+                        code: 131026,
+                        title: "Message undeliverable",
+                        error_data: { details: "To +5500000000001" },
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect((await POST(signed(failed))).status).toBe(200);
+    expect(error).toHaveBeenCalledTimes(1);
+    const [, fields] = error.mock.calls[0] as [string, { reason: string }];
+    expect(fields.reason).toContain("131026 | Message undeliverable");
+    expect(fields.reason).not.toContain("0000000001");
+  });
+
   it("refuses a body signed with another secret", async () => {
     const response = await (await route()).POST(signed(body, "outro"));
     expect(response.status).toBe(401);
