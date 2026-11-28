@@ -146,18 +146,8 @@ export function whatsappLink(phone: string, text: string): string | null {
     : null;
 }
 
-// ---- Automatic reminder from Zemana's number (migration 0043) ----
-// The patient writes first (her activation code); her "1" or "2" afterwards
-// is recorded and answered with the clinic's contact.
-
-const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
-export function newOptInCode(random: () => number = Math.random): string {
-  return Array.from(
-    { length: 6 },
-    () => CODE_ALPHABET[Math.floor(random() * CODE_ALPHABET.length)],
-  ).join("");
-}
+// ---- Messages she sends to Zemana's number (migration 0043) ----
+// Her "1" or "2" is recorded and answered with the clinic's contact.
 
 // The activation code inside her message ("… Código: K7P2Q9"), if any.
 export function optInCodeFrom(text: string): string | null {
@@ -174,16 +164,6 @@ export function replyChoice(text: string): "confirmed" | "declined" | null {
   }
   if (["2", "não", "nao"].includes(answer)) return "declined";
   return null;
-}
-
-// Reminders allowed today: 10 on the first day, 5 more each day, up to 150.
-export function warmUpLimit(daysSinceFirst: number): number {
-  return Math.min(150, 10 + 5 * Math.max(0, daysSinceFirst));
-}
-
-// The text she sends to activate, ready in the WhatsApp link.
-export function optInMessage(clinicName: string, code: string): string {
-  return `Oi! Quero receber os lembretes da ${clinicName.trim()} ✅ Código: ${code}`;
 }
 
 export function optInAckText(clinicName: string): string {

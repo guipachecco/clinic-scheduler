@@ -15,9 +15,6 @@ import { sendDueReminders } from "@/modules/reminders/reminders";
 
 import { CLINIC } from "../helpers/clinic";
 
-// No real pauses between messages in the tests.
-const FAST = { sleep: async () => {}, random: () => 0, elapsedMs: () => 0 };
-
 // Every record here is fictitious and exists only during the test.
 
 const MINUTE = 60_000;
@@ -156,7 +153,7 @@ describe("markReminded", () => {
     expect(audit[0]!.actorUserId).toBe(actorId);
 
     const send = vi.fn(async () => {});
-    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
+    expect(await sendDueReminders(NOW, send)).toEqual({
       sent: 0,
       failed: 0,
     });

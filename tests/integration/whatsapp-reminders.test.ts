@@ -9,7 +9,6 @@ import {
   serviceCategories,
   services,
   users,
-  whatsappDailySends,
   whatsappOptInCodes,
 } from "@/db/schema";
 import {
@@ -23,9 +22,6 @@ import { sendDueReminders } from "@/modules/reminders/reminders";
 import type { WhatsAppTemplate } from "@/modules/reminders/whatsapp";
 
 import { CLINIC } from "../helpers/clinic";
-
-// No real pauses between messages in the tests.
-const FAST = { sleep: async () => {}, random: () => 0, elapsedMs: () => 0 };
 
 // Every record here is fictitious and exists only during the test.
 
@@ -139,7 +135,7 @@ describe("sendDueReminders", () => {
     const id = await insertAppointment();
     const { sent, send } = recorder();
 
-    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
+    expect(await sendDueReminders(NOW, send)).toEqual({
       sent: 1,
       failed: 0,
     });
@@ -165,7 +161,7 @@ describe("sendDueReminders", () => {
     expect(audit[0]!.actorType).toBe("system");
 
     // A second run the same day sends nothing.
-    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
+    expect(await sendDueReminders(NOW, send)).toEqual({
       sent: 0,
       failed: 0,
     });
@@ -187,7 +183,7 @@ describe("sendDueReminders", () => {
     });
     const { sent, send } = recorder();
 
-    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
+    expect(await sendDueReminders(NOW, send)).toEqual({
       sent: 0,
       failed: 0,
     });
@@ -197,7 +193,7 @@ describe("sendDueReminders", () => {
   it("sends again after the appointment moves to another time", async () => {
     const id = await insertAppointment();
     const { sent, send } = recorder();
-    await sendDueReminders(NOW, send, FAST);
+    await sendDueReminders(NOW, send);
 
     const moved = new Date(TOMORROW.getTime() + 2 * 60 * MINUTE);
     await db
@@ -212,7 +208,7 @@ describe("sendDueReminders", () => {
 
     // Due again one day before the new time.
     const later = new Date(NOW.getTime() + 2 * 60 * MINUTE);
-    expect(await sendDueReminders(later, send, FAST)).toEqual({
+    expect(await sendDueReminders(later, send)).toEqual({
       sent: 1,
       failed: 0,
     });
@@ -228,7 +224,7 @@ describe("sendDueReminders", () => {
     });
     const { sent, send } = recorder();
 
-    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
+    expect(await sendDueReminders(NOW, send)).toEqual({
       sent: 1,
       failed: 0,
     });
@@ -239,7 +235,7 @@ describe("sendDueReminders", () => {
     await insertAppointment();
     const { send } = recorder();
     const early = new Date(NOW.getTime() - 15 * MINUTE);
-    expect(await sendDueReminders(early, send, FAST)).toEqual({
+    expect(await sendDueReminders(early, send)).toEqual({
       sent: 0,
       failed: 0,
     });
@@ -251,7 +247,7 @@ describe("sendDueReminders", () => {
       throw new Error("Falha ao enviar o WhatsApp (Meta 400).");
     });
 
-    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
+    expect(await sendDueReminders(NOW, send)).toEqual({
       sent: 0,
       failed: 1,
     });
@@ -259,38 +255,41 @@ describe("sendDueReminders", () => {
   });
 });
 
-describe("only after she writes first", () => {
-  it("sends nothing to a patient who never activated", async () => {
+describe("the ticked box is enough", () => {
+  it("sends to a patient who never wrote to the number", async () => {
     await db
       .update(patients)
       .set({ whatsappOptInAt: null, whatsappSenderId: null })
       .where(eq(patients.id, patientId));
     await insertAppointment();
     const { sent, send } = recorder();
-    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
-      sent: 0,
+    expect(await sendDueReminders(NOW, send)).toEqual({
+      sent: 1,
       failed: 0,
     });
-    expect(sent).toEqual([]);
+    expect(sent).toHaveLength(1);
   });
 
   it("sends the clinic's slug for the map button", async () => {
     await insertAppointment();
     const { sent, send } = recorder();
-    await sendDueReminders(NOW, send, FAST);
+    await sendDueReminders(NOW, send);
     expect(sent[0]!.button).toMatch(/^[a-z0-9-]+$/);
     expect(sent[0]!.params).toHaveLength(6);
   });
 
-  it("stops at the day's warm-up limit", async () => {
-    // The first day allows 10; 10 already went out today.
-    await db.insert(whatsappDailySends).values({ day: "2026-11-18", sent: 10 });
-    await insertAppointment();
-    const { send } = recorder();
-    expect(await sendDueReminders(NOW, send, FAST)).toEqual({
-      sent: 0,
+  it("sends every due reminder in one run, with no daily cap", async () => {
+    for (let i = 0; i < 12; i += 1) {
+      await insertAppointment({
+        startsAt: new Date(TOMORROW.getTime() - i * 60 * MINUTE),
+      });
+    }
+    const { sent, send } = recorder();
+    expect(await sendDueReminders(NOW, send)).toEqual({
+      sent: 12,
       failed: 0,
     });
+    expect(sent).toHaveLength(12);
   });
 
   it("activates with her code and records her 1 and 2", async () => {
@@ -322,7 +321,7 @@ describe("only after she writes first", () => {
 
     const id = await insertAppointment();
     const recorded = recorder();
-    await sendDueReminders(NOW, recorded.send, FAST);
+    await sendDueReminders(NOW, recorded.send);
     await handleIncoming("sender-novo", "1", NOW, send);
     expect((await getAppointment(CLINIC, id, NOW))?.patientReply).toBe(
       "confirmed",
