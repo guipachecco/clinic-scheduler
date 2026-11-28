@@ -8,7 +8,6 @@ import {
   newOptInCode,
   optInCodeFrom,
   optInMessage,
-  reminderAskText,
   replyChoice,
   reminderParams,
   reminderText,
@@ -40,13 +39,14 @@ describe("templateText", () => {
 });
 
 describe("reminderParams", () => {
-  it("fills the five template variables in order", () => {
+  it("fills the six template variables in order", () => {
     const params = reminderParams({
       patientName: "  Maria  Souza Lima ",
       clinicName: "Clínica Teste",
       serviceName: "Design de sobrancelha",
       startsAt: new Date("2026-11-19T17:30:00Z"),
       timezone: ZONE,
+      address: "Rua Fictícia, 100",
     });
     expect(params).toEqual([
       "Maria",
@@ -54,12 +54,33 @@ describe("reminderParams", () => {
       "quinta-feira, 19/11",
       "14:30",
       "Design de sobrancelha",
+      "Rua Fictícia, 100",
     ]);
     expect(reminderText(params)).toBe(
-      "Olá, Maria! Lembrete da Clínica Teste: seu horário é " +
-        "quinta-feira, 19/11, às 14:30 (Design de sobrancelha). " +
-        "Se não puder ir, avise a clínica com antecedência.",
+      [
+        "Olá, Maria.",
+        "",
+        "Este é um lembrete do seu horário na Clínica Teste:",
+        "",
+        "Data: quinta-feira, 19/11",
+        "Horário: 14:30",
+        "Serviço: Design de sobrancelha",
+        "Endereço: Rua Fictícia, 100",
+        "",
+        "Caso não possa comparecer, pedimos que avise a clínica com antecedência.",
+      ].join("\n"),
     );
+  });
+
+  it("puts a dash where the clinic has no address", () => {
+    const params = reminderParams({
+      patientName: "Maria",
+      clinicName: "Clínica Teste",
+      serviceName: "Corte",
+      startsAt: new Date("2026-11-19T17:30:00Z"),
+      timezone: ZONE,
+    });
+    expect(params[5]).toBe("-");
   });
 });
 
@@ -184,28 +205,6 @@ describe("the automatic reminder with opt-in", () => {
     mapsUrl: "https://maps.app.goo.gl/exemplo",
     clinicPhone: "+5547900000001",
   };
-
-  it("asks for 1 or 2, by nickname, with no link", () => {
-    const text = reminderAskText({
-      patientName: "Maria Fictícia",
-      nickname: "Mari",
-      clinicName: "Clínica Teste",
-      serviceName: "Limpeza de pele",
-      timezone: ZONE,
-      now: new Date("2026-11-18T13:00:00Z"),
-      startsAt: new Date("2026-11-18T14:00:00Z"),
-    });
-    expect(text).toBe(
-      [
-        "Oi, Mari! 😊 Aqui é o lembrete da Clínica Teste.",
-        "",
-        "Seu horário de Limpeza de pele é hoje, quarta-feira (18/11), às 11:00.",
-        "",
-        "Responda *1* para confirmar ou *2* se não puder vir.",
-      ].join("\n"),
-    );
-    expect(text).not.toMatch(/https?:/);
-  });
 
   it("sends the address, map and contact only after the 1", () => {
     expect(confirmedText(contact)).toBe(

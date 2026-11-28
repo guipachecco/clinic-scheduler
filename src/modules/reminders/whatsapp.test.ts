@@ -21,7 +21,15 @@ afterEach(async () => {
 
 const message = {
   to: "5511987654321",
-  params: ["Maria", "Clínica Teste", "quinta-feira, 19/11", "14:30", "Corte"],
+  params: [
+    "Maria",
+    "Clínica Teste",
+    "quinta-feira, 19/11",
+    "14:30",
+    "Corte",
+    "Rua Fictícia, 100",
+  ],
+  button: "clinica-teste",
 };
 
 describe("sendWhatsAppTemplate", () => {
@@ -38,8 +46,11 @@ describe("sendWhatsAppTemplate", () => {
 
     const sent = await readWhatsAppOutbox(outbox);
     expect(sent).toHaveLength(1);
-    expect(sent[0]).toMatchObject({ ...message, template: "lembrete_horario" });
-    expect(sent[0]!.text).toContain("Olá, Maria!");
+    expect(sent[0]).toMatchObject({
+      ...message,
+      template: "lembrete_horario_v2",
+    });
+    expect(sent[0]!.text).toContain("Olá, Maria.");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -74,12 +85,27 @@ describe("sendWhatsAppTemplate", () => {
       to: "5511987654321",
       type: "template",
       template: {
-        name: "lembrete_horario",
+        name: "lembrete_horario_v2",
         language: { code: "pt_BR" },
         components: [
           {
+            type: "header",
+            parameters: [
+              {
+                type: "image",
+                image: { link: "https://zemana.com.br/whatsapp/lembrete.png" },
+              },
+            ],
+          },
+          {
             type: "body",
             parameters: message.params.map((text) => ({ type: "text", text })),
+          },
+          {
+            type: "button",
+            sub_type: "url",
+            index: "0",
+            parameters: [{ type: "text", text: "clinica-teste" }],
           },
         ],
       },
@@ -87,35 +113,29 @@ describe("sendWhatsAppTemplate", () => {
     expect(await readWhatsAppOutbox(outbox)).toEqual([]);
   });
 
-  it("without the Meta keys but with Z-API Omni sends the reminder as text", async () => {
-    vi.stubEnv("WHATSAPP_TOKEN", "");
-    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "");
-    vi.stubEnv("ZAPI_INSTANCE_ID", "CANALFICTICIO");
-    vi.stubEnv("ZAPI_TOKEN", "token-ficticio-zapi");
+  it("sends free text (her answers) through the Cloud API", async () => {
+    vi.stubEnv("WHATSAPP_TOKEN", "token-ficticio-da-meta");
+    vi.stubEnv("WHATSAPP_PHONE_NUMBER_ID", "123456789012345");
     vi.stubEnv("WHATSAPP_OUTBOX_DIR", outbox);
     vi.resetModules();
-    const { readWhatsAppOutbox, sendWhatsAppTemplate } =
-      await import("./whatsapp");
+    const { readWhatsAppOutbox, sendWhatsAppText } = await import("./whatsapp");
     const fetchMock = vi.fn(
-      async () => new Response(JSON.stringify({ messageId: "x" })),
+      async () => new Response(JSON.stringify({ messages: [{ id: "x" }] })),
     );
 
-    await sendWhatsAppTemplate(message, fetchMock);
+    await sendWhatsAppText("5511987654321", "Perfeito!", fetchMock);
 
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [
+    const [, init] = fetchMock.mock.calls[0] as unknown as [
       string,
       RequestInit,
     ];
-    expect(url).toBe(
-      "https://api.omni.z-api.io/v1/channels/CANALFICTICIO/messages",
-    );
-    expect(init.headers).toMatchObject({
-      Authorization: "Bearer token-ficticio-zapi",
+    expect(JSON.parse(init.body as string)).toEqual({
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: "5511987654321",
+      type: "text",
+      text: { body: "Perfeito!", preview_url: false },
     });
-    const body = JSON.parse(init.body as string);
-    expect(body.recipient).toEqual({ identifier: "5511987654321" });
-    expect(body.content.type).toBe("TEXT");
-    expect(body.content.body.message).toContain("Olá, Maria!");
     expect(await readWhatsAppOutbox(outbox)).toEqual([]);
   });
 
@@ -167,7 +187,7 @@ describe("WhatsApp variables in parseServerEnv", () => {
 
   it("has defaults for the template", () => {
     const env = parseServerEnv(base);
-    expect(env.WHATSAPP_TEMPLATE).toBe("lembrete_horario");
+    expect(env.WHATSAPP_TEMPLATE).toBe("lembrete_horario_v2");
     expect(env.WHATSAPP_TEMPLATE_LANGUAGE).toBe("pt_BR");
     expect(env.WHATSAPP_GRAPH_VERSION).toBe("v23.0");
   });

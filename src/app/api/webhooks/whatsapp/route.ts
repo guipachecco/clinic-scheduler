@@ -1,14 +1,17 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
+import { after } from "next/server";
+
 import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
+import { handleIncoming } from "@/modules/reminders/opt-in";
 
 // Webhook of the WhatsApp Cloud API (Meta app > WhatsApp > Configuração).
 // GET is Meta's one-time check of the URL: it echoes hub.challenge when
 // hub.verify_token matches. POST carries incoming messages and delivery
-// statuses, signed with the app secret as X-Hub-Signature-256. For now they
-// are only acknowledged (counts logged, no phone numbers): Meta retries for
-// days on anything but 200.
+// statuses, signed with the app secret as X-Hub-Signature-256. Her text
+// messages go to the opt-in / "1"-"2" handling; statuses are only counted.
+// Meta retries for days on anything but 200.
 //
 // 200 means "received"; 401/403 a wrong signature or token; 503 not set up.
 
@@ -37,9 +40,13 @@ export function GET(request: Request) {
   });
 }
 
+type Incoming = { from?: unknown; type?: unknown; text?: { body?: unknown } };
+
 type Notification = {
   entry?: {
-    changes?: { value?: { messages?: unknown[]; statuses?: unknown[] } }[];
+    changes?: {
+      value?: { messages?: Incoming[]; statuses?: unknown[] };
+    }[];
   }[];
 };
 
@@ -67,5 +74,27 @@ export async function POST(request: Request) {
     messages: values.reduce((n, v) => n + (v.messages?.length ?? 0), 0),
     statuses: values.reduce((n, v) => n + (v.statuses?.length ?? 0), 0),
   });
+  // Her text messages (activation code, "1"/"2"); ours never come here.
+  const texts = values
+    .flatMap((value) => value.messages ?? [])
+    .flatMap((message) =>
+      message.type === "text" &&
+      typeof message.from === "string" &&
+      message.from.length <= 64 &&
+      typeof message.text?.body === "string" &&
+      message.text.body.length <= 500
+        ? [{ from: message.from, body: message.text.body }]
+        : [],
+    );
+  if (texts.length > 0) {
+    // Meta wants the 200 fast; a failure is only logged (she can resend).
+    after(async () => {
+      for (const { from, body } of texts) {
+        await handleIncoming(from, body).catch((error: unknown) => {
+          logger.error("whatsapp webhook: handling failed", { error });
+        });
+      }
+    });
+  }
   return new Response("OK", { status: 200 });
 }
