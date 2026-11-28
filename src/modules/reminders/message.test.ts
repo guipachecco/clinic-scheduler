@@ -5,14 +5,11 @@ import {
   declinedText,
   firstName,
   manualReminderText,
-  newOptInCode,
   optInCodeFrom,
-  optInMessage,
   replyChoice,
   reminderParams,
   reminderText,
   templateText,
-  warmUpLimit,
   whatsappLink,
   whatsappNumber,
 } from "./message";
@@ -223,21 +220,13 @@ describe("the automatic reminder with opt-in", () => {
   });
 
   it("reads the activation code and the short answers", () => {
-    const code = newOptInCode(() => 0);
-    expect(code).toBe("AAAAAA");
-    expect(optInCodeFrom(optInMessage("Clínica Teste", "K7P2Q9"))).toBe(
-      "K7P2Q9",
-    );
+    expect(
+      optInCodeFrom("Oi! Quero receber os lembretes ✅ Código: K7P2Q9"),
+    ).toBe("K7P2Q9");
     expect(optInCodeFrom("oi, tudo bem?")).toBeNull();
     expect(replyChoice(" 1 ")).toBe("confirmed");
     expect(replyChoice("Sim!")).toBe("confirmed");
     expect(replyChoice("2")).toBe("declined");
     expect(replyChoice("1 hora depois?")).toBeNull();
-  });
-
-  it("warms the number up: 10, then 5 more a day, up to 150", () => {
-    expect(warmUpLimit(0)).toBe(10);
-    expect(warmUpLimit(3)).toBe(25);
-    expect(warmUpLimit(100)).toBe(150);
   });
 });

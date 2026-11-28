@@ -3,7 +3,6 @@ import "server-only";
 import { and, eq, gt, isNull } from "drizzle-orm";
 
 import { inClinic, platformDb } from "@/db/client";
-import { findPgError } from "@/db/errors";
 import {
   appointments,
   auditLogs,
@@ -12,26 +11,22 @@ import {
   whatsappOptInCodes,
   whatsappPending,
 } from "@/db/schema";
-import { env } from "@/lib/env";
 import { logger } from "@/lib/logger";
 import { recordMessage } from "@/modules/platform/message-log";
 
 import {
   confirmedText,
   declinedText,
-  newOptInCode,
   optInAckText,
   optInCodeFrom,
-  optInMessage,
   replyChoice,
   whatsappNumber,
 } from "./message";
 import { sendWhatsAppText } from "./whatsapp";
 
-// The patient writes first: the booking confirmation gives her a WhatsApp
-// link to Zemana's number with a code; the Meta webhook
-// (/api/webhooks/whatsapp) sees the code and turns her reminders on. Later her "1" or "2" answers the
-// last reminder sent to her (whatsapp_pending). The codes and the pending map
+// Messages she sends to Zemana's number (the Meta webhook,
+// /api/webhooks/whatsapp). An old activation code still links her number;
+// her "1" or "2" answers the last reminder sent to her (whatsapp_pending). The codes and the pending map
 // are app_platform's; the patient and the appointment are written inside
 // their clinic (inClinic), like the rest of the panel.
 
@@ -51,37 +46,6 @@ async function sendLogged(
     throw error;
   }
   await recordMessage({ ...log, to, body });
-}
-
-// The activation link for a patient, or null when Zemana's number is not set
-// or she already activated.
-export async function optInLink(
-  clinicId: string,
-  patientId: string,
-  clinicName: string,
-): Promise<string | null> {
-  if (!env.WHATSAPP_PHONE) return null;
-  const [patient] = await inClinic(clinicId, (tx) =>
-    tx
-      .select({ optIn: patients.whatsappOptInAt })
-      .from(patients)
-      .where(and(eq(patients.id, patientId), eq(patients.clinicId, clinicId))),
-  );
-  if (!patient || patient.optIn) return null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const code = newOptInCode();
-    try {
-      await platformDb
-        .insert(whatsappOptInCodes)
-        .values({ code, clinicId, patientId });
-    } catch (error) {
-      if (findPgError(error)?.code === "23505") continue;
-      throw error;
-    }
-    // api.whatsapp.com, not wa.me: wa.me turns emoji into "�" on the way.
-    return `https://api.whatsapp.com/send?phone=${env.WHATSAPP_PHONE}&text=${encodeURIComponent(optInMessage(clinicName, code))}`;
-  }
-  return null;
 }
 
 // One message she sent to Zemana's number (the webhook already checked it is

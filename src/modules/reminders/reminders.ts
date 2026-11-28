@@ -1,7 +1,6 @@
 import "server-only";
 
 import { and, asc, eq, gt, isNotNull, isNull, or, sql } from "drizzle-orm";
-import { DateTime } from "luxon";
 
 import { inClinic, platformDb } from "@/db/client";
 import {
@@ -9,60 +8,29 @@ import {
   auditLogs,
   clinics,
   patients,
-  whatsappDailySends,
   whatsappPending,
 } from "@/db/schema";
 import { logger } from "@/lib/logger";
 import { recordMessage } from "@/modules/platform/message-log";
 
-import {
-  reminderParams,
-  reminderText,
-  warmUpLimit,
-  whatsappNumber,
-} from "./message";
+import { reminderParams, reminderText, whatsappNumber } from "./message";
 import { sendWhatsAppTemplate, type WhatsAppTemplate } from "./whatsapp";
 
 // The run of the WhatsApp reminder (GET /api/cron/lembretes, every 15 min from
 // cron-job.org plus the daily Vercel cron). For every active clinic, the
 // confirmed appointments whose patient asked for the reminder (or whose owner
-// ticked it) AND activated it by writing to Zemana's number first, now inside
-// their chosen lead, not started, and without one for this start yet.
+// ticked it), now inside their chosen lead, not started, and without one for
+// this start yet. The ticked box is her consent; the Cloud API template needs
+// no message from her first.
 //
-// To keep the number from being restricted: at most the warm-up limit per day
-// (whatsapp_daily_sends), a random 30-120 s pause between messages, and a run
-// stops before the route's time limit; what is left goes on the next run.
-//
-// Root's role (app_platform) lists the clinics and keeps the counters; each
-// clinic's appointments are read as app_panel inside that clinic (inClinic).
-// Each appointment is claimed (reminder_sent_for = its starts_at) before the
-// message goes out, so two runs at once never send it twice; a failed send
-// gives the claim back.
+// Root's role (app_platform) lists the clinics; each clinic's appointments are
+// read as app_panel inside that clinic (inClinic). Each appointment is claimed
+// (reminder_sent_for = its starts_at) before the message goes out, so two runs
+// at once never send it twice; a failed send gives the claim back.
 
 export type ReminderRun = { sent: number; failed: number };
 
 type Send = (message: WhatsAppTemplate) => Promise<string | void>;
-
-export type Pace = {
-  sleep: (ms: number) => Promise<void>;
-  random: () => number;
-  elapsedMs: () => number;
-};
-
-const ZONE = "America/Sao_Paulo";
-const MIN_PAUSE_MS = 30_000;
-const MAX_PAUSE_MS = 120_000;
-// The route may run 300 s; leave room for the last send.
-const RUN_BUDGET_MS = 240_000;
-
-function realPace(): Pace {
-  const started = Date.now();
-  return {
-    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-    random: Math.random,
-    elapsedMs: () => Date.now() - started,
-  };
-}
 
 type Clinic = {
   id: string;
@@ -86,11 +54,8 @@ type Due = {
 export async function sendDueReminders(
   now: Date = new Date(),
   send: Send = (message) => sendWhatsAppTemplate(message),
-  pace: Pace = realPace(),
 ): Promise<ReminderRun> {
   const run: ReminderRun = { sent: 0, failed: 0 };
-  let left = await remainingToday(now);
-  if (left <= 0) return run;
 
   const list = await platformDb
     .select({
@@ -120,19 +85,9 @@ export async function sendDueReminders(
   // Soonest first, whatever the clinic: they have the least time left.
   due.sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
 
-  let first = true;
   for (const row of due) {
-    if (left <= 0) break;
     const to = whatsappNumber(row.phone);
     if (!to) continue;
-    if (!first) {
-      const pause =
-        MIN_PAUSE_MS +
-        Math.round(pace.random() * (MAX_PAUSE_MS - MIN_PAUSE_MS));
-      if (pace.elapsedMs() + pause > RUN_BUDGET_MS) break;
-      await pace.sleep(pause);
-    }
-    first = false;
     if (!(await claim(row))) continue;
     const clinicName = row.clinic.displayName?.trim() || row.clinic.name;
     const params = reminderParams({
@@ -160,7 +115,6 @@ export async function sendDueReminders(
       continue;
     }
     run.sent += 1;
-    left -= 1;
     await afterSend(row, now).catch((error: unknown) => {
       logger.error("whatsapp reminder: bookkeeping failed", {
         clinicId: row.clinic.id,
@@ -172,33 +126,7 @@ export async function sendDueReminders(
   return run;
 }
 
-// Today's warm-up limit minus what already went out today (Brasília days).
-async function remainingToday(now: Date): Promise<number> {
-  const today = DateTime.fromJSDate(now, { zone: ZONE }).toISODate()!;
-  const [stats] = await platformDb
-    .select({
-      first: sql<string | null>`min(${whatsappDailySends.day})::text`,
-      today: sql<number>`coalesce(sum(${whatsappDailySends.sent}) filter (where ${whatsappDailySends.day} = ${today}), 0)::int`,
-    })
-    .from(whatsappDailySends);
-  const days = stats?.first
-    ? Math.floor(
-        DateTime.fromISO(today).diff(DateTime.fromISO(stats.first), "days")
-          .days,
-      )
-    : 0;
-  return warmUpLimit(days) - (stats?.today ?? 0);
-}
-
 async function afterSend(row: Due, now: Date) {
-  const today = DateTime.fromJSDate(now, { zone: ZONE }).toISODate()!;
-  await platformDb
-    .insert(whatsappDailySends)
-    .values({ day: today, sent: 1 })
-    .onConflictDoUpdate({
-      target: whatsappDailySends.day,
-      set: { sent: sql`${whatsappDailySends.sent} + 1` },
-    });
   if (row.senderId) {
     // Her "1" or "2" answers this appointment.
     await platformDb
@@ -256,8 +184,6 @@ async function dueInClinic(clinic: Clinic, now: Date): Promise<Due[]> {
           sql`${appointments.startsAt} - make_interval(mins => ${appointments.reminderLeadMinutes}) <= ${now}`,
           notSentForThisStart(),
           isNotNull(patients.phone),
-          // She wrote to Zemana's number first.
-          isNotNull(patients.whatsappOptInAt),
           isNull(patients.anonymizedAt),
         ),
       )

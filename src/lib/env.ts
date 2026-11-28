@@ -99,12 +99,6 @@ export const serverEnvSchema = z
     // signs each POST as X-Hub-Signature-256. Without both the route says 503.
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: optionalText(),
     WHATSAPP_APP_SECRET: optionalText(),
-    // Zemana's WhatsApp number (digits, with 55), where the patient sends her
-    // activation code. Without it the activation button stays hidden.
-    WHATSAPP_PHONE: optionalText().refine(
-      (value) => value === undefined || /^55\d{10,11}$/.test(value),
-      { error: "só dígitos, com 55 e DDD, como 5547984777512" },
-    ),
     // Sent by the Vercel cron as "Authorization: Bearer <CRON_SECRET>" to
     // /api/cron/lembretes. Without it the route refuses every call.
     CRON_SECRET: optionalText(),
