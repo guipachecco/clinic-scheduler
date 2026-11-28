@@ -3,7 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 
 import { env } from "@/lib/env";
-import { logger } from "@/lib/logger";
+import { logger, redactText } from "@/lib/logger";
 import { handleIncoming } from "@/modules/reminders/opt-in";
 
 // Webhook of the WhatsApp Cloud API (Meta app > WhatsApp > Configuração).
@@ -42,13 +42,39 @@ export function GET(request: Request) {
 
 type Incoming = { from?: unknown; type?: unknown; text?: { body?: unknown } };
 
+type Status = {
+  status?: unknown;
+  errors?: {
+    code?: unknown;
+    title?: unknown;
+    error_data?: { details?: unknown };
+  }[];
+};
+
 type Notification = {
   entry?: {
     changes?: {
-      value?: { messages?: Incoming[]; statuses?: unknown[] };
+      value?: { messages?: Incoming[]; statuses?: Status[] };
     }[];
   }[];
 };
+
+// Why Meta did not deliver a message (sent, delivered and read are only
+// counted). Code, title and details, phone numbers taken out.
+function failureReasons(statuses: Status[]): string[] {
+  return statuses
+    .filter((status) => status.status === "failed")
+    .flatMap((status) => status.errors ?? [])
+    .map((error) =>
+      redactText(
+        [error.code, error.title, error.error_data?.details]
+          .filter(
+            (part) => typeof part === "string" || typeof part === "number",
+          )
+          .join(" | "),
+      ).slice(0, 300),
+    );
+}
 
 export async function POST(request: Request) {
   const secret = env.WHATSAPP_APP_SECRET;
@@ -70,10 +96,14 @@ export async function POST(request: Request) {
   const values = (body.entry ?? []).flatMap((entry) =>
     (entry.changes ?? []).map((change) => change.value ?? {}),
   );
+  const statuses = values.flatMap((value) => value.statuses ?? []);
   logger.info("whatsapp webhook", {
     messages: values.reduce((n, v) => n + (v.messages?.length ?? 0), 0),
-    statuses: values.reduce((n, v) => n + (v.statuses?.length ?? 0), 0),
+    statuses: statuses.map((status) => String(status.status)).join(","),
   });
+  for (const reason of failureReasons(statuses)) {
+    logger.error("whatsapp webhook: message failed", { reason });
+  }
   // Her text messages (activation code, "1"/"2"); ours never come here.
   const texts = values
     .flatMap((value) => value.messages ?? [])
